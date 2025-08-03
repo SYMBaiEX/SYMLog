@@ -1,26 +1,15 @@
 #!/bin/bash
 
-# Script to run Tauri desktop app with proper display configuration
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Tauri desktop app launcher for WSL2
 
 # Function to check if WSLg is available
 check_wslg() {
-    if [[ -n "$WAYLAND_DISPLAY" ]] || [[ -n "$PULSE_SERVER" ]]; then
-        return 0
-    fi
-    return 1
+    [[ -n "$WAYLAND_DISPLAY" ]] || [[ -n "$PULSE_SERVER" ]]
 }
 
 # Function to check X server connection
 check_x_server() {
-    local host=$1
-    timeout 1 bash -c "echo >/dev/tcp/$host/6000" 2>/dev/null
+    timeout 1 bash -c "echo >/dev/tcp/$1/6000" 2>/dev/null
 }
 
 # Detect the environment
