@@ -1,0 +1,11 @@
+prefix=/usr
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib/x86_64-linux-gnu
+includedir=${prefix}/include
+
+Name: JavaScriptCoreGTK+ 4.1
+Description: JavaScriptCoreGTK+ is the JavaScript engine used in WebKitGTK+
+Version: 2.42.2
+Requires:
+Libs: -L${libdir} -ljavascriptcoregtk-4.1
+Cflags: -I${includedir}/javascriptcoregtk-4.1
