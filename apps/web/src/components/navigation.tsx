@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Brain } from "lucide-react"
+import { Menu, X } from "lucide-react"
 
 import {
   NavigationMenu,
@@ -36,7 +36,6 @@ export function Navigation() {
         <div className="flex flex-1 items-center justify-between">
           {/* Logo */}
           <Link href="/" className="flex items-center space-x-2">
-            <Brain className="h-8 w-8 text-primary" />
             <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
               SYMLog
             </span>
