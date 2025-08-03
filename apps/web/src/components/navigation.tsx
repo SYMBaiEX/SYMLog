@@ -85,7 +85,7 @@ export function Navigation() {
   }, [focusedIndex, router])
 
   return (
-    <header className="sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-border">
+    <header className="navigation sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-border">
       <nav className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8">
         <div className="flex flex-1 items-center justify-between">
           {/* Logo */}

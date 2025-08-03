@@ -48,6 +48,10 @@ pub fn run() {
     .setup(|app| {
       // Create and set menu on the main window
       let main_window = app.get_webview_window("main").unwrap();
+      
+      // Set window shadow for depth
+      let _ = main_window.set_shadow(true);
+      
       let menu = create_app_menu(&app.handle())?;
       main_window.set_menu(menu)?;
 

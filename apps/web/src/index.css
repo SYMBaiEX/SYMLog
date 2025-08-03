@@ -391,3 +391,9 @@ html.dark {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Tauri-specific styles */
+body.tauri-app {
+  /* No extra padding needed with native title bar */
+  overflow: hidden;
+}
