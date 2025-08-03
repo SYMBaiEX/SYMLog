@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Menu, X, Brain, Settings, BookOpen, FlaskConical } from "lucide-react"
 
 import {
@@ -28,7 +28,61 @@ const navigation = [
 
 export function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+  const [focusedIndex, setFocusedIndex] = React.useState(-1)
   const pathname = usePathname()
+  const router = useRouter()
+  const navRefs = React.useRef<(HTMLAnchorElement | null)[]>([])
+
+  // Keyboard navigation
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle navigation when not in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return
+      }
+
+      // Arrow key navigation
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault()
+        const currentIndex = focusedIndex === -1 ? 0 : focusedIndex
+        let newIndex: number
+
+        if (e.key === "ArrowLeft") {
+          newIndex = currentIndex === 0 ? navigation.length - 1 : currentIndex - 1
+        } else {
+          newIndex = currentIndex === navigation.length - 1 ? 0 : currentIndex + 1
+        }
+
+        setFocusedIndex(newIndex)
+        navRefs.current[newIndex]?.focus()
+      }
+
+      // Enter key to navigate
+      if (e.key === "Enter" && focusedIndex !== -1) {
+        const item = navigation[focusedIndex]
+        if (item) {
+          router.push(item.href)
+        }
+      }
+
+      // Escape key to unfocus
+      if (e.key === "Escape") {
+        setFocusedIndex(-1)
+        ;(document.activeElement as HTMLElement)?.blur()
+      }
+
+      // Number keys for quick navigation (1-4)
+      if (e.key >= "1" && e.key <= "4" && !e.metaKey && !e.ctrlKey) {
+        const index = parseInt(e.key) - 1
+        if (index < navigation.length) {
+          router.push(navigation[index].href)
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [focusedIndex, router])
 
   return (
     <header className="sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-border">
@@ -44,20 +98,26 @@ export function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex md:items-center md:space-x-2">
-            {navigation.map((item) => {
+            {navigation.map((item, index) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
                 <Link
                   key={item.name}
+                  ref={(el) => (navRefs.current[index] = el)}
                   href={item.href}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
-                    "hover:bg-accent hover:text-foreground",
+                    "hover:bg-accent hover:text-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
                     isActive 
                       ? "bg-periwinkle/20 text-periwinkle border border-periwinkle/30 glow-periwinkle" 
-                      : "text-muted-foreground"
+                      : "text-muted-foreground",
+                    focusedIndex === index && "ring-2 ring-ring ring-offset-2"
                   )}
+                  onFocus={() => setFocusedIndex(index)}
+                  onBlur={() => setFocusedIndex(-1)}
+                  tabIndex={0}
+                  aria-label={`Navigate to ${item.name} (Press ${index + 1} for quick access)`}
                 >
                   <Icon className="h-4 w-4" />
                   {item.name}

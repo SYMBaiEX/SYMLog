@@ -5,6 +5,8 @@ import Providers from "@/components/providers";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
 import { AnimatedBackground } from "@/components/animated-background";
+import { AppMenuBar } from "@/components/app-menu-bar";
+import { TauriMenuHandler } from "@/components/tauri-menu-handler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +35,9 @@ export default function RootLayout({
       >
         <Providers>
           <AnimatedBackground />
+          <TauriMenuHandler />
           <div className="relative flex min-h-screen flex-col">
+            <AppMenuBar />
             <Navigation />
             <main className="flex-1 relative z-10">{children}</main>
             <Footer />
