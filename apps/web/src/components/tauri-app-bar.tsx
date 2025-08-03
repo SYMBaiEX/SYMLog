@@ -48,21 +48,19 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
+type TauriMenuItem = {
+  label: string
+  icon?: React.ElementType
+  shortcut?: string
+  action?: () => void
+  submenu?: TauriMenuItem[]
+} | {
+  separator: true
+}
+
 interface MenuBarItem {
   label: string
-  items: {
-    label: string
-    icon?: React.ElementType
-    shortcut?: string
-    action?: () => void
-    separator?: boolean
-    submenu?: {
-      label: string
-      icon?: React.ElementType
-      shortcut?: string
-      action?: () => void
-    }[]
-  }[]
+  items: TauriMenuItem[]
 }
 
 export function TauriAppBar() {
@@ -315,11 +313,11 @@ export function TauriAppBar() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="min-w-[220px]">
               {menu.items.map((item, itemIndex) => {
-                if (item.separator) {
+                if ('separator' in item && item.separator) {
                   return <DropdownMenuSeparator key={`separator-${itemIndex}`} />
                 }
 
-                if (item.submenu) {
+                if ('submenu' in item && item.submenu) {
                   return (
                     <DropdownMenuSub key={item.label}>
                       <DropdownMenuSubTrigger>
@@ -327,18 +325,23 @@ export function TauriAppBar() {
                         {item.label}
                       </DropdownMenuSubTrigger>
                       <DropdownMenuSubContent>
-                        {item.submenu.map((subItem) => (
-                          <DropdownMenuItem
-                            key={subItem.label}
-                            onClick={subItem.action}
-                          >
-                            {subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
-                            {subItem.label}
-                            {subItem.shortcut && (
-                              <DropdownMenuShortcut>{subItem.shortcut}</DropdownMenuShortcut>
-                            )}
-                          </DropdownMenuItem>
-                        ))}
+                        {item.submenu.map((subItem, subIndex) => {
+                          if ('separator' in subItem && subItem.separator) {
+                            return <DropdownMenuSeparator key={`sub-separator-${subIndex}`} />
+                          }
+                          return (
+                            <DropdownMenuItem
+                              key={'label' in subItem ? subItem.label : `sub-item-${subIndex}`}
+                              onClick={'action' in subItem ? subItem.action : undefined}
+                            >
+                              {'icon' in subItem && subItem.icon && <subItem.icon className="mr-2 h-4 w-4" />}
+                              {'label' in subItem && subItem.label}
+                              {'shortcut' in subItem && subItem.shortcut && (
+                                <DropdownMenuShortcut>{subItem.shortcut}</DropdownMenuShortcut>
+                              )}
+                            </DropdownMenuItem>
+                          )
+                        })}
                       </DropdownMenuSubContent>
                     </DropdownMenuSub>
                   )
@@ -346,12 +349,12 @@ export function TauriAppBar() {
 
                 return (
                   <DropdownMenuItem
-                    key={item.label}
-                    onClick={item.action}
+                    key={'label' in item ? item.label : `item-${itemIndex}`}
+                    onClick={'action' in item ? item.action : undefined}
                   >
-                    {item.icon && <item.icon className="mr-2 h-4 w-4" />}
-                    {item.label}
-                    {item.shortcut && (
+                    {'icon' in item && item.icon && <item.icon className="mr-2 h-4 w-4" />}
+                    {'label' in item && item.label}
+                    {'shortcut' in item && item.shortcut && (
                       <DropdownMenuShortcut>{item.shortcut}</DropdownMenuShortcut>
                     )}
                   </DropdownMenuItem>

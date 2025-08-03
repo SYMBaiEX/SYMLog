@@ -104,7 +104,7 @@ export function Navigation() {
               return (
                 <Link
                   key={item.name}
-                  ref={(el) => (navRefs.current[index] = el)}
+                  ref={(el) => { navRefs.current[index] = el }}
                   href={item.href}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
