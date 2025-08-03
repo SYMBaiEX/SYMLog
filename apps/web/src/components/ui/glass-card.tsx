@@ -34,10 +34,11 @@ const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
         className={cn(
           variantClass,
           blurClass,
-          "rounded-xl p-6 transition-all duration-300",
+          "rounded-xl p-6 transition-all duration-300 relative",
           hover && "hover-lift",
           glowClass,
           "glass-shadow",
+          "before:absolute before:inset-0 before:bg-background/5 before:rounded-xl before:pointer-events-none", // Extra contrast layer
           className
         )}
         {...props}

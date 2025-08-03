@@ -3,14 +3,14 @@ import { cn } from "@/lib/utils"
 import { type VariantProps, cva } from "class-variance-authority"
 
 const glassButtonVariants = cva(
-  "inline-flex items-center justify-center rounded-lg text-sm font-medium transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-periwinkle focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ripple glass-button relative overflow-hidden",
+  "inline-flex items-center justify-center rounded-lg text-sm font-semibold transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 ripple glass-button relative overflow-hidden backdrop-blur-md",
   {
     variants: {
       variant: {
-        default: "bg-periwinkle/20 text-white hover:bg-periwinkle/30 border-periwinkle/30",
-        secondary: "bg-light-green/20 text-white hover:bg-light-green/30 border-light-green/30",
-        ghost: "hover:bg-white/10 hover:text-white",
-        outline: "border border-white/20 bg-transparent hover:bg-white/10",
+        default: "bg-periwinkle/20 text-foreground hover:bg-periwinkle/30 border-periwinkle/30",
+        secondary: "bg-light-green/20 text-foreground hover:bg-light-green/30 border-light-green/30",
+        ghost: "hover:bg-accent hover:text-accent-foreground border-2 border-transparent",
+        outline: "border-2 border-border bg-background/50 hover:bg-accent hover:border-accent",
       },
       size: {
         default: "h-10 px-4 py-2",

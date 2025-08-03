@@ -119,10 +119,10 @@ const config: Config = {
     function ({ addUtilities }: any) {
       const newUtilities = {
         ".glass": {
-          background: "rgba(255, 255, 255, 0.05)",
+          background: "var(--glass-bg)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
+          border: "1px solid var(--glass-border)",
         },
         ".glass-dark": {
           background: "rgba(0, 0, 0, 0.05)",
@@ -131,23 +131,23 @@ const config: Config = {
           border: "1px solid rgba(0, 0, 0, 0.1)",
         },
         ".glass-card": {
-          background: "rgba(255, 255, 255, 0.05)",
+          background: "var(--glass-bg)",
           backdropFilter: "blur(16px)",
           WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          boxShadow: "0 8px 32px rgba(0, 0, 0, 0.1)",
+          border: "1px solid var(--glass-border)",
+          boxShadow: "0 8px 32px var(--glass-shadow)",
         },
         ".glass-button": {
-          background: "rgba(255, 255, 255, 0.1)",
+          background: "var(--glass-bg)",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
-          border: "1px solid rgba(255, 255, 255, 0.2)",
+          border: "1px solid var(--glass-border)",
           transition: "all 0.3s ease",
         },
         ".glass-button:hover": {
-          background: "rgba(255, 255, 255, 0.15)",
+          background: "var(--glass-highlight)",
           transform: "translateY(-2px)",
-          boxShadow: "0 8px 20px rgba(0, 0, 0, 0.2)",
+          boxShadow: "0 8px 20px var(--glass-shadow)",
         },
         ".text-gradient": {
           backgroundClip: "text",

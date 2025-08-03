@@ -208,7 +208,7 @@ export default function BlogPage() {
                 </div>
                 <Button className="mt-4" asChild>
                   <Link href={`/blog/${featuredPost.id}`}>
-                    Read More <ArrowRight className="ml-2 h-4 w-4" />
+                    Read More
                   </Link>
                 </Button>
               </CardContent>
@@ -256,7 +256,7 @@ export default function BlogPage() {
                       </span>
                       <Button variant="ghost" size="sm" asChild>
                         <Link href={`/blog/${post.id}`}>
-                          Read <ArrowRight className="ml-1 h-3 w-3" />
+                          Read
                         </Link>
                       </Button>
                     </div>

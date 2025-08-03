@@ -1,13 +1,13 @@
 import Link from "next/link"
-import { Brain, Github, Twitter, Linkedin, Bot, Database, Globe } from "lucide-react"
+import { Brain, Github, Twitter, Linkedin, Globe } from "lucide-react"
 import { GlassCard } from "./ui/glass-card"
 
 const footerLinks = {
   platform: [
-    { name: "AI Agents", href: "/agents", icon: Bot },
-    { name: "MCP Servers", href: "/mcp", icon: Database },
     { name: "Documentation", href: "/docs" },
     { name: "API Reference", href: "/api" },
+    { name: "Research", href: "/research" },
+    { name: "Blog", href: "/blog" },
   ],
   company: [
     { name: "About", href: "/about" },
@@ -48,8 +48,8 @@ export function Footer() {
                   SYMLog
                 </span>
               </Link>
-              <p className="mt-4 text-sm text-gray-300 max-w-xs">
-                Intelligent AI agents with advanced memory systems and MCP integration for the Web3 era.
+              <p className="mt-4 text-sm text-muted-foreground max-w-xs">
+                Advanced digital platform with cutting-edge technology and secure Web3 integration.
               </p>
               <div className="flex space-x-3 mt-6">
                 {socialLinks.map((social) => {
@@ -58,7 +58,7 @@ export function Footer() {
                     <Link
                       key={social.name}
                       href={social.href}
-                      className="text-gray-400 hover:text-periwinkle transition-colors p-2 rounded-lg hover:bg-white/5"
+                      className="text-muted-foreground hover:text-periwinkle transition-colors p-2 rounded-lg hover:bg-accent"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
@@ -73,7 +73,7 @@ export function Footer() {
             {/* Links */}
             <div className="md:col-span-4 grid grid-cols-2 md:grid-cols-4 gap-8">
               <div>
-                <h3 className="font-semibold mb-4 text-white">Platform</h3>
+                <h3 className="font-semibold mb-4 text-foreground">Platform</h3>
                 <ul className="space-y-3">
                   {footerLinks.platform.map((link) => {
                     const Icon = link.icon
@@ -81,7 +81,7 @@ export function Footer() {
                       <li key={link.name}>
                         <Link
                           href={link.href}
-                          className="text-sm text-gray-300 hover:text-periwinkle transition-colors flex items-center gap-2"
+                          className="text-sm text-muted-foreground hover:text-periwinkle transition-colors flex items-center gap-2"
                         >
                           {Icon && <Icon className="h-4 w-4" />}
                           {link.name}
@@ -93,13 +93,13 @@ export function Footer() {
               </div>
 
               <div>
-                <h3 className="font-semibold mb-4 text-white">Company</h3>
+                <h3 className="font-semibold mb-4 text-foreground">Company</h3>
                 <ul className="space-y-3">
                   {footerLinks.company.map((link) => (
                     <li key={link.name}>
                       <Link
                         href={link.href}
-                        className="text-sm text-gray-300 hover:text-light-green transition-colors"
+                        className="text-sm text-muted-foreground hover:text-light-green transition-colors"
                       >
                         {link.name}
                       </Link>
@@ -109,13 +109,13 @@ export function Footer() {
               </div>
 
               <div>
-                <h3 className="font-semibold mb-4 text-white">Resources</h3>
+                <h3 className="font-semibold mb-4 text-foreground">Resources</h3>
                 <ul className="space-y-3">
                   {footerLinks.resources.map((link) => (
                     <li key={link.name}>
                       <Link
                         href={link.href}
-                        className="text-sm text-gray-300 hover:text-light-green transition-colors"
+                        className="text-sm text-muted-foreground hover:text-light-green transition-colors"
                       >
                         {link.name}
                       </Link>
@@ -125,13 +125,13 @@ export function Footer() {
               </div>
 
               <div>
-                <h3 className="font-semibold mb-4 text-white">Legal</h3>
+                <h3 className="font-semibold mb-4 text-foreground">Legal</h3>
                 <ul className="space-y-3">
                   {footerLinks.legal.map((link) => (
                     <li key={link.name}>
                       <Link
                         href={link.href}
-                        className="text-sm text-gray-300 hover:text-periwinkle transition-colors"
+                        className="text-sm text-muted-foreground hover:text-periwinkle transition-colors"
                       >
                         {link.name}
                       </Link>
@@ -142,12 +142,12 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="border-t border-white/10 mt-12 pt-8">
+          <div className="border-t border-border mt-12 pt-8">
             <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-muted-foreground">
                 © 2025 SYMLog. All rights reserved. Built with ❤️ for the AI community.
               </p>
-              <div className="flex items-center space-x-2 text-xs text-gray-500">
+              <div className="flex items-center space-x-2 text-xs text-muted-foreground/70">
                 <span>Powered by</span>
                 <span className="text-periwinkle">Glassmorphism</span>
                 <span>&</span>

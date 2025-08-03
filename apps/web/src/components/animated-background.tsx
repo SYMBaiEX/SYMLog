@@ -40,7 +40,7 @@ export function AnimatedBackground() {
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none">
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0A0A0F] via-[#0A0A0F] to-[#1a1a2e]" />
+      <div className="absolute inset-0 bg-gradient-to-br from-background via-background to-background/95" />
       
       {/* Grid pattern overlay */}
       <div

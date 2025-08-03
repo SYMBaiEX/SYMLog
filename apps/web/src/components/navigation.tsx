@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X, Brain, Bot, Database, Settings } from "lucide-react"
+import { Menu, X, Brain, Settings, BookOpen, FlaskConical } from "lucide-react"
 
 import {
   NavigationMenu,
@@ -21,8 +21,8 @@ import { PhantomEmbeddedWallet } from "@/components/phantom-embedded-wallet"
 
 const navigation = [
   { name: "Home", href: "/", icon: Brain },
-  { name: "Agents", href: "/agents", icon: Bot },
-  { name: "MCP Servers", href: "/mcp", icon: Database },
+  { name: "Blog", href: "/blog", icon: BookOpen },
+  { name: "Research", href: "/research", icon: FlaskConical },
   { name: "Contact", href: "/contact", icon: Settings },
 ]
 
@@ -31,7 +31,7 @@ export function Navigation() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-white/10">
+    <header className="sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-border">
       <nav className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8">
         <div className="flex flex-1 items-center justify-between">
           {/* Logo */}
@@ -53,10 +53,10 @@ export function Navigation() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
-                    "hover:bg-white/10 hover:text-white",
+                    "hover:bg-accent hover:text-foreground",
                     isActive 
                       ? "bg-periwinkle/20 text-periwinkle border border-periwinkle/30 glow-periwinkle" 
-                      : "text-gray-300"
+                      : "text-muted-foreground"
                   )}
                 >
                   <Icon className="h-4 w-4" />
@@ -91,7 +91,7 @@ export function Navigation() {
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden glass border-t border-white/10 animate-slide-down">
+        <div className="md:hidden glass border-t border-border animate-slide-down">
           <div className="space-y-2 px-4 pb-4 pt-2">
             {navigation.map((item) => {
               const Icon = item.icon
@@ -102,10 +102,10 @@ export function Navigation() {
                   href={item.href}
                   className={cn(
                     "flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-all duration-300",
-                    "hover:bg-white/10 hover:text-white",
+                    "hover:bg-accent hover:text-foreground",
                     isActive 
                       ? "bg-periwinkle/20 text-periwinkle border border-periwinkle/30" 
-                      : "text-gray-300"
+                      : "text-muted-foreground"
                   )}
                   onClick={() => setMobileMenuOpen(false)}
                 >
@@ -114,7 +114,7 @@ export function Navigation() {
                 </Link>
               )
             })}
-            <div className="mt-4 pt-4 border-t border-white/10">
+            <div className="mt-4 pt-4 border-t border-border">
               <PhantomEmbeddedWallet />
             </div>
           </div>

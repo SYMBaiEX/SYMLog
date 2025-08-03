@@ -17,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SYMLog - AI Agent Portal",
-  description: "Experience the future of AI-powered conversations with SYMLog. Manage AI agents, customize MCP servers, and enjoy a secure Web3-enabled platform.",
+  title: "SYMLog - Digital Platform",
+  description: "Experience the future of digital innovation with SYMLog. Advanced technology solutions with secure Web3 integration and cutting-edge features.",
 };
 
 export default function RootLayout({
