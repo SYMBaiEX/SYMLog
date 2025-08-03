@@ -163,7 +163,9 @@ export async function POST(request: NextRequest) {
     const expiresAt = Date.now() + (60 * 60 * 1000) // 1 hour
 
     // Log successful verification (remove in production)
-    console.log(`Wallet verification successful for: ${publicKey}`)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Wallet verification successful for: ${publicKey}`)
+    }
 
     return NextResponse.json({
       isValid: true,

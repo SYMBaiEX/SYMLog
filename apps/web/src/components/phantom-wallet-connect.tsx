@@ -62,7 +62,8 @@ export function PhantomWalletConnect() {
         await navigator.clipboard.writeText(address)
         setCopiedAddress(true)
         toast.success("Address copied to clipboard")
-        setTimeout(() => setCopiedAddress(false), 2000)
+        const timeoutId = setTimeout(() => setCopiedAddress(false), 2000)
+        return () => clearTimeout(timeoutId)
       } catch (error) {
         toast.error("Failed to copy address")
       }
