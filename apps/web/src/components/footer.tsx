@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { Brain, Github, Twitter, Linkedin } from "lucide-react"
+import { Github, Twitter, Linkedin } from "lucide-react"
 import { Separator } from "@/components/ui/separator"
 
 const footerLinks = {
@@ -42,7 +42,6 @@ export function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <Link href="/" className="flex items-center space-x-2">
-              <Brain className="h-8 w-8 text-primary" />
               <span className="text-2xl font-bold">SYMLog</span>
             </Link>
             <p className="mt-4 text-sm text-muted-foreground">
