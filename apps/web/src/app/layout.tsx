@@ -4,6 +4,7 @@ import "../index.css";
 import Providers from "@/components/providers";
 import { Navigation } from "@/components/navigation";
 import { Footer } from "@/components/footer";
+import { AnimatedBackground } from "@/components/animated-background";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -16,8 +17,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SYMLog - AI Chat Application",
-  description: "Experience the future of AI-powered conversations with SYMLog. Secure, intelligent, and Web3-enabled chat platform.",
+  title: "SYMLog - AI Agent Portal",
+  description: "Experience the future of AI-powered conversations with SYMLog. Manage AI agents, customize MCP servers, and enjoy a secure Web3-enabled platform.",
 };
 
 export default function RootLayout({
@@ -31,9 +32,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>
-          <div className="flex min-h-screen flex-col">
+          <AnimatedBackground />
+          <div className="relative flex min-h-screen flex-col">
             <Navigation />
-            <main className="flex-1">{children}</main>
+            <main className="flex-1 relative z-10">{children}</main>
             <Footer />
           </div>
         </Providers>
