@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Menu, X } from "lucide-react"
+import { Menu, X, Brain, Bot, Database, Settings } from "lucide-react"
 
 import {
   NavigationMenu,
@@ -14,16 +14,16 @@ import {
   NavigationMenuTrigger,
   navigationMenuTriggerStyle,
 } from "@/components/ui/navigation-menu"
-import { Button } from "@/components/ui/button"
+import { GlassButton } from "@/components/ui/glass-button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
 import { PhantomEmbeddedWallet } from "@/components/phantom-embedded-wallet"
 
 const navigation = [
-  { name: "Home", href: "/" },
-  { name: "Research", href: "/research" },
-  { name: "Blog", href: "/blog" },
-  { name: "Contact", href: "/contact" },
+  { name: "Home", href: "/", icon: Brain },
+  { name: "Agents", href: "/agents", icon: Bot },
+  { name: "MCP Servers", href: "/mcp", icon: Database },
+  { name: "Contact", href: "/contact", icon: Settings },
 ]
 
 export function Navigation() {
@@ -31,37 +31,39 @@ export function Navigation() {
   const pathname = usePathname()
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-white/10">
       <nav className="container mx-auto flex h-16 items-center px-4 sm:px-6 lg:px-8">
         <div className="flex flex-1 items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center space-x-2">
-            <span className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+          <Link href="/" className="flex items-center space-x-2 group">
+            <Brain className="h-8 w-8 text-periwinkle group-hover:animate-pulse" />
+            <span className="text-2xl font-bold gradient-text from-periwinkle to-light-green">
               SYMLog
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex md:items-center md:space-x-8">
-            <NavigationMenu>
-              <NavigationMenuList>
-                {navigation.map((item) => (
-                  <NavigationMenuItem key={item.name}>
-                    <NavigationMenuLink asChild>
-                      <Link
-                        href={item.href}
-                        className={cn(
-                          navigationMenuTriggerStyle(),
-                          pathname === item.href && "bg-accent text-accent-foreground"
-                        )}
-                      >
-                        {item.name}
-                      </Link>
-                    </NavigationMenuLink>
-                  </NavigationMenuItem>
-                ))}
-              </NavigationMenuList>
-            </NavigationMenu>
+          <div className="hidden md:flex md:items-center md:space-x-2">
+            {navigation.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300",
+                    "hover:bg-white/10 hover:text-white",
+                    isActive 
+                      ? "bg-periwinkle/20 text-periwinkle border border-periwinkle/30 glow-periwinkle" 
+                      : "text-gray-300"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {item.name}
+                </Link>
+              )
+            })}
           </div>
 
           {/* Right side actions */}
@@ -70,9 +72,10 @@ export function Navigation() {
             <PhantomEmbeddedWallet />
 
             {/* Mobile menu button */}
-            <button
-              type="button"
-              className="md:hidden inline-flex items-center justify-center rounded-md p-2 text-foreground hover:bg-accent hover:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary"
+            <GlassButton
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             >
               <span className="sr-only">Open main menu</span>
@@ -81,29 +84,37 @@ export function Navigation() {
               ) : (
                 <Menu className="h-6 w-6" aria-hidden="true" />
               )}
-            </button>
+            </GlassButton>
           </div>
         </div>
       </nav>
 
       {/* Mobile menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden">
-          <div className="space-y-1 px-2 pb-3 pt-2">
-            {navigation.map((item) => (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={cn(
-                  "block rounded-md px-3 py-2 text-base font-medium hover:bg-accent hover:text-accent-foreground",
-                  pathname === item.href && "bg-accent text-accent-foreground"
-                )}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {item.name}
-              </Link>
-            ))}
-            <div className="mt-4 w-full md:hidden">
+        <div className="md:hidden glass border-t border-white/10 animate-slide-down">
+          <div className="space-y-2 px-4 pb-4 pt-2">
+            {navigation.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-lg text-base font-medium transition-all duration-300",
+                    "hover:bg-white/10 hover:text-white",
+                    isActive 
+                      ? "bg-periwinkle/20 text-periwinkle border border-periwinkle/30" 
+                      : "text-gray-300"
+                  )}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <Icon className="h-5 w-5" />
+                  {item.name}
+                </Link>
+              )
+            })}
+            <div className="mt-4 pt-4 border-t border-white/10">
               <PhantomEmbeddedWallet />
             </div>
           </div>
