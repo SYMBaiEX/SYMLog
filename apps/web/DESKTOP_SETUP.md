@@ -43,49 +43,31 @@
 
 ## Running the Desktop App
 
-### Standard Method (Windows/Mac/Linux with Display)
+### Running the App
+
+**Windows/Mac/Linux:**
 ```bash
 bun run desktop:dev
 ```
 
-### WSL2 Users
-
-#### Option 1: Use the Smart Runner Script (Recommended)
+**WSL2 Users:**
 ```bash
+# Use the helper script (recommended)
 ./run-desktop.sh
+
+# Or set DISPLAY manually for WSLg
+DISPLAY=:0 bun run desktop:dev
 ```
-This script will:
-- Detect your WSL2 environment
-- Check for WSLg (Windows 11) or X server (Windows 10)
-- Configure display settings automatically
-- Provide clear instructions if setup is needed
 
-#### Option 2: Manual Setup for Windows 10
-1. **Install VcXsrv X Server**
-   - Download from: https://sourceforge.net/projects/vcxsrv/
-   - Run XLaunch with these settings:
-     - Multiple windows
-     - Start no client
-     - **✓ Disable access control** (IMPORTANT!)
-     - Save configuration for future use
+### WSL2 Setup
 
-2. **Allow Windows Firewall Access**
-   - When prompted, allow VcXsrv through firewall
-   - Or manually add firewall rule for port 6000
+**Windows 11**: WSLg is included - GUI apps work automatically
 
-3. **Run the App**
-   ```bash
-   ./run-desktop.sh
-   # or
-   bun run desktop:dev
-   ```
-
-#### Option 3: Web Development Mode
-If you can't get X server working:
-```bash
-bun run dev
-```
-Then open http://localhost:3001 in your browser.
+**Windows 10**: Install an X server
+1. Download [VcXsrv](https://sourceforge.net/projects/vcxsrv/)
+2. Run XLaunch with "Disable access control" checked
+3. Allow through Windows Firewall
+4. Run the app using the helper script
 
 ## Troubleshooting
 
@@ -151,19 +133,14 @@ The app uses:
 - **WebView**: Platform native (WebView2/WebKit/WebKitGTK)
 - **Platform Support**: Windows, macOS, Linux (including WSL2)
 
-## Development Tips
+## Quick Reference
 
-### WSL2 Performance
-- Use Windows 11 with WSLg for best experience
-- Store code in WSL2 filesystem (not /mnt/c/)
-- Use VS Code with WSL2 extension
+### Commands
+- `bun run desktop:dev` - Start development server
+- `bun run desktop:build` - Build for production
+- `./run-desktop.sh` - WSL2-aware launcher
 
-### Hot Reload
-- Frontend changes reload automatically
-- Rust changes require restart
-- Use `cargo watch` for Rust auto-rebuild
-
-### Debugging
-- Frontend: Browser DevTools in app window
-- Rust: Use `RUST_LOG=debug` environment variable
-- GTK Issues: Run with `GTK_DEBUG=all`
+### Environment Variables
+- `DISPLAY=:0` - For WSLg (Windows 11)
+- `DISPLAY=<host-ip>:0` - For external X server (Windows 10)
+- `RUST_LOG=debug` - Enable debug logging
