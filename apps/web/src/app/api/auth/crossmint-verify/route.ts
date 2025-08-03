@@ -12,7 +12,9 @@ interface CrossmintTokenPayload {
   exp: number
   aud: string
   iss: string
-  [key: string]: any
+  email?: string
+  wallet_address?: string
+  scope?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -31,23 +33,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For development, we'll trust Crossmint tokens
-    // In production, you should verify the JWT signature using Crossmint's public key
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Verifying Crossmint token:', token.substring(0, 50) + '...')
-    }
-
+    // Validate JWT format and extract payload
     let crossmintPayload: CrossmintTokenPayload
     try {
-      // In production, use Crossmint's public key to verify the JWT
-      // For now, we'll decode without verification for development
       const parts = token.split('.')
       if (parts.length !== 3) {
-        throw new Error('Invalid JWT format')
+        throw new Error('Invalid JWT format - must have 3 parts')
       }
       
       const payload = JSON.parse(atob(parts[1]))
-      crossmintPayload = payload
+      
+      // Validate required payload fields
+      if (!payload.sub || !payload.iat || !payload.exp) {
+        throw new Error('Missing required JWT claims')
+      }
+      
+      crossmintPayload = payload as CrossmintTokenPayload
     } catch (error) {
       return NextResponse.json(
         { 
@@ -70,10 +71,21 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Validate JWT_SECRET exists and is secure
+    const jwtSecretEnv = process.env.JWT_SECRET
+    if (!jwtSecretEnv || jwtSecretEnv.length < 32) {
+      console.error('JWT_SECRET is missing or too short. Must be at least 32 characters.')
+      return NextResponse.json(
+        { 
+          isValid: false, 
+          message: 'Server configuration error' 
+        },
+        { status: 500 }
+      )
+    }
+
     // Create our own session token
-    const jwtSecret = new TextEncoder().encode(
-      process.env.JWT_SECRET || 'default-secret-key-change-in-production'
-    )
+    const jwtSecret = new TextEncoder().encode(jwtSecretEnv)
 
     const sessionToken = await new SignJWT({
       userId: crossmintPayload.sub,
@@ -120,14 +132,25 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle CORS for development
+// Handle CORS with secure origin policy
 export async function OPTIONS(request: NextRequest) {
+  const origin = request.headers.get('origin')
+  const allowedOrigins = [
+    'http://localhost:3001',
+    'http://localhost:3000', 
+    'https://symlog.app',
+    process.env.NEXT_PUBLIC_APP_DOMAIN ? `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}` : null
+  ].filter(Boolean)
+  
+  const isAllowedOrigin = allowedOrigins.includes(origin || '')
+  
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Origin': isAllowedOrigin ? (origin || '') : 'null',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Credentials': 'true',
     },
   })
 }

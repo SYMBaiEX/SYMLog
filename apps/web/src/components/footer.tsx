@@ -75,20 +75,16 @@ export function Footer() {
               <div>
                 <h3 className="font-semibold mb-4 text-foreground">Platform</h3>
                 <ul className="space-y-3">
-                  {footerLinks.platform.map((link) => {
-                    const Icon = link.icon
-                    return (
-                      <li key={link.name}>
-                        <Link
-                          href={link.href}
-                          className="text-sm text-muted-foreground hover:text-periwinkle transition-colors flex items-center gap-2"
-                        >
-                          {Icon && <Icon className="h-4 w-4" />}
-                          {link.name}
-                        </Link>
-                      </li>
-                    )
-                  })}
+                  {footerLinks.platform.map((link) => (
+                    <li key={link.name}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-muted-foreground hover:text-periwinkle transition-colors"
+                      >
+                        {link.name}
+                      </Link>
+                    </li>
+                  ))}
                 </ul>
               </div>
 
