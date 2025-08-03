@@ -17,7 +17,8 @@ import {
 import { GlassButton } from "@/components/ui/glass-button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
-import { PhantomEmbeddedWallet } from "@/components/phantom-embedded-wallet"
+import { PhantomWalletConnect } from "@/components/phantom-wallet-connect"
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui'
 
 const navigation = [
   { name: "Home", href: "/", icon: Brain },
@@ -69,7 +70,19 @@ export function Navigation() {
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
             <ModeToggle />
-            <PhantomEmbeddedWallet />
+            <WalletMultiButton 
+              style={{
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(16px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: '0.5rem',
+                color: 'white',
+                fontFamily: 'inherit',
+                fontSize: '0.875rem',
+                padding: '0.5rem 1rem',
+              }}
+            />
+            <PhantomWalletConnect />
 
             {/* Mobile menu button */}
             <GlassButton
@@ -115,7 +128,19 @@ export function Navigation() {
               )
             })}
             <div className="mt-4 pt-4 border-t border-white/10">
-              <PhantomEmbeddedWallet />
+              <WalletMultiButton 
+                style={{
+                  background: 'rgba(255, 255, 255, 0.05)',
+                  backdropFilter: 'blur(16px)',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  borderRadius: '0.5rem',
+                  color: 'white',
+                  fontFamily: 'inherit',
+                  fontSize: '0.875rem',
+                  padding: '0.5rem 1rem',
+                  width: '100%'
+                }}
+              />
             </div>
           </div>
         </div>
