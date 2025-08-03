@@ -17,7 +17,7 @@ import {
 import { GlassButton } from "@/components/ui/glass-button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
-import { PhantomEmbeddedWallet } from "@/components/phantom-embedded-wallet"
+import { CrossmintWalletAuth } from "@/components/crossmint-wallet-auth"
 
 const navigation = [
   { name: "Home", href: "/", icon: Brain },
@@ -129,7 +129,7 @@ export function Navigation() {
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
             <ModeToggle />
-            <PhantomEmbeddedWallet />
+            <CrossmintWalletAuth />
 
             {/* Mobile menu button */}
             <GlassButton
@@ -174,8 +174,8 @@ export function Navigation() {
                 </Link>
               )
             })}
-            <div className="mt-4 pt-4 border-t border-border">
-              <PhantomEmbeddedWallet />
+            <div className="mt-4 pt-4 border-t border-white/10">
+              <CrossmintWalletAuth />
             </div>
           </div>
         </div>

@@ -14,7 +14,7 @@
   "dependencies": {
     "@SYMLog/backend": "workspace:*",
     "@hookform/resolvers": "^5.2.1",
-    "@phantom/wallet-sdk": "^0.1.2",
+    "@crossmint/client-sdk-react-ui": "^1.17.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",
