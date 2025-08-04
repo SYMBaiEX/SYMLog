@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Brain, Settings, BookOpen, FlaskConical } from "lucide-react"
+import { Menu, X, Brain, Settings, BookOpen, FlaskConical, MessageSquare } from "lucide-react"
 
 import {
   NavigationMenu,
@@ -18,6 +18,7 @@ import { GlassButton } from "@/components/ui/glass-button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
 import { CrossmintWalletAuth } from "@/components/crossmint-wallet-auth"
+import { useAuth } from "@crossmint/client-sdk-react-ui"
 
 const navigation = [
   { name: "Home", href: "/", icon: Brain },
@@ -32,6 +33,24 @@ export function Navigation() {
   const pathname = usePathname()
   const router = useRouter()
   const navRefs = React.useRef<(HTMLAnchorElement | null)[]>([])
+
+  // Check if user is authenticated
+  let isAuthenticated = false
+  try {
+    const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
+    if (clientApiKey && clientApiKey !== 'your_client_api_key_here') {
+      const auth = useAuth()
+      isAuthenticated = !!auth.jwt && !!auth.user
+    }
+  } catch (error) {
+    // Crossmint not available
+  }
+
+  // Build navigation items including AI Chat for authenticated users
+  const navItems = [
+    ...navigation,
+    ...(isAuthenticated ? [{ name: "AI Chat", href: "/chat", icon: MessageSquare }] : [])
+  ]
 
   // Keyboard navigation
   React.useEffect(() => {
@@ -48,9 +67,9 @@ export function Navigation() {
         let newIndex: number
 
         if (e.key === "ArrowLeft") {
-          newIndex = currentIndex === 0 ? navigation.length - 1 : currentIndex - 1
+          newIndex = currentIndex === 0 ? navItems.length - 1 : currentIndex - 1
         } else {
-          newIndex = currentIndex === navigation.length - 1 ? 0 : currentIndex + 1
+          newIndex = currentIndex === navItems.length - 1 ? 0 : currentIndex + 1
         }
 
         setFocusedIndex(newIndex)
@@ -59,7 +78,7 @@ export function Navigation() {
 
       // Enter key to navigate
       if (e.key === "Enter" && focusedIndex !== -1) {
-        const item = navigation[focusedIndex]
+        const item = navItems[focusedIndex]
         if (item) {
           router.push(item.href)
         }
@@ -72,10 +91,10 @@ export function Navigation() {
       }
 
       // Number keys for quick navigation (1-4)
-      if (e.key >= "1" && e.key <= "4" && !e.metaKey && !e.ctrlKey) {
+      if (e.key >= "1" && e.key <= "5" && !e.metaKey && !e.ctrlKey) {
         const index = parseInt(e.key) - 1
-        if (index < navigation.length) {
-          router.push(navigation[index].href)
+        if (index < navItems.length) {
+          router.push(navItems[index].href)
         }
       }
     }
@@ -98,7 +117,7 @@ export function Navigation() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex md:items-center md:space-x-2">
-            {navigation.map((item, index) => {
+            {navItems.map((item, index) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
@@ -153,7 +172,7 @@ export function Navigation() {
       {mobileMenuOpen && (
         <div className="md:hidden glass border-t border-border animate-slide-down">
           <div className="space-y-2 px-4 pb-4 pt-2">
-            {navigation.map((item) => {
+            {navItems.map((item) => {
               const Icon = item.icon
               const isActive = pathname === item.href
               return (
