@@ -1,19 +1,12 @@
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-
-// Initialize Convex client
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error("NEXT_PUBLIC_CONVEX_URL is not set");
-}
-
-const convex = new ConvexHttpClient(convexUrl);
+import { getConvexClient } from "./convex-client";
 
 /**
  * Generate a CSRF token for a user
  */
 export async function generateCSRFToken(userId: string): Promise<string> {
   try {
+    const convex = getConvexClient();
     const result = await convex.mutation(api.csrf.generateCSRFToken, {
       userId,
     });
@@ -37,6 +30,7 @@ export async function validateCSRFToken(
   }
 
   try {
+    const convex = getConvexClient();
     const result = await convex.mutation(api.csrf.validateCSRFToken, {
       token,
       userId,
@@ -54,6 +48,7 @@ export async function validateCSRFToken(
  */
 export async function getUserCSRFTokens(userId: string) {
   try {
+    const convex = getConvexClient();
     const tokens = await convex.query(api.csrf.getUserCSRFTokens, {
       userId,
     });

@@ -28,8 +28,9 @@ import {
   Twitter,
   Zap
 } from "lucide-react"
+import { CrossmintErrorBoundary } from "@/components/wallet-error-boundary"
 
-export function CrossmintWalletAuth() {
+function CrossmintWalletAuthBase() {
   const [showAccountDialog, setShowAccountDialog] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
@@ -296,5 +297,14 @@ export function CrossmintWalletAuth() {
       <User className="mr-2 h-4 w-4" />
       Sign In
     </GlassButton>
+  )
+}
+
+// Export wrapped component
+export function CrossmintWalletAuth() {
+  return (
+    <CrossmintErrorBoundary>
+      <CrossmintWalletAuthBase />
+    </CrossmintErrorBoundary>
   )
 }

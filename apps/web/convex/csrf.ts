@@ -1,22 +1,30 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { randomBytes } from "crypto";
+import { EXPIRY_TIMES, TIME_CONSTANTS } from "./constants";
 
-// CSRF token expiry time (24 hours)
-const CSRF_TOKEN_EXPIRY = 24 * 60 * 60 * 1000;
+// Generate cryptographically secure random token
+function generateSecureToken(): string {
+  // Convex runtime supports crypto.getRandomValues for secure random generation
+  // This is safe to use in Convex functions
+  const tokenBytes = new Uint8Array(32);
+  crypto.getRandomValues(tokenBytes);
+  return Array.from(tokenBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+}
 
 export const generateCSRFToken = mutation({
   args: {
     userId: v.string(),
   },
   handler: async (ctx, args) => {
+    // Validate input
+    if (!args.userId || args.userId.trim().length === 0) {
+      throw new Error("User ID is required")
+    }
     // Generate a random token
-    const tokenBytes = new Uint8Array(32);
-    crypto.getRandomValues(tokenBytes);
-    const token = Array.from(tokenBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    const token = generateSecureToken();
     
     const now = Date.now();
-    const expiresAt = now + CSRF_TOKEN_EXPIRY;
+    const expiresAt = now + EXPIRY_TIMES.CSRF_TOKEN;
 
     // Store the token
     await ctx.db.insert("csrfTokens", {
@@ -36,6 +44,13 @@ export const validateCSRFToken = mutation({
     userId: v.string(),
   },
   handler: async (ctx, args) => {
+    // Validate inputs
+    if (!args.token || args.token.trim().length === 0) {
+      return { valid: false, reason: "token_required" }
+    }
+    if (!args.userId || args.userId.trim().length === 0) {
+      return { valid: false, reason: "user_id_required" }
+    }
     const now = Date.now();
 
     // Find the token
@@ -89,7 +104,7 @@ export const cleanupExpiredCSRFTokens = mutation({
     }
 
     // Also clean up used tokens older than 1 hour
-    const oneHourAgo = now - (60 * 60 * 1000);
+    const oneHourAgo = now - TIME_CONSTANTS.HOUR;
     const usedTokens = await ctx.db
       .query("csrfTokens")
       .filter((q) => 

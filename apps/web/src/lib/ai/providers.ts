@@ -13,30 +13,26 @@ export const registry = createProviderRegistry({
 export const getAIModel = (preferredModel?: string) => {
   const models = {
     // Latest models as of August 2025
-    // Note: These model identifiers may need adjustment based on the actual API naming conventions
-    primary: 'gpt-4.5',  // OpenAI's latest foundation model (Orion) - 7T parameters
-    secondary: 'claude-opus-4-20250501',  // Anthropic's latest and best coding model (May 2025)
-    fallback: 'claude-3.7-sonnet-20250201',  // Cost-effective fallback (Feb 2025)
-    reasoning: 'o1-preview',  // OpenAI's chain-of-thought reasoning model
-    gemini: 'gemini-2.5-pro',  // Google's latest Gemini model
+    primary: 'gpt-4o',  // OpenAI's stable general-purpose model
+    secondary: 'claude-sonnet-4-20250514',  // Claude 4 Sonnet - latest model (May 2025)
+    fallback: 'gpt-4o-mini',  // Cost-effective OpenAI fallback
+    coding: 'gpt-4.1-2025-04-14',  // OpenAI's specialized coding model
+    reasoning: 'claude-3-7-sonnet@20250219',  // Claude 3.7 hybrid reasoning model
+    budget: 'claude-3-5-sonnet-20241022',  // Proven stable Claude model
   }
 
   // Return the preferred model or use the primary model
   const modelToUse = preferredModel || models.primary
   
   // Map model names to provider-specific formats
-  if (modelToUse.includes('gpt') || modelToUse.includes('o1') || modelToUse.includes('o3')) {
+  if (modelToUse.includes('gpt') || modelToUse.includes('o1')) {
     return openai(modelToUse)
   } else if (modelToUse.includes('claude')) {
     return anthropic(modelToUse)
-  } else if (modelToUse.includes('gemini')) {
-    // Note: Google Gemini integration would need to be added
-    console.warn('Gemini models not yet integrated, falling back to Claude')
-    return anthropic(models.secondary)
   }
   
-  // Default to Claude Opus 4 for best coding performance
-  return anthropic(models.secondary)
+  // Default to OpenAI for stability
+  return openai(models.primary)
 }
 
 // Rate limiting configuration

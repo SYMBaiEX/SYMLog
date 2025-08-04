@@ -38,7 +38,6 @@
     "clsx": "^2.1.1",
     "convex": "^1.25.4",
     "dompurify": "^3.2.6",
-    "ioredis": "^5.7.0",
     "jose": "^6.0.12",
     "lru-cache": "^11.1.0",
     "lucide-react": "^0.487.0",

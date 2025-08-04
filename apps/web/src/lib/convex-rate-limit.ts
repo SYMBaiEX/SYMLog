@@ -1,20 +1,12 @@
-import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-
-// Initialize Convex client
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
-if (!convexUrl) {
-  throw new Error("NEXT_PUBLIC_CONVEX_URL is not set");
-}
-
-const convex = new ConvexHttpClient(convexUrl);
+import { getConvexClient } from "./convex-client";
 
 export interface RateLimitResult {
   allowed: boolean;
   limit: number;
   remaining: number;
-  reset: number;
-  current: number;
+  reset: number; // Timestamp (ms) when the rate limit window resets
+  requestCountInWindow: number; // Number of requests made in the current time window
 }
 
 /**
@@ -25,6 +17,7 @@ export async function checkRateLimit(
   limit: number = 100
 ): Promise<RateLimitResult> {
   try {
+    const convex = getConvexClient();
     const result = await convex.mutation(api.rateLimit.checkRateLimit, {
       userId,
       limit,
@@ -40,7 +33,7 @@ export async function checkRateLimit(
       limit,
       remaining: 0,
       reset: Date.now() + 3600000, // 1 hour from now
-      current: limit,
+      requestCountInWindow: limit,
     };
   }
 }
@@ -53,6 +46,7 @@ export async function getRateLimitStatus(
   limit: number = 100
 ): Promise<Omit<RateLimitResult, 'allowed'>> {
   try {
+    const convex = getConvexClient();
     const result = await convex.query(api.rateLimit.getRateLimitStatus, {
       userId,
       limit,
@@ -66,7 +60,7 @@ export async function getRateLimitStatus(
       limit,
       remaining: 0,
       reset: Date.now() + 3600000,
-      current: limit,
+      requestCountInWindow: limit,
     };
   }
 }
@@ -76,6 +70,7 @@ export async function getRateLimitStatus(
  */
 export async function resetRateLimit(userId: string): Promise<boolean> {
   try {
+    const convex = getConvexClient();
     const result = await convex.mutation(api.rateLimit.resetRateLimit, {
       userId,
     });

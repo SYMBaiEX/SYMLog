@@ -129,12 +129,14 @@ export default function ChatPage() {
 
   // Authenticated - show chat
   return (
-    <div className="min-h-screen bg-background">
-      <ChatContainer
-        sessionToken={sessionToken}
-        userId={user.id || (user as any).sub}
-        userEmail={user.email}
-      />
-    </div>
+    <ChatErrorBoundary onReset={() => setSessionToken(null)}>
+      <div className="min-h-screen bg-background">
+        <ChatContainer
+          sessionToken={sessionToken}
+          userId={user.id || (user as any).sub}
+          userEmail={user.email}
+        />
+      </div>
+    </ChatErrorBoundary>
   )
 }

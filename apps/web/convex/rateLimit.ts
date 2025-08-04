@@ -1,8 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-
-// Rate limit window in milliseconds (1 hour)
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
+import { EXPIRY_TIMES, RATE_LIMIT_DEFAULTS } from "./constants";
 
 export const checkRateLimit = mutation({
   args: {
@@ -10,9 +8,9 @@ export const checkRateLimit = mutation({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
+    const limit = args.limit ?? RATE_LIMIT_DEFAULTS.DEFAULT_LIMIT;
     const now = Date.now();
-    const windowStart = now - RATE_LIMIT_WINDOW;
+    const windowStart = now - EXPIRY_TIMES.RATE_LIMIT_WINDOW;
 
     // Get all rate limit entries for this user in the current window
     const entries = await ctx.db
@@ -31,7 +29,7 @@ export const checkRateLimit = mutation({
       await ctx.db.insert("rateLimits", {
         userId: args.userId,
         timestamp: now,
-        expiresAt: now + RATE_LIMIT_WINDOW,
+        expiresAt: now + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
       });
     }
 
@@ -39,8 +37,8 @@ export const checkRateLimit = mutation({
       allowed: isAllowed,
       limit,
       remaining,
-      reset: windowStart + RATE_LIMIT_WINDOW,
-      current: requestCount,
+      reset: windowStart + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
+      requestCountInWindow: requestCount,
     };
   },
 });
@@ -70,9 +68,9 @@ export const getRateLimitStatus = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    const limit = args.limit ?? 100;
+    const limit = args.limit ?? RATE_LIMIT_DEFAULTS.DEFAULT_LIMIT;
     const now = Date.now();
-    const windowStart = now - RATE_LIMIT_WINDOW;
+    const windowStart = now - EXPIRY_TIMES.RATE_LIMIT_WINDOW;
 
     const entries = await ctx.db
       .query("rateLimits")
@@ -87,8 +85,8 @@ export const getRateLimitStatus = query({
     return {
       limit,
       remaining,
-      reset: windowStart + RATE_LIMIT_WINDOW,
-      current: requestCount,
+      reset: windowStart + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
+      requestCountInWindow: requestCount,
     };
   },
 });

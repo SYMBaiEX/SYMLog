@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { checkRateLimit as checkRedisRateLimit } from '@/lib/redis-rate-limit'
+import { checkRateLimit as checkConvexRateLimit } from '@/lib/convex-rate-limit'
 import { logSecurityEvent, extractClientInfo } from '@/lib/logger'
 import { validateSessionFromRequest } from '@/lib/jwt-utils'
 import { config } from '@/lib/config'
@@ -46,10 +46,10 @@ export async function validateChatAuth(request: NextRequest): Promise<UserSessio
   }
 }
 
-// Use Redis-based rate limiting
+// Use Convex-based rate limiting
 export async function checkRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number }> {
   const maxRequests = config.get().rateLimitMaxRequests
-  const result = await checkRedisRateLimit(userId, maxRequests)
+  const result = await checkConvexRateLimit(userId, maxRequests)
   
   return {
     allowed: result.allowed,

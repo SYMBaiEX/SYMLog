@@ -2,16 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeErrorParam } from '@/lib/security/sanitize'
 import { logSecurityEvent, extractClientInfo } from '@/lib/logger'
 import { randomBytes } from 'crypto'
-import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
 import { validateCSRFToken } from '@/lib/convex-csrf'
-
-// Initialize Convex client
-const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
-if (!convexUrl) {
-  throw new Error("NEXT_PUBLIC_CONVEX_URL is not set")
-}
-const convex = new ConvexHttpClient(convexUrl)
+import { getConvexClient } from '@/lib/convex-client'
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -42,6 +35,7 @@ export async function GET(request: NextRequest) {
       const sessionId = randomBytes(32).toString('hex')
       
       // For now, we'll use a placeholder user info until we can extract from the auth code
+      const convex = getConvexClient();
       await convex.mutation(api.authSessions.storeAuthCode, {
         authCode: sessionId,
         userId: 'pending_auth_' + Date.now(),
@@ -108,6 +102,7 @@ export async function POST(request: NextRequest) {
 
     if (action === 'exchange') {
       // Exchange session ID for auth code
+      const convex = getConvexClient();
       const authSession = await convex.query(api.authSessions.getAuthSession, {
         authCode: sessionId
       })

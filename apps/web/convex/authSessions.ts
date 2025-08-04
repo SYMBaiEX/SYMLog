@@ -1,8 +1,10 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { EXPIRY_TIMES, TIME_CONSTANTS } from "./constants";
 
-// Auth code expiry time (5 minutes)
-const AUTH_CODE_EXPIRY = 5 * 60 * 1000;
+// Auth sessions have a short expiry (5 minutes) for security,
+// but cleanup runs daily to avoid excessive database operations.
+// Expired sessions are automatically ignored when queried.
 
 export const storeAuthCode = mutation({
   args: {
@@ -12,8 +14,21 @@ export const storeAuthCode = mutation({
     walletAddress: v.string(),
   },
   handler: async (ctx, args) => {
+    // Validate inputs
+    if (!args.authCode || args.authCode.trim().length === 0) {
+      throw new Error("Auth code is required")
+    }
+    if (!args.userId || args.userId.trim().length === 0) {
+      throw new Error("User ID is required")
+    }
+    if (!args.userEmail || !args.userEmail.includes('@')) {
+      throw new Error("Valid email is required")
+    }
+    if (!args.walletAddress || args.walletAddress.trim().length === 0) {
+      throw new Error("Wallet address is required")
+    }
     const now = Date.now();
-    const expiresAt = now + AUTH_CODE_EXPIRY;
+    const expiresAt = now + EXPIRY_TIMES.AUTH_CODE;
 
     // Check if auth code already exists
     const existing = await ctx.db
@@ -84,6 +99,10 @@ export const markAuthCodeUsed = mutation({
     authCode: v.string(),
   },
   handler: async (ctx, args) => {
+    // Validate input
+    if (!args.authCode || args.authCode.trim().length === 0) {
+      throw new Error("Auth code is required")
+    }
     const session = await ctx.db
       .query("authSessions")
       .withIndex("by_auth_code", (q) => q.eq("authCode", args.authCode))
@@ -120,7 +139,7 @@ export const cleanupExpiredAuthSessions = mutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const cutoffTime = now - (24 * 60 * 60 * 1000); // 24 hours old
+    const cutoffTime = now - EXPIRY_TIMES.EXPIRED_SESSION_CLEANUP; // 24 hours old
 
     // Find expired sessions older than 24 hours
     const expired = await ctx.db
@@ -139,14 +158,14 @@ export const cleanupExpiredAuthSessions = mutation({
       deletedCount++;
     }
 
-    // Also clean up completed sessions older than 7 days
-    const sevenDaysAgo = now - (7 * 24 * 60 * 60 * 1000);
+    // Also clean up completed sessions older than 1 day for security
+    const oneDayAgo = now - EXPIRY_TIMES.COMPLETED_SESSION_RETENTION;
     const oldCompleted = await ctx.db
       .query("authSessions")
       .filter((q) => 
         q.and(
           q.eq(q.field("status"), "completed"),
-          q.lt(q.field("createdAt"), sevenDaysAgo)
+          q.lt(q.field("createdAt"), oneDayAgo)
         )
       )
       .collect();

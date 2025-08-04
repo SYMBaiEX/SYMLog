@@ -14,10 +14,11 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { Wallet, LogOut, Check, Loader2, Shield } from "lucide-react"
+import { WalletErrorBoundary } from "@/components/wallet-error-boundary"
 
 // Type definitions are now in @/types/phantom.d.ts
 
-export function SolanaWalletButton() {
+function SolanaWalletButtonBase() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
   const [isConnecting, setIsConnecting] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
@@ -264,5 +265,14 @@ export function SolanaWalletButton() {
         </>
       )}
     </Button>
+  )
+}
+
+// Export wrapped component
+export function SolanaWalletButton() {
+  return (
+    <WalletErrorBoundary>
+      <SolanaWalletButtonBase />
+    </WalletErrorBoundary>
   )
 }

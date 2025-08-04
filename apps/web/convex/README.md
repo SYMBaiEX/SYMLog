@@ -1,90 +1,95 @@
-# Welcome to your Convex functions directory!
+# Convex Database Implementation
 
-Write your Convex functions here.
-See https://docs.convex.dev/functions for more.
+This directory contains the Convex implementation that replaces Redis for caching and temporary storage needs.
 
-A query function that takes two arguments looks like:
+## Overview
 
-```ts
-// functions.js
-import { query } from "./_generated/server";
-import { v } from "convex/values";
+We've migrated from Redis to Convex for all temporary storage needs:
+- **Rate Limiting**: Application-layer rate limiting with automatic cleanup
+- **CSRF Tokens**: Secure token storage with expiration and one-time use
+- **Auth Sessions**: Temporary auth code storage with status tracking
 
-export const myQueryFunction = query({
-  // Validators for arguments.
-  args: {
-    first: v.number(),
-    second: v.string(),
-  },
+## Features
 
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Read the database as many times as you need here.
-    // See https://docs.convex.dev/database/reading-data.
-    const documents = await ctx.db.query("tablename").collect();
+### Rate Limiting (`rateLimit.ts`)
+- Tracks API requests per user with a sliding window
+- Configurable limits per endpoint
+- Automatic cleanup of expired entries
+- Atomic operations for distributed consistency
 
-    // Arguments passed from the client are properties of the args object.
-    console.log(args.first, args.second);
+### CSRF Protection (`csrf.ts`)
+- Generates secure random tokens
+- One-time use validation
+- 24-hour expiration
+- User-specific token validation
 
-    // Write arbitrary JavaScript here: filter, aggregate, build derived data,
-    // remove non-public properties, or create new objects.
-    return documents;
-  },
-});
-```
+### Auth Sessions (`authSessions.ts`)
+- Stores auth codes securely
+- 5-minute expiration for security
+- Status tracking (pending, completed, expired)
+- Automatic cleanup of old sessions
 
-Using this query function in a React component looks like:
+### Scheduled Cleanup (`crons.ts`)
+- Hourly cleanup of expired CSRF tokens
+- Daily cleanup of expired auth sessions
+- Every 6 hours cleanup of rate limit entries
 
-```ts
-const data = useQuery(api.functions.myQueryFunction, {
-  first: 10,
-  second: "hello",
-});
-```
+## Usage
 
-A mutation function looks like:
+### Rate Limiting
+```typescript
+import { checkRateLimit } from '@/lib/convex-rate-limit'
 
-```ts
-// functions.js
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
-
-export const myMutationFunction = mutation({
-  // Validators for arguments.
-  args: {
-    first: v.string(),
-    second: v.string(),
-  },
-
-  // Function implementation.
-  handler: async (ctx, args) => {
-    // Insert or modify documents in the database here.
-    // Mutations can also read from the database like queries.
-    // See https://docs.convex.dev/database/writing-data.
-    const message = { body: args.first, author: args.second };
-    const id = await ctx.db.insert("messages", message);
-
-    // Optionally, return a value from your mutation.
-    return await ctx.db.get(id);
-  },
-});
-```
-
-Using this mutation function in a React component looks like:
-
-```ts
-const mutation = useMutation(api.functions.myMutationFunction);
-function handleButtonPress() {
-  // fire and forget, the most common way to use mutations
-  mutation({ first: "Hello!", second: "me" });
-  // OR
-  // use the result once the mutation has completed
-  mutation({ first: "Hello!", second: "me" }).then((result) =>
-    console.log(result),
-  );
+const { allowed, remaining } = await checkRateLimit(userId, 100)
+if (!allowed) {
+  // Handle rate limit exceeded
 }
 ```
 
-Use the Convex CLI to push your functions to a deployment. See everything
-the Convex CLI can do by running `npx convex -h` in your project root
-directory. To learn more, launch the docs with `npx convex docs`.
+### CSRF Protection
+```typescript
+import { generateCSRFToken, validateCSRFToken } from '@/lib/convex-csrf'
+
+// Generate token
+const token = await generateCSRFToken(userId)
+
+// Validate token
+const isValid = await validateCSRFToken(token, userId)
+```
+
+### Auth Sessions
+```typescript
+// Store auth code
+await convex.mutation(api.authSessions.storeAuthCode, {
+  authCode: sessionId,
+  userId,
+  userEmail,
+  walletAddress
+})
+
+// Retrieve session
+const session = await convex.query(api.authSessions.getAuthSession, {
+  authCode: sessionId
+})
+
+// Mark as used
+await convex.mutation(api.authSessions.markAuthCodeUsed, {
+  authCode: sessionId
+})
+```
+
+## Benefits of Convex over Redis
+
+1. **No separate infrastructure**: Convex is already used for the database
+2. **Built-in scheduling**: Cron jobs for automatic cleanup
+3. **Type safety**: Full TypeScript support with schema validation
+4. **ACID transactions**: Atomic operations for consistency
+5. **Real-time updates**: Can subscribe to changes if needed
+6. **Cost effective**: No additional Redis hosting costs
+
+## Migration Notes
+
+- All Redis dependencies have been removed
+- In-memory fallbacks are only used in development
+- All rate limiting, CSRF, and auth code storage now uses Convex
+- Scheduled cleanup functions ensure data doesn't grow unbounded
