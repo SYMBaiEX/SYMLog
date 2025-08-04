@@ -183,6 +183,7 @@ export default function Home() {
           </GlassCard>
         </div>
       </section>
+      
     </div>
   )
 }

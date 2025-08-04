@@ -1,14 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Brain, Minus, Square, X, Maximize2 } from "lucide-react"
+import { X, Minus, Square, Maximize2, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export function TauriTitleBar() {
+export function TauriWindowControls() {
   const [isMaximized, setIsMaximized] = React.useState(false)
   const [isTauri, setIsTauri] = React.useState(false)
 
   React.useEffect(() => {
+    // Check if running in Tauri
     setIsTauri(typeof window !== "undefined" && "__TAURI__" in window)
     
     // Check if window is maximized on load
@@ -42,13 +43,8 @@ export function TauriTitleBar() {
     }
   }
 
-  // Don't show custom title bar when using native decorations
-  if (!isTauri) {
-    return null
-  }
-  
-  // Return null to use native title bar
-  return null
+  // Only show in Tauri environment
+  if (!isTauri) return null
 
   return (
     <div 

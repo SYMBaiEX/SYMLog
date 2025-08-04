@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack --port=3001",
+    "dev": "next dev --turbopack --port=3000",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@SYMLog/backend": "workspace:*",
+    "@crossmint/client-sdk-react-ui": "^2.3.3",
     "@hookform/resolvers": "^5.2.1",
-    "@crossmint/client-sdk-react-ui": "^1.17.0",
     "@radix-ui/react-avatar": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-label": "^2.1.7",

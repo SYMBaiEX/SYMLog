@@ -17,7 +17,7 @@ import {
 import { GlassButton } from "@/components/ui/glass-button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
-import { CrossmintWalletAuth } from "@/components/crossmint-wallet-auth"
+import { WebAuthFlow } from "@/components/web-auth-flow"
 
 const navigation = [
   { name: "Home", href: "/", icon: Brain },
@@ -129,7 +129,7 @@ export function Navigation() {
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
             <ModeToggle />
-            <CrossmintWalletAuth />
+            <WebAuthFlow />
 
             {/* Mobile menu button */}
             <GlassButton
@@ -175,7 +175,7 @@ export function Navigation() {
               )
             })}
             <div className="mt-4 pt-4 border-t border-white/10">
-              <CrossmintWalletAuth />
+              <WebAuthFlow />
             </div>
           </div>
         </div>

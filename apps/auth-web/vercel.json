@@ -1,0 +1,21 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "devCommand": "npm run dev",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "env": {
+    "NEXT_PUBLIC_CONVEX_URL": "@convex_url",
+    "NEXT_PUBLIC_CROSSMINT_CLIENT_KEY": "@crossmint_client_key",
+    "CROSSMINT_SERVER_KEY": "@crossmint_server_key",
+    "NEXT_PUBLIC_AUTH_REDIRECT_URL": "symlog://auth",
+    "NEXT_PUBLIC_APP_ENV": "production",
+    "NEXT_PUBLIC_CROSSMINT_ENVIRONMENT": "production"
+  },
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/$1"
+    }
+  ]
+}

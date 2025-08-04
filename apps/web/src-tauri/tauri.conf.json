@@ -5,7 +5,7 @@
   "identifier": "com.tauri.dev",
   "build": {
     "frontendDist": "../.next",
-    "devUrl": "http://localhost:3001",
+    "devUrl": "http://localhost:3000",
     "beforeDevCommand": "bun run dev",
     "beforeBuildCommand": "bun run build"
   },
@@ -19,8 +19,8 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
-        "transparent": false,
-        "decorations": true,
+        "transparent": true,
+        "decorations": false,
         "alwaysOnTop": false,
         "skipTaskbar": false,
         "center": true,
@@ -33,6 +33,12 @@
       "csp": null
     }
   },
+  "protocols": [
+    {
+      "name": "symlog",
+      "schemes": ["symlog"]
+    }
+  ],
   "bundle": {
     "active": true,
     "targets": "all",

@@ -394,6 +394,34 @@ html.dark {
 
 /* Tauri-specific styles */
 body.tauri-app {
-  /* No extra padding needed with native title bar */
+  /* Add padding for custom title bar */
+  padding-top: 40px;
+  /* Rounded corners for the window content */
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+body.tauri-app .navigation {
+  /* Ensure navigation is below title bar */
+  top: 40px;
+}
+
+/* Rounded window corners */
+body.tauri-app::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* Main content wrapper for Tauri */
+body.tauri-app > div:first-child {
+  border-radius: 12px;
   overflow: hidden;
 }

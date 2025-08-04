@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui"
 import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
 import {
@@ -25,92 +24,125 @@ import {
   User,
   Mail,
   Globe,
-  Twitter,
   Zap
 } from "lucide-react"
 
-export function CrossmintWalletAuth() {
+// Simple local storage-based auth for desktop fallback
+interface LocalUser {
+  id: string
+  email?: string
+  displayName: string
+  walletAddress?: string
+  createdAt: string
+}
+
+export function DesktopAuthFallback() {
+  const [user, setUser] = useState<LocalUser | null>(null)
   const [showAccountDialog, setShowAccountDialog] = useState(false)
-  const [copiedAddress, setCopiedAddress] = useState(false)
+  const [showLoginDialog, setShowLoginDialog] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState("")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [copiedAddress, setCopiedAddress] = useState(false)
 
-  // Check if Crossmint is available
-  const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
-  const isCrossmintEnabled = clientApiKey && clientApiKey !== 'your_client_api_key_here'
-
-  // Use Crossmint hooks
-  const { login, logout, jwt, user } = useAuth()
-  const { wallet, status: walletStatus } = useWallet()
-
-  const isLoggedIn = !!jwt && !!user
-  const isWalletReady = walletStatus === 'loaded' && wallet
-  const walletAddress = wallet?.address
-
-  // Handle connection state changes
+  // Check for existing session on mount
   useEffect(() => {
-    if (isLoggedIn && user) {
-      toast.success("Welcome to SYMLog!", {
-        description: `Signed in as ${user.email || user.id}`
-      })
-    }
-  }, [isLoggedIn, user])
-
-  const formatAddress = (address: string) => {
-    return `${address.slice(0, 4)}...${address.slice(-4)}`
-  }
-
-  const copyAddressToClipboard = async () => {
-    if (walletAddress) {
+    const savedUser = localStorage.getItem('symlog_user')
+    if (savedUser) {
       try {
-        await navigator.clipboard.writeText(walletAddress)
-        setCopiedAddress(true)
-        toast.success("Address copied to clipboard")
-        const timeoutId = setTimeout(() => setCopiedAddress(false), 2000)
-        return () => clearTimeout(timeoutId)
+        setUser(JSON.parse(savedUser))
       } catch (error) {
-        toast.error("Failed to copy address")
+        console.error('Failed to parse saved user:', error)
+        localStorage.removeItem('symlog_user')
       }
     }
+  }, [])
+
+  const generateWalletAddress = () => {
+    // Generate a mock EVM address for demonstration
+    const chars = '0123456789abcdef'
+    let address = '0x'
+    for (let i = 0; i < 40; i++) {
+      address += chars[Math.floor(Math.random() * chars.length)]
+    }
+    return address
   }
 
   const handleLogin = async () => {
+    if (!email || !email.includes('@')) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    setIsLoading(true)
     try {
-      await login()
-    } catch (error: any) {
-      console.error("Login error:", error)
-      toast.error("Login failed", {
-        description: error?.message || "Please try again"
+      // Simulate authentication delay
+      await new Promise(resolve => setTimeout(resolve, 1500))
+      
+      const newUser: LocalUser = {
+        id: Math.random().toString(36).substr(2, 9),
+        email,
+        displayName: email.split('@')[0],
+        walletAddress: generateWalletAddress(),
+        createdAt: new Date().toISOString()
+      }
+      
+      localStorage.setItem('symlog_user', JSON.stringify(newUser))
+      setUser(newUser)
+      setShowLoginDialog(false)
+      setEmail("")
+      
+      toast.success("Welcome to SYMLog!", {
+        description: `Signed in as ${newUser.email}`
       })
+    } catch (error) {
+      toast.error("Login failed", {
+        description: "Please try again"
+      })
+    } finally {
+      setIsLoading(false)
     }
   }
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
     try {
-      await logout()
+      await new Promise(resolve => setTimeout(resolve, 500))
+      localStorage.removeItem('symlog_user')
+      setUser(null)
       setShowAccountDialog(false)
       toast.info("Signed out successfully")
-    } catch (error: any) {
-      toast.error("Logout failed", {
-        description: error?.message || "Please try again"
-      })
+    } catch (error) {
+      toast.error("Logout failed")
     } finally {
       setIsLoggingOut(false)
     }
   }
 
-  const getUserDisplayName = () => {
-    if (user?.email) return user.email
-    return user?.id?.slice(0, 8) || "User"
+  const formatAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`
+  }
+
+  const copyAddressToClipboard = async () => {
+    if (user?.walletAddress) {
+      try {
+        await navigator.clipboard.writeText(user.walletAddress)
+        setCopiedAddress(true)
+        toast.success("Address copied to clipboard")
+        setTimeout(() => setCopiedAddress(false), 2000)
+      } catch (error) {
+        toast.error("Failed to copy address")
+      }
+    }
   }
 
   const getUserInitials = () => {
-    const displayName = getUserDisplayName()
+    const displayName = user?.displayName || user?.email || "User"
     return displayName.slice(0, 2).toUpperCase()
   }
 
   // Logged in state - show account button  
-  if (isLoggedIn) {
+  if (user) {
     return (
       <>
         <GlassButton
@@ -124,10 +156,10 @@ export function CrossmintWalletAuth() {
               {getUserInitials()}
             </AvatarFallback>
           </Avatar>
-          {isWalletReady && walletAddress ? formatAddress(walletAddress) : getUserDisplayName()}
+          {user.walletAddress ? formatAddress(user.walletAddress) : user.displayName}
           <Badge className="ml-2 bg-secondary/20 text-secondary border-secondary/30">
             <Zap className="h-3 w-3 mr-1" />
-            Smart Wallet
+            Local Wallet
           </Badge>
         </GlassButton>
 
@@ -139,7 +171,7 @@ export function CrossmintWalletAuth() {
                 Your Account
               </DialogTitle>
               <DialogDescription className="text-white/70">
-                Manage your SYMLog account with Crossmint smart wallet
+                Manage your SYMLog account with local wallet
               </DialogDescription>
             </DialogHeader>
             
@@ -154,22 +186,22 @@ export function CrossmintWalletAuth() {
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium text-white">{getUserDisplayName()}</p>
+                      <p className="font-medium text-white">{user.displayName}</p>
                       <p className="text-sm text-white/60 flex items-center gap-1">
-                        <User className="h-3 w-3" />
-                        Crossmint Account
+                        <Mail className="h-3 w-3" />
+                        {user.email}
                       </p>
                     </div>
                   </div>
                   <Badge className="bg-secondary/20 text-secondary border-secondary/30 flex items-center gap-1">
                     <Check className="h-3 w-3" />
-                    Verified
+                    Local
                   </Badge>
                 </div>
               </GlassCard>
 
               {/* Wallet Card */}
-              {isWalletReady && walletAddress && (
+              {user.walletAddress && (
                 <GlassCard className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -178,7 +210,7 @@ export function CrossmintWalletAuth() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-white">{formatAddress(walletAddress)}</p>
+                          <p className="font-medium text-white">{formatAddress(user.walletAddress)}</p>
                           <GlassButton
                             variant="ghost"
                             size="sm"
@@ -193,8 +225,8 @@ export function CrossmintWalletAuth() {
                           </GlassButton>
                         </div>
                         <p className="text-sm text-white/60 flex items-center gap-1">
-                          <Zap className="h-3 w-3" />
-                          EVM Smart Wallet
+                          <Shield className="h-3 w-3" />
+                          Local Demo Wallet
                         </p>
                       </div>
                     </div>
@@ -206,24 +238,20 @@ export function CrossmintWalletAuth() {
               <GlassCard className="p-4">
                 <h4 className="text-sm font-medium text-white mb-3 flex items-center gap-2">
                   <CheckCircle2 className="h-4 w-4 text-secondary" />
-                  Smart Wallet Features
+                  Desktop App Features
                 </h4>
                 <ul className="space-y-2 text-sm text-white/70">
                   <li className="flex items-center gap-2">
-                    <Zap className="w-3 h-3 text-secondary" />
-                    Gasless transactions - no fees required
-                  </li>
-                  <li className="flex items-center gap-2">
                     <Shield className="w-3 h-3 text-secondary" />
-                    Programmable security via smart contracts
+                    Local storage - no external dependencies
                   </li>
                   <li className="flex items-center gap-2">
-                    <Globe className="w-3 h-3 text-secondary" />
-                    Cross-device synchronization
+                    <Zap className="w-3 h-3 text-secondary" />
+                    Fast and secure desktop experience
                   </li>
                   <li className="flex items-center gap-2">
                     <User className="w-3 h-3 text-secondary" />
-                    Social login - no seed phrases to lose
+                    Simplified authentication for local use
                   </li>
                 </ul>
               </GlassCard>
@@ -233,10 +261,10 @@ export function CrossmintWalletAuth() {
                 <GlassButton
                   variant="ghost"
                   className="flex-1"
-                  onClick={() => window.open('https://www.crossmint.com/', '_blank')}
+                  onClick={() => toast.info("This is a local demo wallet")}
                 >
                   <Globe className="mr-2 h-4 w-4" />
-                  About Crossmint
+                  About Local Wallet
                 </GlassButton>
                 <GlassButton
                   variant="outline"
@@ -264,30 +292,71 @@ export function CrossmintWalletAuth() {
     )
   }
 
-  // Not logged in - show login button
-  if (!isCrossmintEnabled) {
-    return (
+  // Not logged in - show login button and dialog
+  return (
+    <>
       <GlassButton
-        variant="ghost"
+        variant="default"
         size="sm"
-        onClick={() => window.location.href = '/login'}
-        className="flex w-full md:w-auto items-center gap-2"
+        onClick={() => setShowLoginDialog(true)}
+        className="flex w-full md:w-auto items-center gap-2 glow-primary"
       >
         <User className="mr-2 h-4 w-4" />
         Sign In
       </GlassButton>
-    )
-  }
 
-  return (
-    <GlassButton
-      variant="default"
-      size="sm"
-      onClick={handleLogin}
-      className="flex w-full md:w-auto items-center gap-2 glow-primary"
-    >
-      <User className="mr-2 h-4 w-4" />
-      Sign In
-    </GlassButton>
+      <Dialog open={showLoginDialog} onOpenChange={setShowLoginDialog}>
+        <DialogContent className="glass border-white/10">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <User className="h-5 w-5 text-primary" />
+              Sign In to SYMLog
+            </DialogTitle>
+            <DialogDescription className="text-white/70">
+              Enter your email to access your local desktop account
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-white">
+                Email Address
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="your@email.com"
+                className="w-full px-3 py-2 bg-background/50 border border-border rounded-lg text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+              />
+            </div>
+            
+            <GlassButton
+              onClick={handleLogin}
+              disabled={isLoading || !email}
+              className="w-full glow-primary"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  <User className="mr-2 h-4 w-4" />
+                  Sign In
+                </>
+              )}
+            </GlassButton>
+            
+            <p className="text-xs text-white/50 text-center">
+              This is a local desktop demo. Your data stays on your device.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
