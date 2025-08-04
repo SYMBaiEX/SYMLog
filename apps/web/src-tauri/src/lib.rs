@@ -1,5 +1,5 @@
 use std::env;
-use tauri::{Manager, Emitter};
+use tauri::{Manager, Emitter, Listener};
 
 #[cfg(target_os = "linux")]
 use std::process::Command;
@@ -49,29 +49,31 @@ pub fn run() {
       // Create and set menu on the main window
       let main_window = app.get_webview_window("main").unwrap();
       
+      // Store app handle for use in event handler
+      let app_handle = app.handle().clone();
+      
       // Handle deep link events (symlog:// protocol)
-      app.listen("deep-link", |event| {
-        if let Some(payload) = event.payload() {
-          println!("Received deep link: {}", payload);
-          // The payload should contain the symlog:// URL
-          if let Ok(url) = serde_json::from_str::<String>(payload) {
-            if url.starts_with("symlog://auth") {
-              // Extract auth code from URL
-              if let Some(code_start) = url.find("code=") {
-                let code = &url[code_start + 5..];
-                // Remove any additional query parameters
-                let auth_code = if let Some(amp_pos) = code.find('&') {
-                  &code[..amp_pos]
-                } else {
-                  code
-                };
-                
-                println!("Extracted auth code: {}", auth_code);
-                
-                // Emit event to frontend with the auth code
-                if let Err(e) = app.emit("auth-code-received", auth_code) {
-                  eprintln!("Failed to emit auth code event: {}", e);
-                }
+      app.listen("deep-link", move |event| {
+        let payload = event.payload();
+        println!("Received deep link: {}", payload);
+        // The payload should contain the symlog:// URL
+        if let Ok(url) = serde_json::from_str::<String>(payload) {
+          if url.starts_with("symlog://auth") {
+            // Extract auth code from URL
+            if let Some(code_start) = url.find("code=") {
+              let code = &url[code_start + 5..];
+              // Remove any additional query parameters
+              let auth_code = if let Some(amp_pos) = code.find('&') {
+                &code[..amp_pos]
+              } else {
+                code
+              };
+              
+              println!("Extracted auth code: {}", auth_code);
+              
+              // Emit event to frontend with the auth code
+              if let Err(e) = app_handle.emit("auth-code-received", auth_code) {
+                eprintln!("Failed to emit auth code event: {}", e);
               }
             }
           }
@@ -112,7 +114,16 @@ pub fn run() {
         // This creates rounded corners on the window
         let _ = main_window.set_decorations(false);
       }
+      
+      // Enable drag region for custom title bar
+      #[cfg(target_os = "linux")]
+      {
+        let _ = main_window.set_decorations(false);
+      }
 
+      // Add shell plugin for opening external URLs
+      app.handle().plugin(tauri_plugin_shell::init())?;
+      
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()

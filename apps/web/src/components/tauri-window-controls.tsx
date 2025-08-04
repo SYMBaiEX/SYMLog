@@ -9,12 +9,27 @@ export function TauriWindowControls() {
   const [isTauri, setIsTauri] = React.useState(false)
 
   React.useEffect(() => {
-    // Check if running in Tauri
-    setIsTauri(typeof window !== "undefined" && "__TAURI__" in window)
+    // Check if running in Tauri with multiple attempts
+    const checkTauri = () => {
+      if (typeof window !== "undefined" && "__TAURI__" in window) {
+        setIsTauri(true)
+        
+        // Check if window is maximized on load
+        window.__TAURI__.window.getCurrent().isMaximized().then(setIsMaximized).catch(() => {
+          // Ignore errors
+        })
+        return true
+      }
+      return false
+    }
     
-    // Check if window is maximized on load
-    if (typeof window !== "undefined" && "__TAURI__" in window) {
-      window.__TAURI__.window.getCurrent().isMaximized().then(setIsMaximized)
+    // Try immediately
+    if (!checkTauri()) {
+      // Try again after DOM is ready
+      const attempts = [50, 100, 200, 500]
+      attempts.forEach(delay => {
+        setTimeout(checkTauri, delay)
+      })
     }
   }, [])
 
@@ -26,12 +41,12 @@ export function TauriWindowControls() {
 
   const handleMaximize = async () => {
     if (window.__TAURI__) {
-      const window = window.__TAURI__.window.getCurrent()
+      const currentWindow = window.__TAURI__.window.getCurrent()
       if (isMaximized) {
-        await window.unmaximize()
+        await currentWindow.unmaximize()
         setIsMaximized(false)
       } else {
-        await window.maximize()
+        await currentWindow.maximize()
         setIsMaximized(true)
       }
     }
@@ -43,19 +58,26 @@ export function TauriWindowControls() {
     }
   }
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log("TauriWindowControls render - isTauri:", isTauri, "window.__TAURI__:", typeof window !== "undefined" && !!window.__TAURI__)
+  })
+
   // Only show in Tauri environment
+  if (typeof window === "undefined") return null
   if (!isTauri) return null
 
   return (
     <div 
-      className="fixed top-0 left-0 right-0 h-10 z-[100] flex items-center justify-between select-none"
+      className="fixed top-0 left-0 right-0 h-10 z-[9999] flex items-center justify-between select-none"
       style={{ 
-        background: "linear-gradient(to bottom, rgba(10, 10, 10, 0.95), rgba(10, 10, 10, 0.8))",
+        background: "linear-gradient(to bottom, rgba(10, 10, 10, 0.98), rgba(10, 10, 10, 0.95))",
         backdropFilter: "blur(20px)",
         WebkitBackdropFilter: "blur(20px)",
         borderBottom: "1px solid rgba(255, 255, 255, 0.1)",
         borderTopLeftRadius: "12px",
-        borderTopRightRadius: "12px"
+        borderTopRightRadius: "12px",
+        isolation: "isolate"
       }}
     >
       {/* Left side - App icon and title (draggable) */}

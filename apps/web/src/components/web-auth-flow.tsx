@@ -29,9 +29,17 @@ import {
   Zap,
   ExternalLink,
   Key,
-  Browser
+  Monitor
 } from "lucide-react"
-import { listen } from '@tauri-apps/api/event'
+
+// Extend window type for Tauri
+declare global {
+  interface Window {
+    __TAURI__?: {
+      invoke(cmd: string, args?: Record<string, any>): Promise<any>
+    }
+  }
+}
 
 interface AuthUser {
   id: string
@@ -142,13 +150,12 @@ export function WebAuthFlow() {
     // Open the auth website in external browser
     try {
       if (typeof window !== 'undefined' && window.__TAURI__) {
-        // In Tauri, open external URL
-        import('@tauri-apps/api/shell').then(({ open }) => {
-          open(authUrl)
+        // In Tauri, use shell plugin through IPC
+        window.__TAURI__.invoke('plugin:shell|open', { path: authUrl }).then(() => {
           setShowAuthDialog(true)
           setIsLoading(false)
         }).catch(() => {
-          // Fallback to regular window.open
+          // Fallback to window.open if Tauri API is not available
           window.open(authUrl, '_blank')
           setShowAuthDialog(true)
           setIsLoading(false)
@@ -397,7 +404,7 @@ export function WebAuthFlow() {
           <div className="space-y-4">
             <div className="glass rounded-lg p-4 bg-blue-500/10 border border-blue-500/20">
               <div className="flex items-start gap-3">
-                <Browser className="h-5 w-5 text-blue-400 mt-0.5" />
+                <Monitor className="h-5 w-5 text-blue-400 mt-0.5" />
                 <div className="space-y-1">
                   <p className="text-sm font-medium text-blue-400">
                     Authentication Page Opened

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, Suspense } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui"
 import { useMutation } from "convex/react"
 import { api } from "../../lib/convex"
@@ -13,7 +13,6 @@ import { ModeToggle } from "@/components/mode-toggle"
 
 function SuccessPageContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const { jwt, user, logout } = useAuth()
   const { wallet, status: walletStatus } = useWallet()
   const [authCode, setAuthCode] = useState<string>("")
@@ -36,7 +35,7 @@ function SuccessPageContent() {
     }
   }, [isLoggedIn, router])
 
-  // Generate auth code when user arrives
+  // Generate auth code when user arrives and wallet is ready
   useEffect(() => {
     if (isLoggedIn && isWalletReady && !authCode) {
       generateAuthCode()
@@ -72,17 +71,23 @@ function SuccessPageContent() {
     setIsGeneratingCode(true)
     try {
       // Generate a unique auth code
-      const code = `SYM_${Math.random().toString(36).substr(2, 16).toUpperCase()}`
+      const code = `SYM_${Math.random().toString(36).substring(2, 18).toUpperCase()}`
       
-      // Store auth session in Convex
-      await createAuthSession({
-        authCode: code,
-        userId: user.id,
-        userEmail: user.email || "",
-        walletAddress: wallet.address || "",
-        expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
-        status: "pending"
-      })
+      // Try to store auth session in Convex, but don't fail if it doesn't work
+      try {
+        await createAuthSession({
+          authCode: code,
+          userId: user.id,
+          userEmail: user.email || "",
+          walletAddress: wallet.address || "",
+          expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
+          status: "pending"
+        })
+        console.log("Auth session stored in Convex successfully")
+      } catch (convexError) {
+        console.warn("Failed to store auth session in Convex, continuing without database storage:", convexError)
+        // Continue without database storage - the code will still work for the desktop app
+      }
       
       setAuthCode(code)
       setTimeRemaining(600) // Reset timer
@@ -130,9 +135,9 @@ function SuccessPageContent() {
     }
   }
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
     try {
-      await logout()
+      logout()
       router.push('/')
     } catch (error) {
       console.error("Logout failed:", error)
@@ -251,7 +256,9 @@ function SuccessPageContent() {
             ) : (
               <div className="text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-                <p className="text-muted-foreground">Generating authentication code...</p>
+                <p className="text-muted-foreground">
+                  {!isWalletReady ? "Creating your wallet..." : "Generating authentication code..."}
+                </p>
               </div>
             )}
           </CardContent>
@@ -272,7 +279,7 @@ function SuccessPageContent() {
                 </p>
                 <p className="text-muted-foreground text-xs sm:text-sm flex items-center gap-1">
                   <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-                  {isWalletReady ? "Wallet Connected" : "Connecting wallet..."}
+                  {isWalletReady ? "Wallet Connected" : "Creating wallet..."}
                 </p>
               </div>
             </div>

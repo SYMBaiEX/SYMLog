@@ -1,68 +1,61 @@
 "use client"
 
-import { 
-  CrossmintProvider as CrossmintClientProvider, 
-  CrossmintAuthProvider, 
-  CrossmintWalletProvider 
-} from "@crossmint/client-sdk-react-ui"
-import { useEffect, useState, Suspense } from "react"
-import { ErrorBoundary } from "react-error-boundary"
+import { useEffect, useState } from "react"
+import { CrossmintProvider, CrossmintAuthProvider, CrossmintWalletProvider } from "@crossmint/client-sdk-react-ui"
 
-function ErrorFallback({ error }: { error: Error }) {
-  return (
-    <div role="alert" className="p-4 text-sm text-red-600">
-      <p>Something went wrong with Crossmint initialization:</p>
-      <pre className="mt-2 text-xs">{error.message}</pre>
-    </div>
-  )
-}
-
-function CrossmintProviderInner({ children }: { children: React.ReactNode }) {
+export function CrossmintProviderWrapper({ children }: { children: React.ReactNode }) {
   const [isClient, setIsClient] = useState(false)
-  const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY
-  
+
   useEffect(() => {
     setIsClient(true)
   }, [])
-  
+
+  // Only render Crossmint on the client to avoid SSR issues
   if (!isClient) {
     return <>{children}</>
   }
+
+  const apiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY || ""
   
-  if (!clientApiKey || clientApiKey === 'your_client_api_key_here') {
-    console.warn("Crossmint API key not configured")
-    return <>{children}</>
+  // Log the API key format for debugging (only first/last few chars for security)
+  console.log("Crossmint API Key format check:", {
+    length: apiKey.length,
+    prefix: apiKey.substring(0, 10),
+    suffix: apiKey.substring(apiKey.length - 10),
+    hasInvalidChars: !/^[a-zA-Z0-9_-]+$/.test(apiKey),
+    isEmpty: apiKey === "",
+    env: process.env.NODE_ENV
+  })
+
+  // Check if this is a production key vs staging key issue
+  if (apiKey.startsWith("sk_")) {
+    console.error("WARNING: Using server key (sk_) instead of client key (ck_)")
   }
 
   try {
     return (
-      <CrossmintClientProvider 
-        apiKey={clientApiKey}
+      <CrossmintProvider
+        apiKey={apiKey}
       >
-        <CrossmintAuthProvider>
-          <CrossmintWalletProvider>
+        <CrossmintAuthProvider
+          authModalTitle="SYMLog Authentication"
+          loginMethods={["email", "google"]}
+        >
+          <CrossmintWalletProvider
+            showPasskeyHelpers={false}
+            createOnLogin={{
+              chain: "solana",
+              signer: { type: "email" },
+            }}
+          >
             {children}
           </CrossmintWalletProvider>
         </CrossmintAuthProvider>
-      </CrossmintClientProvider>
+      </CrossmintProvider>
     )
   } catch (error) {
-    console.error("Crossmint initialization error:", error)
+    console.error("Crossmint Provider Error:", error)
+    // Return children without Crossmint if there's an error
     return <>{children}</>
   }
-}
-
-export function CrossmintProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <ErrorBoundary 
-      FallbackComponent={ErrorFallback}
-      onError={(error) => console.error("Crossmint Provider Error:", error)}
-    >
-      <Suspense fallback={<>{children}</>}>
-        <CrossmintProviderInner>
-          {children}
-        </CrossmintProviderInner>
-      </Suspense>
-    </ErrorBoundary>
-  )
 }

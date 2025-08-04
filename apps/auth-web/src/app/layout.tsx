@@ -2,7 +2,8 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ConvexProvider } from './convex-provider'
-import { CrossmintProvider } from './crossmint-provider'
+import { CrossmintProviderWrapper } from './crossmint-provider'
+import { ErrorBoundaryWrapper } from './error-boundary'
 import { Analytics } from '../components/analytics'
 import { Toaster } from 'sonner'
 import { ThemeProvider } from '../components/theme-provider'
@@ -58,11 +59,13 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ConvexProvider>
-            <CrossmintProvider>
-              {children}
-              <Analytics />
-              <Toaster richColors />
-            </CrossmintProvider>
+            <ErrorBoundaryWrapper>
+              <CrossmintProviderWrapper>
+                {children}
+                <Analytics />
+                <Toaster richColors />
+              </CrossmintProviderWrapper>
+            </ErrorBoundaryWrapper>
           </ConvexProvider>
         </ThemeProvider>
       </body>

@@ -23,6 +23,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@solana/web3.js": "^1.98.4",
     "@tanstack/react-form": "^1.12.3",
+    "@tauri-apps/api": "^2.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.25.4",

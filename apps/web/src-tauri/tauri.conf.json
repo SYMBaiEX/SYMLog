@@ -19,13 +19,12 @@
         "minHeight": 700,
         "resizable": true,
         "fullscreen": false,
-        "transparent": true,
-        "decorations": false,
+        "transparent": false,
+        "decorations": true,
         "alwaysOnTop": false,
         "skipTaskbar": false,
         "center": true,
         "hiddenTitle": false,
-        "titleBarStyle": "Visible",
         "theme": "Dark"
       }
     ],
@@ -33,12 +32,6 @@
       "csp": null
     }
   },
-  "protocols": [
-    {
-      "name": "symlog",
-      "schemes": ["symlog"]
-    }
-  ],
   "bundle": {
     "active": true,
     "targets": "all",

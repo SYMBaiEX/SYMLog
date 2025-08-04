@@ -367,3 +367,29 @@ html.dark {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Crossmint Modal Positioning Fix */
+/* Fix for Crossmint authentication modal positioning */
+iframe[src*="crossmint"] {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  width: min(450px, 90vw) !important;
+  height: min(650px, 90vh) !important;
+  z-index: 9999 !important;
+  border-radius: var(--radius) !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* Crossmint modal backdrop */
+div[role="dialog"] {
+  position: fixed !important;
+  inset: 0 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+  backdrop-filter: blur(4px) !important;
+  z-index: 9998 !important;
+}

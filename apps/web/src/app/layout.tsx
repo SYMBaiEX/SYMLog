@@ -42,7 +42,7 @@ export default function RootLayout({
           <TauriDetector />
           <TauriWindowControls />
           <TauriKeyboardShortcuts />
-          <div className="relative flex min-h-screen flex-col">
+          <div className="relative flex min-h-screen flex-col tauri-app:pt-10">
             <AppMenuBar />
             <Navigation />
             <main className="flex-1 relative z-10">{children}</main>

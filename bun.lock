@@ -82,6 +82,7 @@
         "@radix-ui/react-slot": "^1.2.3",
         "@solana/web3.js": "^1.98.4",
         "@tanstack/react-form": "^1.12.3",
+        "@tauri-apps/api": "^2.7.0",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "convex": "^1.25.4",
@@ -1126,6 +1127,8 @@
     "@tanstack/react-store": ["@tanstack/react-store@0.7.3", "", { "dependencies": { "@tanstack/store": "0.7.2", "use-sync-external-store": "^1.5.0" }, "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-3Dnqtbw9P2P0gw8uUM8WP2fFfg8XMDSZCTsywRPZe/XqqYW8PGkXKZTvP0AHkE4mpqP9Y43GpOg9vwO44azu6Q=="],
 
     "@tanstack/store": ["@tanstack/store@0.7.2", "", {}, "sha512-RP80Z30BYiPX2Pyo0Nyw4s1SJFH2jyM6f9i3HfX4pA+gm5jsnYryscdq2aIQLnL4TaGuQMO+zXmN9nh1Qck+Pg=="],
+
+    "@tauri-apps/api": ["@tauri-apps/api@2.7.0", "", {}, "sha512-v7fVE8jqBl8xJFOcBafDzXFc8FnicoH3j8o8DNNs0tHuEBmXUDqrCOAzMRX0UkfpwqZLqvrvK0GNQ45DfnoVDg=="],
 
     "@tauri-apps/cli": ["@tauri-apps/cli@2.7.1", "", { "optionalDependencies": { "@tauri-apps/cli-darwin-arm64": "2.7.1", "@tauri-apps/cli-darwin-x64": "2.7.1", "@tauri-apps/cli-linux-arm-gnueabihf": "2.7.1", "@tauri-apps/cli-linux-arm64-gnu": "2.7.1", "@tauri-apps/cli-linux-arm64-musl": "2.7.1", "@tauri-apps/cli-linux-riscv64-gnu": "2.7.1", "@tauri-apps/cli-linux-x64-gnu": "2.7.1", "@tauri-apps/cli-linux-x64-musl": "2.7.1", "@tauri-apps/cli-win32-arm64-msvc": "2.7.1", "@tauri-apps/cli-win32-ia32-msvc": "2.7.1", "@tauri-apps/cli-win32-x64-msvc": "2.7.1" }, "bin": { "tauri": "tauri.js" } }, "sha512-RcGWR4jOUEl92w3uvI0h61Llkfj9lwGD1iwvDRD2isMrDhOzjeeeVn9aGzeW1jubQ/kAbMYfydcA4BA0Cy733Q=="],
 
