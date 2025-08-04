@@ -128,9 +128,17 @@ export function WebAuthFlow() {
       })
     } catch (error: any) {
       console.error("Auth code validation failed:", error)
-      toast.error("Authentication failed", {
-        description: error?.message || "Invalid or expired code"
-      })
+      
+      // Handle Convex connection errors gracefully
+      if (error?.message?.includes('ConvexError') || error?.message?.includes('Connection failed')) {
+        toast.error("Connection Error", {
+          description: "Unable to validate code. Please check your connection and try again."
+        })
+      } else {
+        toast.error("Authentication failed", {
+          description: error?.message || "Invalid or expired code"
+        })
+      }
     } finally {
       setIsValidatingCode(false)
     }

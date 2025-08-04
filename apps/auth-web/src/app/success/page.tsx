@@ -73,21 +73,15 @@ function SuccessPageContent() {
       // Generate a unique auth code
       const code = `SYM_${Math.random().toString(36).substring(2, 18).toUpperCase()}`
       
-      // Try to store auth session in Convex, but don't fail if it doesn't work
-      try {
-        await createAuthSession({
-          authCode: code,
-          userId: user.id,
-          userEmail: user.email || "",
-          walletAddress: wallet.address || "",
-          expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
-          status: "pending"
-        })
-        console.log("Auth session stored in Convex successfully")
-      } catch (convexError) {
-        console.warn("Failed to store auth session in Convex, continuing without database storage:", convexError)
-        // Continue without database storage - the code will still work for the desktop app
-      }
+      // Store auth session in Convex
+      await createAuthSession({
+        authCode: code,
+        userId: user.id,
+        userEmail: user.email || "",
+        walletAddress: wallet.address || "",
+        expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
+        status: "pending"
+      })
       
       setAuthCode(code)
       setTimeRemaining(600) // Reset timer
