@@ -1,0 +1,46 @@
+# Vercel ignore for main web app
+
+# Tauri build artifacts (largest issue - ~4GB)
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Next.js build (Vercel will rebuild)
+.next/
+out/
+
+# Keep convex functions for deployment
+!convex/
+
+# Dependencies (Vercel handles these)
+node_modules/
+
+# Development files
+.env.local
+.env.development.local
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# Cache
+.turbo/
+.cache/
+
+# Non-essential files
+*.md
+docs/
+CLAUDE.md
+CLAUDE.local.md
+DESKTOP_SETUP.md
+
+# Test files
+test
+test.c
+
+# Large binaries
+*.exe
+*.dmg
+*.so
+*.a
+*.rlib

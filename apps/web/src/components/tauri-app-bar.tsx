@@ -63,6 +63,14 @@ interface MenuBarItem {
   items: TauriMenuItem[]
 }
 
+// Helper function to safely access Tauri window API
+const getTauriWindow = () => {
+  if (typeof window !== 'undefined' && (window as any).__TAURI__?.window) {
+    return (window as any).__TAURI__.window.getCurrent()
+  }
+  return null
+}
+
 export function TauriAppBar() {
   const pathname = usePathname()
   const router = useRouter()
@@ -93,9 +101,9 @@ export function TauriAppBar() {
             break
           case "q":
             e.preventDefault()
-            if (isTauri && window.__TAURI__) {
-              // Close the Tauri window
-              window.__TAURI__.window.getCurrent().close()
+            const tauriWindow = getTauriWindow()
+            if (tauriWindow) {
+              tauriWindow.close()
             }
             break
           case "r":
@@ -155,7 +163,7 @@ export function TauriAppBar() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [router, isTauri])
+  }, [router])
 
   const menuBar: MenuBarItem[] = [
     {
@@ -169,8 +177,9 @@ export function TauriAppBar() {
         { label: "Settings", icon: Settings, shortcut: "⌘,", action: () => router.push("/settings") },
         { separator: true },
         { label: "Quit", shortcut: "⌘Q", action: () => {
-          if (isTauri && window.__TAURI__) {
-            window.__TAURI__.window.getCurrent().close()
+          const tauriWindow = getTauriWindow()
+          if (tauriWindow) {
+            tauriWindow.close()
           }
         }},
       ]
@@ -246,8 +255,9 @@ export function TauriAppBar() {
       label: "Tools",
       items: [
         { label: "Developer Tools", icon: Terminal, shortcut: "⌥⌘I", action: () => {
-          if (isTauri && window.__TAURI__) {
-            window.__TAURI__.window.getCurrent().emit("toggle-devtools")
+          const tauriWindow = getTauriWindow()
+          if (tauriWindow) {
+            tauriWindow.emit("toggle-devtools")
           }
         }},
         { label: "Database Manager", icon: Database, action: () => console.log("Database") },
@@ -260,13 +270,15 @@ export function TauriAppBar() {
       label: "Window",
       items: [
         { label: "Minimize", shortcut: "⌘M", action: () => {
-          if (isTauri && window.__TAURI__) {
-            window.__TAURI__.window.getCurrent().minimize()
+          const tauriWindow = getTauriWindow()
+          if (tauriWindow) {
+            tauriWindow.minimize()
           }
         }},
         { label: "Close", shortcut: "⌘W", action: () => {
-          if (isTauri && window.__TAURI__) {
-            window.__TAURI__.window.getCurrent().close()
+          const tauriWindow = getTauriWindow()
+          if (tauriWindow) {
+            tauriWindow.close()
           }
         }},
         { separator: true },
@@ -379,19 +391,3 @@ export function TauriAppBar() {
   )
 }
 
-// Type declaration for Tauri window API
-declare global {
-  interface Window {
-    __TAURI__?: {
-      window: {
-        getCurrent(): {
-          close(): void
-          minimize(): void
-          maximize(): void
-          unmaximize(): void
-          emit(event: string, payload?: any): void
-        }
-      }
-    }
-  }
-}

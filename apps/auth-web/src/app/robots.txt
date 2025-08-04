@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /success
+Disallow: /error
+Disallow: /loading
+
+Sitemap: https://your-auth-app.vercel.app/sitemap.xml

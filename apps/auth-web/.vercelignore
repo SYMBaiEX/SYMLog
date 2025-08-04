@@ -1,0 +1,25 @@
+# Vercel ignore for auth web app
+
+# Next.js build (Vercel will rebuild)
+.next/
+out/
+
+# Dependencies (Vercel handles these)
+node_modules/
+
+# Development files
+.env.local
+.env.development.local
+*.log
+
+# IDE files
+.vscode/
+.idea/
+
+# Cache
+.turbo/
+.cache/
+
+# Non-essential files
+*.md
+docs/

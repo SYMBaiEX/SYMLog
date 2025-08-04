@@ -84,6 +84,7 @@ export function CrossmintWalletAuth() {
     try {
       await login()
     } catch (error: any) {
+      console.error("Login error:", error)
       toast.error("Login failed", {
         description: error?.message || "Please try again"
       })

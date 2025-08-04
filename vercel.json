@@ -1,0 +1,12 @@
+{
+  "projects": {
+    "auth-web": {
+      "root": "apps/auth-web",
+      "framework": "nextjs"
+    },
+    "web": {
+      "root": "apps/web",
+      "framework": "nextjs"
+    }
+  }
+}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useQuery } from "convex/react"
-import { api } from "@SYMLog/backend/convex/_generated/api"
+import { api } from "../../convex/_generated/api"
 import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Badge } from "@/components/ui/badge"
@@ -24,11 +24,37 @@ import {
 } from "lucide-react"
 
 export default function Home() {
-  const healthCheck = useQuery(api.healthCheck.get)
   const [mounted, setMounted] = useState(false)
+  
+  // Use optional chaining and error handling for Convex query
+  let healthCheck
+  try {
+    healthCheck = useQuery(api.healthCheck.get)
+  } catch (error) {
+    console.warn("Convex health check not available:", error)
+    healthCheck = null
+  }
 
   useEffect(() => {
     setMounted(true)
+    
+    // Check for auth code in URL hash (from callback)
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hash = window.location.hash.substring(1)
+      const params = new URLSearchParams(hash)
+      const authCode = params.get('auth-code')
+      
+      if (authCode) {
+        console.log('Found auth code in URL hash:', authCode)
+        // Dispatch custom event to notify auth components
+        window.dispatchEvent(new CustomEvent('symlog-auth-code', { 
+          detail: { authCode } 
+        }))
+        
+        // Clean up the hash
+        window.history.replaceState(null, '', window.location.pathname + window.location.search)
+      }
+    }
   }, [])
 
   return (
@@ -183,6 +209,7 @@ export default function Home() {
           </GlassCard>
         </div>
       </section>
+      
     </div>
   )
 }
