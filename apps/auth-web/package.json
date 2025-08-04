@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@SYMLog/backend": "workspace:*",
     "@crossmint/client-sdk-react-ui": "^2.3.3",
     "@radix-ui/react-alert-dialog": "^1.1.2",
     "@radix-ui/react-dialog": "^1.1.2",

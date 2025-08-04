@@ -86,6 +86,19 @@ function SuccessPageContent() {
       setAuthCode(code)
       setTimeRemaining(600) // Reset timer
       toast.success("Authentication code generated!")
+      
+      // Send auth code to parent window if opened as popup
+      if (window.opener && window.opener !== window) {
+        try {
+          window.opener.postMessage({
+            type: 'SYMLOG_AUTH_CODE',
+            authCode: code
+          }, '*')
+          console.log('Sent auth code to parent window:', code)
+        } catch (error) {
+          console.error('Failed to send auth code to parent:', error)
+        }
+      }
     } catch (error) {
       console.error("Failed to generate auth code:", error)
       toast.error("Failed to generate authentication code")
@@ -111,6 +124,29 @@ function SuccessPageContent() {
     if (!authCode) return
     
     try {
+      // Send code to parent window if in popup mode
+      if (window.opener && window.opener !== window) {
+        try {
+          window.opener.postMessage({
+            type: 'SYMLOG_AUTH_CODE',
+            authCode: authCode
+          }, '*')
+          toast.success("Code sent to main app!")
+          // Close popup after sending
+          setTimeout(() => window.close(), 1000)
+          return
+        } catch (error) {
+          console.error('Failed to send auth code to parent:', error)
+          // If messaging fails, try web callback redirect
+          const webCallbackUrl = process.env.NEXT_PUBLIC_WEB_CALLBACK_URL
+          if (webCallbackUrl) {
+            window.location.href = `${webCallbackUrl}?code=${encodeURIComponent(authCode)}`
+            return
+          }
+        }
+      }
+      
+      // Fallback to deep link
       const deepLinkUrl = `${process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL}?code=${encodeURIComponent(authCode)}`
       window.location.href = deepLinkUrl
       

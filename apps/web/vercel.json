@@ -1,0 +1,53 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "bun run build",
+  "installCommand": "bun install",
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD ./",
+  "env": {
+    "NEXT_PUBLIC_CONVEX_URL": "https://valiant-chihuahua-726.convex.cloud",
+    "NEXT_PUBLIC_CROSSMINT_CLIENT_KEY": "ck_production_AFarmuLzzQDt9Txy6SWQhYJALsExRR7oDvJNaqLJJ2qvGFxg352Fs723fU9hstZkR4MFeKZdcwnYp1j27o6sXfYYreoSzVbTsksjhBZKWVcyt1MiBipmv31DUSjbWLZa4LA4XVEemF8cCnZdzUJDMerfnf5ciAMm4Zsy35yNKBj8oMJFPaTMriEwVPRhyHYKCy5CBvuvQEUidf7VF8hqsqzK",
+    "NEXT_PUBLIC_CROSSMINT_ENVIRONMENT": "production",
+    "NEXT_PUBLIC_APP_ENV": "production",
+    "NEXT_PUBLIC_AUTH_WEB_URL": "https://auth-web-two.vercel.app",
+    "NEXT_PUBLIC_SOLANA_NETWORK": "mainnet-beta",
+    "NEXT_PUBLIC_SOLANA_RPC_URL": "https://api.mainnet-beta.solana.com",
+    "NEXT_PUBLIC_ENABLE_WALLET_VERIFICATION": "true",
+    "NEXT_PUBLIC_AUTH_REDIRECT_URL": "symlog://auth"
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://crossmint.com https://*.crossmint.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-src https://crossmint.com https://*.crossmint.com;"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/auth",
+      "destination": "https://auth-web-two.vercel.app",
+      "permanent": false
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/api/auth/:path*",
+      "destination": "/api/auth/:path*"
+    }
+  ]
+}

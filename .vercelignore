@@ -1,0 +1,85 @@
+# Vercel deployment ignore file - prevents unnecessary files from being uploaded
+
+# Tauri build artifacts (largest contributor - ~4GB)
+apps/web/src-tauri/target/
+src-tauri/target/
+**/src-tauri/target/
+
+# Rust build files
+*.rlib
+*.so
+*.a
+target/
+Cargo.lock
+
+# Large node_modules (let Vercel handle dependencies)
+node_modules/
+**/node_modules/
+
+# Build outputs not needed for deployment
+apps/web/.next/
+apps/auth-web/.next/
+.next/
+out/
+dist/
+build/
+
+# Cache directories
+.turbo/
+.cache/
+.parcel-cache/
+
+# Development files
+.env.local
+.env.development.local
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Testing artifacts
+coverage/
+.nyc_output/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.temp
+
+# Documentation and non-essential files
+*.md
+CHANGELOG*
+LICENSE*
+docs/
+documentation/
+
+# Large binary files
+*.exe
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.msi
+
+# Rust debug symbols
+*.pdb
+*.dSYM/
+
+# Large media files (if any)
+*.mov
+*.mp4
+*.avi
+*.mkv
+*.zip
+*.tar.gz
+*.rar
+
+# Fumadocs (not needed for main deployment)
+apps/fumadocs/

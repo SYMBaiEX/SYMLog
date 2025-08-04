@@ -20,7 +20,7 @@ This web application provides a secure authentication flow for the SYMLog Tauri 
 ## Features
 
 - **Multiple Authentication Methods**: Email, Google, Apple, Discord, Twitter via Crossmint
-- **Smart Wallet Integration**: Automatic EVM smart wallet creation on Polygon
+- **Smart Wallet Integration**: Automatic SVM smart wallet creation on Solana
 - **Deep Linking**: Seamless return to desktop app with `symlog://` protocol
 - **Manual Fallback**: Code copying for cases where deep linking fails
 - **Security**: 10-minute code expiration, one-time use codes

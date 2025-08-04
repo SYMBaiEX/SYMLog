@@ -59,10 +59,10 @@ export function DesktopAuthFallback() {
   }, [])
 
   const generateWalletAddress = () => {
-    // Generate a mock EVM address for demonstration
-    const chars = '0123456789abcdef'
-    let address = '0x'
-    for (let i = 0; i < 40; i++) {
+    // Generate a mock Solana address for demonstration
+    const chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'
+    let address = ''
+    for (let i = 0; i < 44; i++) {
       address += chars[Math.floor(Math.random() * chars.length)]
     }
     return address

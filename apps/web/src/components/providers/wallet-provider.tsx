@@ -21,10 +21,6 @@ export function WalletProviderWrapper({ children }: WalletProviderWrapperProps) 
   return (
     <CrossmintProvider apiKey={clientApiKey}>
       <CrossmintAuthProvider
-        embeddedWallets={{
-          type: "evm-smart-wallet",
-          createOnLogin: "all-users",
-        }}
         loginMethods={["google", "twitter", "email", "farcaster"]}
       >
         {children}  

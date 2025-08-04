@@ -194,7 +194,7 @@ export function CrossmintWalletAuth() {
                         </div>
                         <p className="text-sm text-white/60 flex items-center gap-1">
                           <Zap className="h-3 w-3" />
-                          EVM Smart Wallet
+                          Solana Smart Wallet
                         </p>
                       </div>
                     </div>

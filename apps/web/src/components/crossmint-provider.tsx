@@ -35,34 +35,20 @@ export function CrossmintProviderWrapper({ children }: { children: React.ReactNo
   return (
     <CrossmintProvider 
       apiKey={clientApiKey}
-      // Configure for desktop/local environment
-      environment="production"
     >
       <CrossmintAuthProvider
-        embeddedWallets={{
-          createOnLogin: "all-users",
-          defaultChain: "polygon", 
-          type: "evm-smart-wallet",
-        }}
         loginMethods={[
           "email",
           "google", 
-          "apple",
-          "discord",
           "twitter"
         ]}
-        // Disable popup-based flows for desktop
-        appearance={{
-          embedded: true,
-          forceEmbedded: isTauri
-        }}
       >
         <CrossmintWalletProvider
           createOnLogin={{
-            chain: "polygon",
+            chain: "solana",
             signer: {
-              type: "evm-smart-wallet",
-            },
+              type: "email"
+            }
           }}
         >
           {children}

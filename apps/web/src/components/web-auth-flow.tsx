@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useMutation } from "convex/react"
-import { api } from "@SYMLog/backend/convex/_generated/api"
+import { api } from "../../convex/_generated/api"
 import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
 import {
@@ -56,6 +56,7 @@ export function WebAuthFlow() {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [isValidatingCode, setIsValidatingCode] = useState(false)
+  const [authPopupWindow, setAuthPopupWindow] = useState<Window | null>(null)
 
   // Convex mutations
   const validateAuthCode = useMutation(api.auth.validateAuthCode)
@@ -99,6 +100,69 @@ export function WebAuthFlow() {
       if (unlisten) {
         unlisten()
       }
+    }
+  }, [])
+
+  // Listen for auth codes from popup window
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Security check: only accept messages from our auth domains
+      const authWebUrl = process.env.NEXT_PUBLIC_AUTH_WEB_URL || 'https://auth-web-two.vercel.app'
+      const allowedOrigins = [
+        'http://localhost:3003', // Development fallback
+        'https://auth-web-two.vercel.app', // Production auth web
+        authWebUrl // Environment configured URL
+      ].filter((url, index, arr) => arr.indexOf(url) === index) // Remove duplicates
+      
+      if (!allowedOrigins.includes(event.origin)) {
+        return
+      }
+
+      if (event.data.type === 'SYMLOG_AUTH_CODE') {
+        const { authCode: receivedCode } = event.data
+        if (receivedCode && receivedCode.startsWith('SYM_')) {
+          console.log('Received auth code from popup:', receivedCode)
+          setAuthCode(receivedCode)
+          
+          // Auto-validate the code
+          handleAuthCode(receivedCode)
+          
+          // Close the popup if it's still open
+          if (authPopupWindow && !authPopupWindow.closed) {
+            authPopupWindow.close()
+            setAuthPopupWindow(null)
+          }
+        }
+      }
+    }
+
+    // Add event listener for messages from popup
+    window.addEventListener('message', handleMessage)
+
+    return () => {
+      window.removeEventListener('message', handleMessage)
+    }
+  }, [authPopupWindow])
+
+  // Listen for auth codes from URL hash (callback redirects)
+  useEffect(() => {
+    const handleCustomEvent = (event: CustomEvent) => {
+      const { authCode: receivedCode } = event.detail
+      if (receivedCode && receivedCode.startsWith('SYM_')) {
+        console.log('Received auth code from URL callback:', receivedCode)
+        setAuthCode(receivedCode)
+        setShowAuthDialog(true)
+        
+        // Auto-validate the code
+        handleAuthCode(receivedCode)
+      }
+    }
+
+    // Add event listener for custom auth code events
+    window.addEventListener('symlog-auth-code', handleCustomEvent as EventListener)
+
+    return () => {
+      window.removeEventListener('symlog-auth-code', handleCustomEvent as EventListener)
     }
   }, [])
 
@@ -149,9 +213,7 @@ export function WebAuthFlow() {
   }
 
   const openAuthPopup = () => {
-    const authUrl = process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:3003' 
-      : 'https://auth-web-two.vercel.app' // SYMLog Auth Portal
+    const authUrl = process.env.NEXT_PUBLIC_AUTH_WEB_URL || 'https://auth-web-two.vercel.app' // SYMLog Auth Portal
     
     setIsLoading(true)
     
@@ -169,10 +231,21 @@ export function WebAuthFlow() {
           setIsLoading(false)
         })
       } else {
-        // In web browser, open popup
-        window.open(authUrl, 'symlog-auth', 'width=500,height=700,scrollbars=yes,resizable=yes')
+        // In web browser, open popup and store reference
+        const popup = window.open(authUrl, 'symlog-auth', 'width=500,height=700,scrollbars=yes,resizable=yes')
+        setAuthPopupWindow(popup)
         setShowAuthDialog(true)
         setIsLoading(false)
+        
+        // Monitor popup for closure
+        if (popup) {
+          const checkClosed = setInterval(() => {
+            if (popup.closed) {
+              setAuthPopupWindow(null)
+              clearInterval(checkClosed)
+            }
+          }, 1000)
+        }
       }
     } catch (error) {
       console.error("Failed to open auth popup:", error)
@@ -303,7 +376,7 @@ export function WebAuthFlow() {
                         </div>
                         <p className="text-sm text-white/60 flex items-center gap-1">
                           <Zap className="h-3 w-3" />
-                          EVM Smart Wallet
+                          Solana Smart Wallet
                         </p>
                       </div>
                     </div>
