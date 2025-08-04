@@ -24,8 +24,16 @@ import {
 } from "lucide-react"
 
 export default function Home() {
-  const healthCheck = useQuery(api.healthCheck.get)
   const [mounted, setMounted] = useState(false)
+  
+  // Use optional chaining and error handling for Convex query
+  let healthCheck
+  try {
+    healthCheck = useQuery(api.healthCheck.get)
+  } catch (error) {
+    console.warn("Convex health check not available:", error)
+    healthCheck = null
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -183,6 +191,7 @@ export default function Home() {
           </GlassCard>
         </div>
       </section>
+      
     </div>
   )
 }

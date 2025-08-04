@@ -5,18 +5,27 @@
   "identifier": "com.tauri.dev",
   "build": {
     "frontendDist": "../.next",
-    "devUrl": "http://localhost:3001",
+    "devUrl": "http://localhost:3000",
     "beforeDevCommand": "bun run dev",
     "beforeBuildCommand": "bun run build"
   },
   "app": {
     "windows": [
       {
-        "title": "SYMLog",
-        "width": 800,
-        "height": 600,
+        "title": "SYMLog - AI Platform",
+        "width": 1400,
+        "height": 900,
+        "minWidth": 1200,
+        "minHeight": 700,
         "resizable": true,
-        "fullscreen": false
+        "fullscreen": false,
+        "transparent": false,
+        "decorations": true,
+        "alwaysOnTop": false,
+        "skipTaskbar": false,
+        "center": true,
+        "hiddenTitle": false,
+        "theme": "Dark"
       }
     ],
     "security": {

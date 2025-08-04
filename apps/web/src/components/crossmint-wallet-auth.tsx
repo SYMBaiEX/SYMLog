@@ -38,29 +38,9 @@ export function CrossmintWalletAuth() {
   const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
   const isCrossmintEnabled = clientApiKey && clientApiKey !== 'your_client_api_key_here'
 
-  // Only use Crossmint hooks if enabled
-  let login: any
-  let logout: any
-  let jwt: string | undefined
-  let user: any
-  let wallet: any
-  let walletStatus: any
-  
-  try {
-    if (isCrossmintEnabled) {
-      const auth = useAuth()
-      const walletHooks = useWallet()
-      login = auth.login
-      logout = auth.logout
-      jwt = auth.jwt
-      user = auth.user
-      wallet = walletHooks.wallet
-      walletStatus = walletHooks.status
-    }
-  } catch (error) {
-    // Crossmint hooks not available
-    console.warn("Crossmint hooks not available:", error)
-  }
+  // Use Crossmint hooks
+  const { login, logout, jwt, user } = useAuth()
+  const { wallet, status: walletStatus } = useWallet()
 
   const isLoggedIn = !!jwt && !!user
   const isWalletReady = walletStatus === 'loaded' && wallet
@@ -97,6 +77,7 @@ export function CrossmintWalletAuth() {
     try {
       await login()
     } catch (error: any) {
+      console.error("Login error:", error)
       toast.error("Login failed", {
         description: error?.message || "Please try again"
       })
@@ -213,7 +194,7 @@ export function CrossmintWalletAuth() {
                         </div>
                         <p className="text-sm text-white/60 flex items-center gap-1">
                           <Zap className="h-3 w-3" />
-                          Solana Smart Wallet
+                          EVM Smart Wallet
                         </p>
                       </div>
                     </div>

@@ -7,6 +7,9 @@ import { Footer } from "@/components/footer";
 import { AnimatedBackground } from "@/components/animated-background";
 import { AppMenuBar } from "@/components/app-menu-bar";
 import { TauriMenuHandler } from "@/components/tauri-menu-handler";
+import { TauriDetector } from "@/components/tauri-detector";
+import { TauriKeyboardShortcuts } from "@/components/tauri-keyboard-shortcuts";
+import { TauriWindowControls } from "@/components/tauri-window-controls";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,7 +39,10 @@ export default function RootLayout({
         <Providers>
           <AnimatedBackground />
           <TauriMenuHandler />
-          <div className="relative flex min-h-screen flex-col">
+          <TauriDetector />
+          <TauriWindowControls />
+          <TauriKeyboardShortcuts />
+          <div className="relative flex min-h-screen flex-col tauri-app:pt-10">
             <AppMenuBar />
             <Navigation />
             <main className="flex-1 relative z-10">{children}</main>
