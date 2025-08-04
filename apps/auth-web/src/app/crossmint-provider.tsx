@@ -17,37 +17,9 @@ export function CrossmintProvider({ children }: { children: React.ReactNode }) {
   return (
     <CrossmintClientProvider 
       apiKey={clientApiKey}
-      environment="production"
     >
-      <CrossmintAuthProvider
-        embeddedWallets={{
-          createOnLogin: "all-users",
-          defaultChain: "polygon", 
-          type: "evm-smart-wallet",
-        }}
-        loginMethods={[
-          "email",
-          "google", 
-          "apple",
-          "discord",
-          "twitter"
-        ]}
-        appearance={{
-          embedded: true,
-          colors: {
-            primary: "#9999FF",
-            accent: "#90EE90",
-          }
-        }}
-      >
-        <CrossmintWalletProvider
-          createOnLogin={{
-            chain: "polygon",
-            signer: {
-              type: "evm-smart-wallet",
-            },
-          }}
-        >
+      <CrossmintAuthProvider>
+        <CrossmintWalletProvider>
           {children}
         </CrossmintWalletProvider>
       </CrossmintAuthProvider>

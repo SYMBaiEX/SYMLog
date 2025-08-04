@@ -1,5 +1,8 @@
+"use client"
+
 import Link from 'next/link'
 import { Brain, Home, ArrowLeft } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 export default function NotFound() {
   return (
@@ -29,21 +32,26 @@ export default function NotFound() {
         {/* Action Card */}
         <div className="glass rounded-2xl p-8 space-y-6">
           <div className="space-y-4">
-            <Link
-              href="/"
-              className="w-full glass-button bg-periwinkle/20 hover:bg-periwinkle/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 glow-primary flex items-center justify-center gap-2"
-            >
-              <Home className="h-5 w-5" />
-              Go to Authentication
-            </Link>
+            <Button asChild variant="periwinkle" size="lg" className="w-full">
+              <Link href="/">
+                <Home className="h-5 w-5" />
+                Go to Authentication
+              </Link>
+            </Button>
             
-            <button
-              onClick={() => window.history.back()}
-              className="w-full glass-button bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 font-medium py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+            <Button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.history.back()
+                }
+              }}
+              variant="glass"
+              size="lg"
+              className="w-full"
             >
               <ArrowLeft className="h-5 w-5" />
               Go Back
-            </button>
+            </Button>
           </div>
         </div>
 

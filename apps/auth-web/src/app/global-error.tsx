@@ -61,16 +61,19 @@ export default function GlobalError({
               {/* Action Buttons */}
               <div className="space-y-3">
                 <button
-                  onClick={reset}
-                  className="w-full backdrop-filter backdrop-blur-12 bg-[#9999FF]/20 hover:bg-[#9999FF]/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
-                  style={{ boxShadow: '0 0 20px rgba(153, 153, 255, 0.3)' }}
+                  onClick={() => reset()}
+                  className="w-full backdrop-filter backdrop-blur-12 bg-periwinkle/20 hover:bg-periwinkle/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2 glow-primary"
                 >
                   <RefreshCw className="h-5 w-5" />
                   Try Again
                 </button>
                 
                 <button
-                  onClick={() => window.location.href = '/'}
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.location.href = '/'
+                    }
+                  }}
                   className="w-full backdrop-filter backdrop-blur-12 bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 font-medium py-3 px-6 rounded-lg transition-all duration-300"
                 >
                   Go to Homepage

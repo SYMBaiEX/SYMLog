@@ -3,15 +3,9 @@
 import { useEffect, useState } from "react"
 import { Brain, Loader2 } from "lucide-react"
 
-interface LoadingPageProps {
-  message?: string
-  progress?: number
-}
-
-export default function LoadingPage({ 
-  message = "Authenticating...", 
-  progress 
-}: LoadingPageProps) {
+export default function LoadingPage() {
+  const message = "Authenticating..."
+  const progress = undefined
   const [dots, setDots] = useState("")
 
   // Animated dots effect

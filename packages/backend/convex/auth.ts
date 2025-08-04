@@ -26,7 +26,6 @@ export const createAuthSession = mutation({
     const sessionId = await ctx.db.insert("authSessions", {
       ...args,
       createdAt: Date.now(),
-      usedAt: null,
     })
 
     return sessionId
@@ -50,7 +49,7 @@ export const updateAuthSession = mutation({
 
     await ctx.db.patch(session._id, {
       status: args.status,
-      usedAt: args.status === "completed" ? Date.now() : session.usedAt,
+      ...(args.status === "completed" && { usedAt: Date.now() }),
     })
 
     return session._id
@@ -73,8 +72,6 @@ export const getAuthSession = query({
 
     // Check if expired
     if (session.expiresAt < Date.now()) {
-      // Mark as expired
-      await ctx.db.patch(session._id, { status: "expired" })
       return null
     }
 

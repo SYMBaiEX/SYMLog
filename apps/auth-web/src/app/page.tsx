@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import { useAuth } from "@crossmint/client-sdk-react-ui"
 import { Brain, Shield, Zap, CheckCircle2 } from "lucide-react"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function HomePage() {
   const router = useRouter()
@@ -70,23 +72,27 @@ export default function HomePage() {
         </div>
 
         {/* Login Card */}
-        <div className="glass rounded-2xl p-8 space-y-6">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-white mb-3">
+        <Card className="p-8 space-y-6">
+          <CardHeader className="text-center p-0">
+            <CardTitle className="text-2xl font-semibold text-white mb-3">
               Sign in to continue
-            </h2>
-            <p className="text-gray-400">
+            </CardTitle>
+            <CardDescription className="text-gray-400">
               Connect your account to generate an authentication code for your SYMLog desktop application.
-            </p>
-          </div>
+            </CardDescription>
+          </CardHeader>
 
-          {/* Login Button */}
-          <button
-            onClick={handleLogin}
-            className="w-full glass-button bg-periwinkle/20 hover:bg-periwinkle/30 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 glow-primary text-lg"
-          >
-            Sign in with Crossmint
-          </button>
+          <CardContent className="p-0">
+            {/* Login Button */}
+            <Button
+              onClick={handleLogin}
+              variant="periwinkle"
+              size="xl"
+              className="w-full"
+            >
+              Sign in with Crossmint
+            </Button>
+          </CardContent>
 
           {/* Features */}
           <div className="grid grid-cols-3 gap-4 pt-4">
@@ -109,7 +115,7 @@ export default function HomePage() {
               <p className="text-xs text-gray-400">Trusted</p>
             </div>
           </div>
-        </div>
+        </Card>
 
         {/* How it Works */}
         <div className="glass rounded-xl p-6 mt-6">

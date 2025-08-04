@@ -1,9 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Brain, AlertTriangle, RefreshCw, Home, ArrowLeft } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent } from "@/components/ui/card"
 
 interface ErrorInfo {
   type: string
@@ -49,7 +51,7 @@ const errorTypes = {
   }
 }
 
-export default function ErrorPage() {
+function ErrorPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [errorInfo, setErrorInfo] = useState<ErrorInfo | null>(null)
@@ -123,29 +125,36 @@ export default function ErrorPage() {
 
           {/* Action Buttons */}
           <div className="space-y-3">
-            <button
+            <Button
               onClick={handleRetry}
-              className="w-full glass-button bg-periwinkle/20 hover:bg-periwinkle/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 glow-primary flex items-center justify-center gap-2"
+              variant="periwinkle"
+              size="lg"
+              className="w-full"
             >
               <RefreshCw className="h-5 w-5" />
               Try Again
-            </button>
+            </Button>
             
-            <Link
-              href="/"
-              className="w-full glass-button bg-gray-800/50 hover:bg-gray-700/50 text-gray-300 font-medium py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
-            >
-              <Home className="h-5 w-5" />
-              Back to Login
-            </Link>
+            <Button asChild variant="glass" size="lg" className="w-full">
+              <Link href="/">
+                <Home className="h-5 w-5" />
+                Back to Login
+              </Link>
+            </Button>
 
-            <button
-              onClick={() => window.history.back()}
-              className="w-full text-gray-500 hover:text-gray-300 text-sm transition-colors flex items-center justify-center gap-2"
+            <Button
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.history.back()
+                }
+              }}
+              variant="ghost"
+              size="sm"
+              className="w-full text-gray-500 hover:text-gray-300"
             >
               <ArrowLeft className="h-4 w-4" />
               Go Back
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -173,5 +182,13 @@ export default function ErrorPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ErrorPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-500"></div></div>}>
+      <ErrorPageContent />
+    </Suspense>
   )
 }

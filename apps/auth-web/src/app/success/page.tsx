@@ -1,14 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth, useWallet } from "@crossmint/client-sdk-react-ui"
 import { useMutation } from "convex/react"
 import { api } from "../../lib/convex"
 import { Brain, Copy, ExternalLink, CheckCircle2, Clock, Shield } from "lucide-react"
 import { toast } from "sonner"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
-export default function SuccessPage() {
+function SuccessPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { jwt, user, logout } = useAuth()
@@ -190,9 +192,10 @@ export default function SuccessPage() {
                   <code className="flex-1 text-lg font-mono text-white bg-black/50 px-3 py-2 rounded border-l-4 border-periwinkle">
                     {authCode}
                   </code>
-                  <button
+                  <Button
                     onClick={copyCodeToClipboard}
-                    className="glass-button p-2 rounded hover:bg-white/10 transition-colors"
+                    variant="glass"
+                    size="icon"
                     title="Copy code"
                   >
                     {copiedCode ? (
@@ -200,27 +203,31 @@ export default function SuccessPage() {
                     ) : (
                       <Copy className="h-5 w-5 text-gray-400" />
                     )}
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="space-y-3">
-                <button
+                <Button
                   onClick={handleDeepLink}
-                  className="w-full glass-button bg-light-green/20 hover:bg-light-green/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+                  variant="glass"
+                  size="lg"
+                  className="w-full bg-light-green/20 hover:bg-light-green/30"
                 >
                   <ExternalLink className="h-5 w-5" />
                   Open SYMLog App
-                </button>
+                </Button>
 
-                <button
+                <Button
                   onClick={generateAuthCode}
                   disabled={isGeneratingCode}
-                  className="w-full glass-button bg-periwinkle/20 hover:bg-periwinkle/30 text-white font-medium py-3 px-6 rounded-lg transition-all duration-300 disabled:opacity-50"
+                  variant="periwinkle"
+                  size="lg"
+                  className="w-full"
                 >
                   {isGeneratingCode ? "Generating..." : "Generate New Code"}
-                </button>
+                </Button>
 
                 <div className="text-center">
                   <p className="text-xs text-gray-500 mb-2">
@@ -259,15 +266,25 @@ export default function SuccessPage() {
                 </p>
               </div>
             </div>
-            <button
+            <Button
               onClick={handleLogout}
-              className="text-gray-400 hover:text-white text-sm transition-colors"
+              variant="ghost"
+              size="sm"
+              className="text-gray-400 hover:text-white"
             >
               Sign Out
-            </button>
+            </Button>
           </div>
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SuccessPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-periwinkle"></div></div>}>
+      <SuccessPageContent />
+    </Suspense>
   )
 }

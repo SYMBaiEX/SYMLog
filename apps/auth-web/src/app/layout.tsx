@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { ConvexProvider } from './convex-provider'
 import { CrossmintProvider } from './crossmint-provider'
+import { Analytics } from '../components/analytics'
 import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -19,9 +20,11 @@ export const metadata: Metadata = {
   publisher: 'SYMLog',
   robots: 'index, follow',
   manifest: '/manifest.json',
-  viewport: 'width=device-width, initial-scale=1',
-  themeColor: '#9999ff',
-  colorScheme: 'dark',
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-status-bar-style': 'black-translucent',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
@@ -47,6 +50,7 @@ export default function RootLayout({
         <ConvexProvider>
           <CrossmintProvider>
             {children}
+            <Analytics />
             <Toaster richColors />
           </CrossmintProvider>
         </ConvexProvider>
