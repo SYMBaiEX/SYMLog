@@ -32,12 +32,19 @@ function CodeBlock({ children, className, inline }: CodeBlockProps) {
   const [copied, setCopied] = useState(false)
   const language = className?.replace('language-', '') || 'text'
   
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    if (copied) {
+      const timeoutId = setTimeout(() => setCopied(false), 2000)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [copied])
+  
   const copyToClipboard = async () => {
     try {
       await navigator.clipboard.writeText(children)
       setCopied(true)
       toast.success('Code copied to clipboard')
-      setTimeout(() => setCopied(false), 2000)
     } catch (error) {
       toast.error('Failed to copy code')
     }

@@ -77,9 +77,12 @@ export function DataViewer({ artifact, className }: DataViewerProps) {
     }
 
     if (typeof value === "string") {
-      const highlighted = searchTerm
+      // Sanitize search term to prevent XSS and regex injection
+      const sanitizedSearchTerm = searchTerm ? searchTerm.replace(/[^a-zA-Z0-9\s.,!?-]/g, '') : ''
+      
+      const highlighted = sanitizedSearchTerm
         ? value.replace(
-            new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi"),
+            new RegExp(`(${sanitizedSearchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi"),
             '<mark class="bg-yellow-400/30 text-yellow-300">$1</mark>'
           )
         : value

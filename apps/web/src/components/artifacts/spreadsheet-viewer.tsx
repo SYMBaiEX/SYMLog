@@ -180,6 +180,7 @@ export function SpreadsheetViewer({ artifact, className }: SpreadsheetViewerProp
                   checked={selectedRows.size === filteredAndSortedData.length}
                   onChange={handleSelectAll}
                   className="rounded border-white/20"
+                  aria-label="Select all rows"
                 />
               </TableHead>
               {artifact.columns.map((column) => (
@@ -219,6 +220,7 @@ export function SpreadsheetViewer({ artifact, className }: SpreadsheetViewerProp
                     checked={selectedRows.has(rowIndex)}
                     onChange={() => handleSelectRow(rowIndex)}
                     className="rounded border-white/20"
+                    aria-label={`Select row ${rowIndex + 1}`}
                   />
                 </TableCell>
                 {artifact.columns.map((column) => (

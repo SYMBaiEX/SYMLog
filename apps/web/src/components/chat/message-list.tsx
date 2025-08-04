@@ -188,7 +188,12 @@ export function MessageList({
       })}
       
       {isLoading && (
-        <GlassCard className="p-4 mr-auto max-w-[80%] animate-pulse">
+        <GlassCard 
+          className="p-4 mr-auto max-w-[80%] animate-pulse"
+          role="status"
+          aria-live="polite"
+          aria-label="AI Assistant is thinking"
+        >
           <div className="flex gap-3">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-light-green/20 text-light-green">
@@ -210,6 +215,7 @@ export function MessageList({
                 size="sm"
                 className="mt-2"
                 onClick={onStop}
+                aria-label="Stop AI response generation"
               >
                 <Square className="h-3 w-3 mr-1" />
                 Stop
