@@ -1,0 +1,741 @@
+---
+description: "Code Quality and Maintainability Standards"
+globs: 
+  - "**/*.{ts,tsx,js,jsx}"
+  - "**/biome.json"
+  - "**/.eslintrc*"
+alwaysApply: true
+---
+
+# Code Quality Standards
+
+## Quality Principles
+
+1. **Readability > Cleverness**: Code is read more than it's written
+2. **Simplicity > Complexity**: Prefer simple, obvious solutions
+3. **Consistency > Personal Preference**: Follow team standards
+4. **Tests > Documentation**: Tests are executable documentation
+5. **Refactor > Rewrite**: Improve incrementally
+
+## Code Style Guidelines
+
+### 1. TypeScript Excellence
+```typescript
+// Use strict TypeScript configuration
+{
+  "compilerOptions": {
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true
+  }
+}
+
+// Prefer interfaces for object types
+interface User {
+  id: string
+  email: string
+  profile: UserProfile
+}
+
+// Use type for unions, intersections, and aliases
+type Status = 'active' | 'inactive' | 'pending'
+type AsyncData<T> = { loading: true } | { loading: false; data: T }
+
+// Use const assertions for literals
+const ROUTES = {
+  home: '/',
+  login: '/login',
+  dashboard: '/dashboard',
+} as const
+
+type Route = typeof ROUTES[keyof typeof ROUTES]
+
+// Use satisfies for type validation
+const config = {
+  api: {
+    url: process.env.NEXT_PUBLIC_API_URL,
+    timeout: 5000,
+  },
+  features: {
+    darkMode: true,
+    analytics: false,
+  }
+} satisfies AppConfig
+```
+
+### 2. Naming Conventions
+```typescript
+// Components: PascalCase
+export function UserProfile() { }
+export const MessageList = () => { }
+
+// Functions/Variables: camelCase
+const getUserById = (id: string) => { }
+let isLoading = false
+
+// Constants: UPPER_SNAKE_CASE
+const MAX_RETRY_ATTEMPTS = 3
+const API_BASE_URL = 'https://api.example.com'
+
+// Types/Interfaces: PascalCase
+interface UserData { }
+type ApiResponse<T> = { }
+
+// Enums: PascalCase with PascalCase members
+enum UserRole {
+  Admin = 'ADMIN',
+  User = 'USER',
+  Guest = 'GUEST',
+}
+
+// Files: kebab-case
+// user-profile.tsx
+// api-client.ts
+// auth-context.tsx
+
+// Descriptive boolean names
+const isDisabled = true
+const hasError = false
+const canEdit = true
+const shouldUpdate = false
+```
+
+### 3. Function Guidelines
+```typescript
+// Keep functions small and focused
+// ❌ Bad: Multiple responsibilities
+function processUserData(user: User) {
+  // Validate
+  if (!user.email) throw new Error('Email required')
+  
+  // Transform
+  const normalized = {
+    ...user,
+    email: user.email.toLowerCase(),
+  }
+  
+  // Save
+  database.save(normalized)
+  
+  // Send email
+  emailService.sendWelcome(normalized.email)
+  
+  // Log
+  logger.info('User processed')
+}
+
+// ✅ Good: Single responsibility
+const validateUser = (user: User): void => {
+  if (!user.email) throw new Error('Email required')
+}
+
+const normalizeUser = (user: User): User => ({
+  ...user,
+  email: user.email.toLowerCase(),
+})
+
+const saveUser = async (user: User): Promise<void> => {
+  await database.save(user)
+}
+
+const processUser = async (user: User): Promise<void> => {
+  validateUser(user)
+  const normalized = normalizeUser(user)
+  await saveUser(normalized)
+  await emailService.sendWelcome(normalized.email)
+  logger.info('User processed', { userId: user.id })
+}
+
+// Use default parameters
+function createUser(
+  email: string,
+  role: UserRole = UserRole.User,
+  isActive = true
+): User {
+  return { email, role, isActive }
+}
+
+// Return early to reduce nesting
+function getUserName(user: User | null): string {
+  if (!user) return 'Guest'
+  if (!user.profile) return 'Anonymous'
+  if (!user.profile.name) return user.email
+  return user.profile.name
+}
+```
+
+### 4. Error Handling
+```typescript
+// Create custom error classes
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public field: string,
+    public code: string
+  ) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code: string
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+// Use Result pattern for expected errors
+type Result<T, E = Error> = 
+  | { success: true; data: T }
+  | { success: false; error: E }
+
+async function fetchUser(id: string): Promise<Result<User>> {
+  try {
+    const user = await api.get(`/users/${id}`)
+    return { success: true, data: user }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error instanceof Error ? error : new Error('Unknown error')
+    }
+  }
+}
+
+// Handle errors gracefully
+const result = await fetchUser(userId)
+if (!result.success) {
+  console.error('Failed to fetch user:', result.error)
+  return <ErrorMessage error={result.error} />
+}
+
+const { data: user } = result
+```
+
+## Component Quality
+
+### 1. Component Structure
+```typescript
+// Organize component files consistently
+// UserProfile.tsx
+
+import { memo, useCallback, useMemo } from 'react'
+import { useUser } from '@/hooks/useUser'
+import { Avatar } from '@/components/ui/Avatar'
+import type { User } from '@/types'
+
+// Types at the top
+interface UserProfileProps {
+  userId: string
+  onEdit?: (user: User) => void
+  className?: string
+}
+
+// Component definition
+export const UserProfile = memo(function UserProfile({
+  userId,
+  onEdit,
+  className,
+}: UserProfileProps) {
+  // Hooks first
+  const { user, loading, error } = useUser(userId)
+  
+  // Derived state
+  const displayName = useMemo(
+    () => user?.name || user?.email || 'Anonymous',
+    [user]
+  )
+  
+  // Callbacks
+  const handleEdit = useCallback(() => {
+    if (user && onEdit) {
+      onEdit(user)
+    }
+  }, [user, onEdit])
+  
+  // Early returns for edge cases
+  if (loading) return <ProfileSkeleton />
+  if (error) return <ErrorMessage error={error} />
+  if (!user) return null
+  
+  // Main render
+  return (
+    <div className={className}>
+      <Avatar src={user.avatar} alt={displayName} />
+      <h3>{displayName}</h3>
+      {onEdit && (
+        <button onClick={handleEdit}>Edit</button>
+      )}
+    </div>
+  )
+})
+
+// Sub-components (if needed)
+function ProfileSkeleton() {
+  return <div className="animate-pulse">Loading...</div>
+}
+
+// Export types if needed
+export type { UserProfileProps }
+```
+
+### 2. Props Design
+```typescript
+// Use discriminated unions for complex props
+type ButtonProps = 
+  | { variant: 'primary'; onClick: () => void }
+  | { variant: 'link'; href: string; external?: boolean }
+  | { variant: 'disabled'; reason: string }
+
+// Extend native HTML props
+interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label: string
+  error?: string
+  hint?: string
+}
+
+// Use composition for flexibility
+interface CardProps {
+  children: React.ReactNode
+  header?: React.ReactNode
+  footer?: React.ReactNode
+  className?: string
+}
+
+// Avoid boolean traps
+// ❌ Bad
+<Button primary large disabled />
+
+// ✅ Good
+<Button variant="primary" size="large" state="disabled" />
+```
+
+### 3. Hook Guidelines
+```typescript
+// Custom hooks follow rules of hooks
+export function useUser(userId: string) {
+  // Always call hooks at top level
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+  
+  useEffect(() => {
+    let cancelled = false
+    
+    async function fetchUser() {
+      try {
+        setLoading(true)
+        const data = await api.get(`/users/${userId}`)
+        if (!cancelled) {
+          setUser(data)
+          setError(null)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err : new Error('Failed to fetch'))
+          setUser(null)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    
+    fetchUser()
+    
+    // Cleanup function
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+  
+  return { user, loading, error }
+}
+
+// Compose hooks for complex logic
+export function useAuth() {
+  const user = useUser()
+  const permissions = usePermissions(user?.id)
+  const session = useSession()
+  
+  return {
+    user,
+    permissions,
+    session,
+    isAuthenticated: !!user && !!session,
+    can: (action: string) => permissions.includes(action),
+  }
+}
+```
+
+## Testing Standards
+
+### 1. Test Structure
+```typescript
+// Follow AAA pattern: Arrange, Act, Assert
+describe('UserService', () => {
+  describe('createUser', () => {
+    it('should create a user with valid data', async () => {
+      // Arrange
+      const userData = {
+        email: 'test@example.com',
+        name: 'Test User',
+      }
+      
+      // Act
+      const user = await userService.createUser(userData)
+      
+      // Assert
+      expect(user).toMatchObject({
+        id: expect.any(String),
+        email: userData.email,
+        name: userData.name,
+        createdAt: expect.any(Date),
+      })
+    })
+    
+    it('should throw ValidationError for invalid email', async () => {
+      // Arrange
+      const userData = {
+        email: 'invalid-email',
+        name: 'Test User',
+      }
+      
+      // Act & Assert
+      await expect(userService.createUser(userData))
+        .rejects
+        .toThrow(ValidationError)
+    })
+  })
+})
+```
+
+### 2. Component Testing
+```typescript
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+describe('LoginForm', () => {
+  const mockOnSubmit = jest.fn()
+  
+  beforeEach(() => {
+    mockOnSubmit.mockClear()
+  })
+  
+  it('should submit form with valid data', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(<LoginForm onSubmit={mockOnSubmit} />)
+    
+    // Act
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com')
+    await user.type(screen.getByLabelText(/password/i), 'password123')
+    await user.click(screen.getByRole('button', { name: /login/i }))
+    
+    // Assert
+    await waitFor(() => {
+      expect(mockOnSubmit).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123',
+      })
+    })
+  })
+  
+  it('should show validation errors', async () => {
+    // Arrange
+    const user = userEvent.setup()
+    render(<LoginForm onSubmit={mockOnSubmit} />)
+    
+    // Act - submit empty form
+    await user.click(screen.getByRole('button', { name: /login/i }))
+    
+    // Assert
+    expect(screen.getByText(/email is required/i)).toBeInTheDocument()
+    expect(screen.getByText(/password is required/i)).toBeInTheDocument()
+    expect(mockOnSubmit).not.toHaveBeenCalled()
+  })
+})
+```
+
+### 3. Test Utilities
+```typescript
+// Create test factories
+export const createMockUser = (overrides?: Partial<User>): User => ({
+  id: 'test-id',
+  email: 'test@example.com',
+  name: 'Test User',
+  role: UserRole.User,
+  createdAt: new Date(),
+  ...overrides,
+})
+
+// Custom render with providers
+export const renderWithProviders = (
+  ui: React.ReactElement,
+  {
+    preloadedState = {},
+    ...renderOptions
+  }: RenderOptions = {}
+) => {
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <ConvexProvider client={convexClient}>
+        {children}
+      </ConvexProvider>
+    </QueryClientProvider>
+  )
+  
+  return render(ui, { wrapper: Wrapper, ...renderOptions })
+}
+
+// Test hooks
+export const renderHook = <Result, Props>(
+  hook: (props: Props) => Result
+) => {
+  const { result, rerender } = renderHookBase(
+    () => hook(props),
+    { wrapper: Wrapper }
+  )
+  
+  return { result, rerender }
+}
+```
+
+## Documentation
+
+### 1. Code Comments
+```typescript
+/**
+ * Processes user authentication using Web3 wallet signature.
+ * 
+ * @param signature - The wallet signature from the user
+ * @param message - The original message that was signed
+ * @param publicKey - The user's public wallet address
+ * @returns Promise resolving to authenticated user or null
+ * @throws {ValidationError} If signature is invalid
+ * @throws {ApiError} If authentication service fails
+ * 
+ * @example
+ * ```typescript
+ * const user = await authenticateWallet(
+ *   signature,
+ *   'Sign this message to authenticate',
+ *   '5FHne...QxFJ'
+ * )
+ * ```
+ */
+export async function authenticateWallet(
+  signature: string,
+  message: string,
+  publicKey: string
+): Promise<User | null> {
+  // Implementation
+}
+
+// Use inline comments sparingly
+const result = await complexCalculation(
+  data,
+  // Use cached results for better performance
+  { useCache: true }
+)
+```
+
+### 2. Type Documentation
+```typescript
+/**
+ * Represents a user in the system
+ */
+interface User {
+  /** Unique identifier */
+  id: string
+  
+  /** Email address (unique) */
+  email: string
+  
+  /** Display name (optional) */
+  name?: string
+  
+  /** User's role in the system */
+  role: UserRole
+  
+  /** Wallet address for Web3 authentication */
+  walletAddress?: string
+  
+  /** ISO 8601 timestamp */
+  createdAt: string
+  
+  /** ISO 8601 timestamp */
+  updatedAt: string
+}
+
+/**
+ * Configuration options for API client
+ */
+interface ApiClientConfig {
+  /** Base URL for API requests */
+  baseUrl: string
+  
+  /** Request timeout in milliseconds (default: 30000) */
+  timeout?: number
+  
+  /** Retry configuration */
+  retry?: {
+    /** Maximum number of retry attempts (default: 3) */
+    maxAttempts?: number
+    
+    /** Delay between retries in ms (default: 1000) */
+    delay?: number
+  }
+}
+```
+
+## Code Organization
+
+### 1. File Structure
+```
+src/
+├── components/          # Reusable UI components
+│   ├── ui/             # Base UI components
+│   ├── forms/          # Form components
+│   └── layouts/        # Layout components
+├── features/           # Feature-based modules
+│   ├── auth/          # Authentication feature
+│   ├── chat/          # Chat feature
+│   └── wallet/        # Web3 wallet feature
+├── hooks/             # Custom React hooks
+├── lib/               # Utility functions
+├── services/          # API and external services
+├── stores/            # State management
+├── types/             # TypeScript types
+└── utils/             # Helper functions
+```
+
+### 2. Module Organization
+```typescript
+// features/auth/index.ts - Public API
+export { LoginForm } from './components/LoginForm'
+export { useAuth } from './hooks/useAuth'
+export { authService } from './services/authService'
+export type { User, AuthState } from './types'
+
+// features/auth/components/LoginForm.tsx
+// Keep feature-specific components private unless needed elsewhere
+
+// features/auth/hooks/useAuth.ts
+// Feature-specific hooks
+
+// features/auth/services/authService.ts
+// Feature-specific services
+
+// features/auth/types.ts
+// Feature-specific types
+```
+
+## Refactoring Guidelines
+
+### 1. When to Refactor
+- **Rule of Three**: Refactor when you see the same pattern three times
+- **Code Smells**: Long methods, large classes, duplicate code
+- **Performance Issues**: After profiling identifies bottlenecks
+- **New Requirements**: When changes become difficult
+- **Technical Debt**: Scheduled refactoring sprints
+
+### 2. Safe Refactoring
+```typescript
+// Step 1: Add tests for existing behavior
+describe('calculatePrice', () => {
+  it('should calculate price with tax', () => {
+    expect(calculatePrice(100, 0.1)).toBe(110)
+  })
+})
+
+// Step 2: Refactor with confidence
+// Before
+function calculatePrice(base: number, taxRate: number): number {
+  return base + (base * taxRate)
+}
+
+// After
+interface PriceCalculation {
+  base: number
+  tax: number
+  total: number
+}
+
+function calculatePrice(
+  base: number,
+  taxRate: number
+): PriceCalculation {
+  const tax = base * taxRate
+  return {
+    base,
+    tax,
+    total: base + tax,
+  }
+}
+
+// Step 3: Update tests
+it('should return detailed price calculation', () => {
+  const result = calculatePrice(100, 0.1)
+  expect(result).toEqual({
+    base: 100,
+    tax: 10,
+    total: 110,
+  })
+})
+```
+
+## Code Review Checklist
+
+### Functionality
+- [ ] Code works as intended
+- [ ] Edge cases are handled
+- [ ] Error handling is appropriate
+- [ ] No regressions introduced
+
+### Code Quality
+- [ ] Follows coding standards
+- [ ] No code duplication
+- [ ] Functions are focused
+- [ ] Naming is clear and consistent
+
+### Testing
+- [ ] Tests cover new code
+- [ ] Tests are meaningful
+- [ ] Edge cases are tested
+- [ ] Tests follow best practices
+
+### Performance
+- [ ] No obvious performance issues
+- [ ] Efficient algorithms used
+- [ ] No memory leaks
+- [ ] Appropriate caching
+
+### Security
+- [ ] Input validation in place
+- [ ] No security vulnerabilities
+- [ ] Secrets not exposed
+- [ ] Authentication/authorization correct
+
+### Documentation
+- [ ] Code is self-documenting
+- [ ] Complex logic explained
+- [ ] API documented
+- [ ] README updated if needed
+
+Remember: Quality is not negotiable. Take pride in craftsmanship.

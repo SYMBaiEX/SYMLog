@@ -1,0 +1,745 @@
+---
+description: "Documentation Standards and Best Practices"
+globs: 
+  - "**/*.md"
+  - "**/*.mdx"
+  - "**/README*"
+  - "**/CONTRIBUTING*"
+  - "**/docs/**/*"
+alwaysApply: true
+---
+
+# Documentation Rules
+
+## Documentation Philosophy
+
+### 1. README Structure
+
+```markdown
+# Project Name
+
+Brief description of what the project does and why it exists.
+
+## 🚀 Quick Start
+
+\```bash
+# Installation
+npm install
+
+# Development
+npm run dev
+
+# Build
+npm run build
+\```
+
+## 📋 Prerequisites
+
+- Node.js 18+
+- PostgreSQL 14+
+- Redis 6+
+
+## 🛠️ Installation
+
+### Local Development
+
+1. Clone the repository
+\```bash
+git clone https://github.com/symlog/symlog.git
+cd symlog
+\```
+
+2. Install dependencies
+\```bash
+npm install
+\```
+
+3. Set up environment variables
+\```bash
+cp .env.example .env.local
+# Edit .env.local with your values
+\```
+
+4. Run database migrations
+\```bash
+npm run db:migrate
+\```
+
+5. Start development server
+\```bash
+npm run dev
+\```
+
+## 🏗️ Architecture
+
+Brief overview of system architecture with diagram if helpful.
+
+### Tech Stack
+- **Frontend**: Next.js 15, React 19, TypeScript
+- **Backend**: Convex, Node.js
+- **Database**: PostgreSQL with Prisma
+- **Desktop**: Tauri 2
+- **Blockchain**: Solana
+
+### Project Structure
+\```
+symlog/
+├── apps/
+│   ├── web/          # Next.js web application
+│   └── desktop/      # Tauri desktop application
+├── packages/
+│   ├── ui/           # Shared UI components
+│   └── utils/        # Shared utilities
+└── docs/             # Documentation
+\```
+
+## 📚 Documentation
+
+- [API Documentation](./docs/api.md)
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Architecture Decision Records](./docs/adr/)
+
+## 🧪 Testing
+
+\```bash
+# Unit tests
+npm test
+
+# Integration tests
+npm run test:integration
+
+# E2E tests
+npm run test:e2e
+\```
+
+## 🚀 Deployment
+
+### Production
+
+\```bash
+# Build for production
+npm run build
+
+# Deploy
+npm run deploy
+\```
+
+## 🤝 Contributing
+
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```
+
+### 2. API Documentation
+
+```typescript
+/**
+ * @api {post} /api/users Create User
+ * @apiName CreateUser
+ * @apiGroup Users
+ * @apiVersion 1.0.0
+ * 
+ * @apiDescription Creates a new user account with the provided information.
+ * 
+ * @apiParam {String} email User's email address
+ * @apiParam {String} password User's password (min 8 characters)
+ * @apiParam {String} [name] User's display name
+ * 
+ * @apiParamExample {json} Request-Example:
+ *     {
+ *       "email": "user@example.com",
+ *       "password": "securepassword123",
+ *       "name": "John Doe"
+ *     }
+ * 
+ * @apiSuccess {String} id User's unique ID
+ * @apiSuccess {String} email User's email
+ * @apiSuccess {String} name User's name
+ * @apiSuccess {Date} createdAt Account creation timestamp
+ * 
+ * @apiSuccessExample {json} Success-Response:
+ *     HTTP/1.1 201 Created
+ *     {
+ *       "id": "usr_123456",
+ *       "email": "user@example.com",
+ *       "name": "John Doe",
+ *       "createdAt": "2025-08-04T12:00:00Z"
+ *     }
+ * 
+ * @apiError ValidationError Invalid input data
+ * @apiError ConflictError Email already exists
+ * 
+ * @apiErrorExample {json} Error-Response:
+ *     HTTP/1.1 400 Bad Request
+ *     {
+ *       "error": "ValidationError",
+ *       "message": "Invalid email format",
+ *       "field": "email"
+ *     }
+ */
+
+// OpenAPI/Swagger Documentation
+const swaggerDoc = {
+  openapi: '3.0.0',
+  info: {
+    title: 'SYMLog API',
+    version: '1.0.0',
+    description: 'API documentation for SYMLog platform',
+    contact: {
+      name: 'API Support',
+      email: 'api@symlog.com',
+    },
+  },
+  servers: [
+    {
+      url: 'https://api.symlog.com/v1',
+      description: 'Production server',
+    },
+    {
+      url: 'https://staging-api.symlog.com/v1',
+      description: 'Staging server',
+    },
+  ],
+  paths: {
+    '/users': {
+      post: {
+        summary: 'Create a new user',
+        operationId: 'createUser',
+        tags: ['Users'],
+        requestBody: {
+          required: true,
+          content: {
+            'application/json': {
+              schema: {
+                $ref: '#/components/schemas/CreateUserRequest',
+              },
+            },
+          },
+        },
+        responses: {
+          '201': {
+            description: 'User created successfully',
+            content: {
+              'application/json': {
+                schema: {
+                  $ref: '#/components/schemas/User',
+                },
+              },
+            },
+          },
+          '400': {
+            $ref: '#/components/responses/BadRequest',
+          },
+          '409': {
+            $ref: '#/components/responses/Conflict',
+          },
+        },
+      },
+    },
+  },
+}
+```
+
+### 3. Code Documentation
+
+```typescript
+/**
+ * Calculates the discount percentage for a user based on their loyalty tier
+ * and purchase history.
+ * 
+ * @param userId - The unique identifier of the user
+ * @param purchaseAmount - The current purchase amount in cents
+ * @returns The discount percentage to apply (0-100)
+ * 
+ * @example
+ * ```typescript
+ * const discount = await calculateUserDiscount('usr_123', 10000)
+ * console.log(discount) // 15 (representing 15% off)
+ * ```
+ * 
+ * @throws {UserNotFoundError} If the user doesn't exist
+ * @throws {InvalidAmountError} If the purchase amount is negative
+ * 
+ * @since v1.2.0
+ * @see {@link LoyaltyTier} for tier definitions
+ * @see {@link PurchaseHistory} for history structure
+ */
+export async function calculateUserDiscount(
+  userId: string,
+  purchaseAmount: number
+): Promise<number> {
+  // Validate inputs
+  if (!userId) {
+    throw new Error('User ID is required')
+  }
+  
+  if (purchaseAmount < 0) {
+    throw new InvalidAmountError('Purchase amount cannot be negative')
+  }
+  
+  // Fetch user data
+  const user = await getUserById(userId)
+  if (!user) {
+    throw new UserNotFoundError(`User ${userId} not found`)
+  }
+  
+  // Calculate base discount from loyalty tier
+  const baseDiscount = LOYALTY_DISCOUNTS[user.loyaltyTier] || 0
+  
+  // Add bonus for high-value purchases
+  const purchaseBonus = purchaseAmount > 50000 ? 5 : 0
+  
+  // Add streak bonus
+  const streakBonus = user.purchaseStreak >= 5 ? 3 : 0
+  
+  return Math.min(baseDiscount + purchaseBonus + streakBonus, MAX_DISCOUNT)
+}
+
+/**
+ * Configuration options for the email service
+ * @interface EmailConfig
+ */
+export interface EmailConfig {
+  /** SMTP host address */
+  host: string
+  
+  /** SMTP port (typically 587 for TLS) */
+  port: number
+  
+  /** Whether to use secure connection */
+  secure?: boolean
+  
+  /** Authentication credentials */
+  auth: {
+    /** Username for SMTP authentication */
+    user: string
+    /** Password for SMTP authentication */
+    pass: string
+  }
+  
+  /** Default sender information */
+  defaults?: {
+    /** Default from address */
+    from?: string
+    /** Default reply-to address */
+    replyTo?: string
+  }
+}
+```
+
+### 4. Architecture Decision Records (ADR)
+
+```markdown
+# ADR-001: Use Next.js App Router
+
+## Status
+Accepted
+
+## Context
+We need to choose between Next.js Pages Router and App Router for our web application.
+
+## Decision
+We will use Next.js App Router (introduced in Next.js 13) for the following reasons:
+
+1. **Better Performance**: Server Components reduce client-side JavaScript
+2. **Improved DX**: Simpler data fetching with async components
+3. **Modern Features**: Streaming, Suspense, and parallel routes
+4. **Future-Proof**: App Router is the recommended approach going forward
+
+## Consequences
+
+### Positive
+- Smaller client bundles
+- Better SEO with server-side rendering
+- Simpler data fetching patterns
+- Built-in loading and error states
+
+### Negative
+- Learning curve for developers familiar with Pages Router
+- Some third-party libraries may not be compatible
+- More complex mental model with Server/Client Components
+
+### Mitigation
+- Provide training on App Router concepts
+- Create clear guidelines for Server vs Client Components
+- Maintain a list of compatible libraries
+
+## References
+- [Next.js App Router Documentation](https://nextjs.org/docs/app)
+- [Migration Guide](https://nextjs.org/docs/app/building-your-application/upgrading/app-router-migration)
+```
+
+### 5. Component Documentation
+
+```typescript
+/**
+ * A reusable button component that supports multiple variants and states.
+ * 
+ * @component
+ * @example
+ * ```tsx
+ * // Basic usage
+ * <Button onClick={() => alert('Clicked!')}>
+ *   Click me
+ * </Button>
+ * 
+ * // With variant and size
+ * <Button variant="destructive" size="lg" disabled>
+ *   Delete Account
+ * </Button>
+ * 
+ * // As a link
+ * <Button asChild>
+ *   <a href="/home">Go Home</a>
+ * </Button>
+ * ```
+ */
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  /**
+   * The visual style variant of the button
+   * @default "default"
+   */
+  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link'
+  
+  /**
+   * The size of the button
+   * @default "default"
+   */
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  
+  /**
+   * Whether to render as a child component
+   * Useful for rendering as links or other elements
+   * @default false
+   */
+  asChild?: boolean
+  
+  /**
+   * Loading state - shows spinner and disables interaction
+   * @default false
+   */
+  loading?: boolean
+}
+
+// Storybook Documentation
+export default {
+  title: 'Components/Button',
+  component: Button,
+  parameters: {
+    docs: {
+      description: {
+        component: 'Base button component used throughout the application',
+      },
+    },
+  },
+  argTypes: {
+    variant: {
+      control: 'select',
+      options: ['default', 'destructive', 'outline', 'secondary', 'ghost', 'link'],
+      description: 'Visual style variant',
+      table: {
+        defaultValue: { summary: 'default' },
+      },
+    },
+    size: {
+      control: 'select',
+      options: ['default', 'sm', 'lg', 'icon'],
+      description: 'Button size',
+      table: {
+        defaultValue: { summary: 'default' },
+      },
+    },
+  },
+}
+```
+
+### 6. Migration Guides
+
+```markdown
+# Migrating from v1 to v2
+
+This guide helps you migrate from SYMLog v1 to v2.
+
+## Breaking Changes
+
+### 1. Authentication API
+
+**v1:**
+```typescript
+import { auth } from '@symlog/auth'
+
+const user = await auth.login(email, password)
+```
+
+**v2:**
+```typescript
+import { createAuth } from '@symlog/auth'
+
+const auth = createAuth({ provider: 'credentials' })
+const { user, session } = await auth.signIn({ email, password })
+```
+
+### 2. Database Schema
+
+Run the migration script:
+```bash
+npm run migrate:v2
+```
+
+Notable changes:
+- `user.username` → `user.email` (primary identifier)
+- Added `user.emailVerified` timestamp
+- New `sessions` table for JWT management
+
+### 3. Component Props
+
+**Button Component**
+
+v1:
+```tsx
+<Button type="primary" size="large" />
+```
+
+v2:
+```tsx
+<Button variant="default" size="lg" />
+```
+
+## New Features
+
+### 1. Real-time Subscriptions
+```typescript
+const { data, error } = useSubscription('messages', {
+  onUpdate: (message) => console.log('New message:', message),
+})
+```
+
+### 2. Server Components
+```tsx
+// app/users/page.tsx
+export default async function UsersPage() {
+  const users = await getUsers() // Direct DB call
+  return <UserList users={users} />
+}
+```
+
+## Deprecations
+
+The following will be removed in v3:
+- `auth.loginWithProvider()` - Use `auth.signIn({ provider })`
+- `<Card bordered />` - Use `<Card variant="bordered" />`
+- `api.request()` - Use `api.get()`, `api.post()`, etc.
+```
+
+### 7. Troubleshooting Guide
+
+```markdown
+# Troubleshooting Guide
+
+## Common Issues
+
+### Build Errors
+
+#### "Module not found"
+```
+Error: Cannot find module '@symlog/ui'
+```
+
+**Solution:**
+1. Ensure all packages are installed: `npm install`
+2. Check workspace configuration in `package.json`
+3. Clear cache: `rm -rf node_modules .next && npm install`
+
+#### TypeScript Errors
+```
+Type error: Property 'X' does not exist on type 'Y'
+```
+
+**Solution:**
+1. Run `npm run type-check` to see all errors
+2. Ensure TypeScript version matches: `npm ls typescript`
+3. Regenerate types: `npm run generate:types`
+
+### Runtime Errors
+
+#### "Hydration mismatch"
+**Symptoms:** Content differs between server and client
+
+**Solutions:**
+1. Check for browser-only APIs in Server Components
+2. Use `useEffect` for client-only code
+3. Wrap dynamic content in `<Suspense>`
+
+### Performance Issues
+
+#### Slow Page Load
+**Diagnosis:**
+```bash
+npm run analyze
+npm run lighthouse
+```
+
+**Common Causes:**
+1. Large bundle size - implement code splitting
+2. Unoptimized images - use Next.js Image component
+3. Missing caching headers - configure in next.config.js
+
+## Debug Mode
+
+Enable debug logging:
+```bash
+DEBUG=symlog:* npm run dev
+```
+
+Specific modules:
+```bash
+DEBUG=symlog:auth,symlog:db npm run dev
+```
+```
+
+### 8. Documentation Tools
+
+```typescript
+// docusaurus.config.js
+module.exports = {
+  title: 'SYMLog Documentation',
+  tagline: 'Comprehensive platform documentation',
+  url: 'https://docs.symlog.com',
+  baseUrl: '/',
+  onBrokenLinks: 'throw',
+  onBrokenMarkdownLinks: 'warn',
+  favicon: 'img/favicon.ico',
+  
+  presets: [
+    [
+      'classic',
+      {
+        docs: {
+          sidebarPath: require.resolve('./sidebars.js'),
+          editUrl: 'https://github.com/symlog/docs/edit/main/',
+          showLastUpdateAuthor: true,
+          showLastUpdateTime: true,
+        },
+        blog: {
+          showReadingTime: true,
+          editUrl: 'https://github.com/symlog/docs/edit/main/',
+        },
+        theme: {
+          customCss: require.resolve('./src/css/custom.css'),
+        },
+      },
+    ],
+  ],
+  
+  plugins: [
+    [
+      '@docusaurus/plugin-content-docs',
+      {
+        id: 'api',
+        path: 'api',
+        routeBasePath: 'api',
+        sidebarPath: require.resolve('./sidebars-api.js'),
+      },
+    ],
+  ],
+}
+```
+
+### 9. Inline Documentation
+
+```typescript
+// Use meaningful variable names with context
+const userAuthenticationToken = generateJWT(user.id) // not: const token = genJWT(u.id)
+
+// Document complex business logic
+function calculateShippingCost(items: CartItem[], destination: Address): number {
+  // Free shipping for orders over $100
+  const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  if (subtotal >= 10000) return 0 // prices in cents
+  
+  // Zone-based pricing:
+  // Zone 1 (same state): $5
+  // Zone 2 (neighboring states): $10  
+  // Zone 3 (cross-country): $15
+  const zone = getShippingZone(destination)
+  const zoneRates = { 1: 500, 2: 1000, 3: 1500 }
+  
+  // Add $2 per item for fragile items
+  const fragileCount = items.filter(item => item.metadata?.fragile).length
+  const fragileFee = fragileCount * 200
+  
+  return zoneRates[zone] + fragileFee
+}
+
+// Document edge cases and gotchas
+async function processPayment(amount: number, paymentMethod: PaymentMethod) {
+  // IMPORTANT: Stripe expects amounts in cents, not dollars
+  const amountInCents = Math.round(amount * 100)
+  
+  // NOTE: For amounts over $999,999.99, use Stripe's high-value flow
+  if (amountInCents > 99999999) {
+    return processHighValuePayment(amountInCents, paymentMethod)
+  }
+  
+  // WARNING: Test cards will be rejected in production
+  if (isTestCard(paymentMethod) && process.env.NODE_ENV === 'production') {
+    throw new Error('Test cards not allowed in production')
+  }
+  
+  return stripe.charges.create({
+    amount: amountInCents,
+    currency: 'usd',
+    source: paymentMethod.id,
+  })
+}
+```
+
+### 10. Documentation Standards
+
+```typescript
+// Documentation Checklist
+export const DocumentationStandards = {
+  // Every file should have
+  file: {
+    purpose: "Clear description of what this file does",
+    exports: "Document all exported functions/types",
+    examples: "Include usage examples",
+    dependencies: "Note external dependencies",
+  },
+  
+  // Every function should have
+  function: {
+    description: "What the function does",
+    parameters: "All parameters with types",
+    returns: "Return type and meaning",
+    throws: "Possible exceptions",
+    examples: "Usage examples",
+    complexity: "Big O notation if relevant",
+  },
+  
+  // Every component should have
+  component: {
+    description: "Component purpose",
+    props: "All props with types and defaults",
+    usage: "Common usage patterns",
+    accessibility: "ARIA and keyboard info",
+    styling: "Customization options",
+  },
+  
+  // API endpoints should have
+  api: {
+    method: "HTTP method",
+    path: "URL path with parameters",
+    auth: "Authentication requirements",
+    request: "Request body schema",
+    response: "Response format",
+    errors: "Possible error codes",
+    rateLimit: "Rate limiting info",
+  },
+}
+```
+
+Remember: Good documentation is as important as good code. It helps others (including future you) understand and maintain the system.

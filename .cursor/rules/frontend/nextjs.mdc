@@ -1,0 +1,704 @@
+---
+description: "Next.js 15 Development Standards"
+globs: 
+  - "apps/*/app/**/*.{ts,tsx}"
+  - "apps/*/pages/**/*.{ts,tsx}"
+  - "**/next.config.{js,ts,mjs}"
+  - "**/middleware.{ts,js}"
+alwaysApply: true
+---
+
+# Next.js 15 Development Rules
+
+## App Router Best Practices
+
+### 1. File Structure
+```
+app/
+├── (auth)/                    # Route groups
+│   ├── login/
+│   │   ├── page.tsx          # Page component
+│   │   ├── layout.tsx        # Nested layout
+│   │   └── loading.tsx       # Loading UI
+│   └── signup/
+│       └── page.tsx
+├── api/                      # API routes
+│   ├── auth/
+│   │   └── [...auth]/
+│   │       └── route.ts      # Dynamic API route
+│   └── users/
+│       ├── route.ts          # /api/users
+│       └── [id]/
+│           └── route.ts      # /api/users/[id]
+├── layout.tsx                # Root layout
+├── page.tsx                  # Home page
+├── error.tsx                 # Error boundary
+├── not-found.tsx            # 404 page
+└── global-error.tsx         # Global error boundary
+```
+
+### 2. Server Components (Default)
+```typescript
+// app/users/page.tsx
+import { Suspense } from 'react'
+import { getUsers } from '@/lib/api'
+import { UserList } from '@/components/UserList'
+
+// Server Component - runs on the server
+export default async function UsersPage({
+  searchParams,
+}: {
+  searchParams: { page?: string; search?: string }
+}) {
+  const page = Number(searchParams.page) || 1
+  const search = searchParams.search || ''
+  
+  // Direct async data fetching
+  const users = await getUsers({ page, search })
+  
+  return (
+    <div>
+      <h1>Users</h1>
+      <Suspense fallback={<UserListSkeleton />}>
+        <UserList users={users} />
+      </Suspense>
+    </div>
+  )
+}
+
+// Metadata API
+export async function generateMetadata({ searchParams }) {
+  const search = searchParams.search || ''
+  
+  return {
+    title: search ? `Search: ${search}` : 'Users',
+    description: 'Browse all users',
+  }
+}
+
+// Static params for dynamic routes
+export async function generateStaticParams() {
+  const users = await getTopUsers()
+  
+  return users.map((user) => ({
+    id: user.id,
+  }))
+}
+```
+
+### 3. Client Components
+```typescript
+// Mark client components explicitly
+'use client'
+
+import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+
+export function SearchBar() {
+  const [search, setSearch] = useState('')
+  const [isPending, startTransition] = useTransition()
+  const router = useRouter()
+  
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    startTransition(() => {
+      // Navigate with new search params
+      router.push(`/users?search=${encodeURIComponent(search)}`)
+    })
+  }
+  
+  return (
+    <form onSubmit={handleSearch}>
+      <input
+        type="search"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search users..."
+        disabled={isPending}
+      />
+      <button type="submit" disabled={isPending}>
+        {isPending ? 'Searching...' : 'Search'}
+      </button>
+    </form>
+  )
+}
+```
+
+### 4. Route Handlers
+```typescript
+// app/api/users/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+import { auth } from '@/lib/auth'
+import { db } from '@/lib/db'
+
+// GET /api/users
+export async function GET(request: NextRequest) {
+  try {
+    // Authentication
+    const session = await auth()
+    if (!session) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
+    // Parse query params
+    const searchParams = request.nextUrl.searchParams
+    const page = Number(searchParams.get('page')) || 1
+    const limit = Number(searchParams.get('limit')) || 10
+    
+    // Fetch data
+    const users = await db.user.findMany({
+      skip: (page - 1) * limit,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+    })
+    
+    return NextResponse.json({
+      users,
+      page,
+      limit,
+      total: await db.user.count(),
+    })
+  } catch (error) {
+    console.error('Failed to fetch users:', error)
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    )
+  }
+}
+
+// POST /api/users
+export async function POST(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user.isAdmin) {
+      return NextResponse.json(
+        { error: 'Forbidden' },
+        { status: 403 }
+      )
+    }
+    
+    // Parse and validate body
+    const body = await request.json()
+    const schema = z.object({
+      email: z.string().email(),
+      name: z.string().min(1),
+      role: z.enum(['user', 'admin']),
+    })
+    
+    const data = schema.parse(body)
+    
+    // Create user
+    const user = await db.user.create({
+      data: {
+        ...data,
+        createdBy: session.user.id,
+      },
+    })
+    
+    return NextResponse.json(user, { status: 201 })
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { error: 'Validation Error', details: error.errors },
+        { status: 400 }
+      )
+    }
+    
+    return NextResponse.json(
+      { error: 'Internal Server Error' },
+      { status: 500 }
+    )
+  }
+}
+
+// Dynamic route: app/api/users/[id]/route.ts
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const user = await db.user.findUnique({
+    where: { id: params.id },
+  })
+  
+  if (!user) {
+    return NextResponse.json(
+      { error: 'User not found' },
+      { status: 404 }
+    )
+  }
+  
+  return NextResponse.json(user)
+}
+```
+
+### 5. Layouts and Templates
+```typescript
+// app/layout.tsx - Root layout
+import { Inter } from 'next/font/google'
+import { ThemeProvider } from '@/components/ThemeProvider'
+import { ConvexProvider } from '@/components/ConvexProvider'
+
+const inter = Inter({ 
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-inter',
+})
+
+export const metadata = {
+  title: {
+    default: 'SYMLog',
+    template: '%s | SYMLog',
+  },
+  description: 'Modern digital platform',
+  metadataBase: new URL('https://symlog.ai'),
+}
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <html lang="en" className={inter.variable}>
+      <body>
+        <ConvexProvider>
+          <ThemeProvider>
+            {children}
+          </ThemeProvider>
+        </ConvexProvider>
+      </body>
+    </html>
+  )
+}
+
+// app/(dashboard)/layout.tsx - Nested layout
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  return (
+    <div className="dashboard">
+      <Sidebar />
+      <main>{children}</main>
+    </div>
+  )
+}
+
+// app/template.tsx - Re-renders on navigation
+export default function Template({ children }: { children: React.ReactNode }) {
+  return <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+    {children}
+  </motion.div>
+}
+```
+
+### 6. Loading and Error States
+```typescript
+// app/users/loading.tsx
+export default function Loading() {
+  return (
+    <div className="animate-pulse">
+      <div className="h-8 bg-gray-200 rounded w-1/4 mb-4" />
+      <div className="space-y-3">
+        {[...Array(5)].map((_, i) => (
+          <div key={i} className="h-20 bg-gray-200 rounded" />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// app/users/error.tsx
+'use client'
+
+import { useEffect } from 'react'
+
+export default function Error({
+  error,
+  reset,
+}: {
+  error: Error & { digest?: string }
+  reset: () => void
+}) {
+  useEffect(() => {
+    // Log error to error reporting service
+    console.error(error)
+  }, [error])
+  
+  return (
+    <div className="error-container">
+      <h2>Something went wrong!</h2>
+      <details className="mt-4">
+        <summary>Error details</summary>
+        <pre>{error.message}</pre>
+      </details>
+      <button onClick={reset} className="mt-4">
+        Try again
+      </button>
+    </div>
+  )
+}
+
+// app/not-found.tsx
+import Link from 'next/link'
+
+export default function NotFound() {
+  return (
+    <div className="not-found">
+      <h2>Page Not Found</h2>
+      <p>Could not find requested resource</p>
+      <Link href="/">Return Home</Link>
+    </div>
+  )
+}
+```
+
+### 7. Data Fetching Patterns
+```typescript
+// Server-side data fetching with caching
+async function getPosts() {
+  const res = await fetch('https://api.example.com/posts', {
+    // Cache for 1 hour
+    next: { revalidate: 3600 },
+  })
+  
+  if (!res.ok) {
+    throw new Error('Failed to fetch posts')
+  }
+  
+  return res.json()
+}
+
+// No caching (always fresh)
+async function getUser(id: string) {
+  const res = await fetch(`https://api.example.com/users/${id}`, {
+    cache: 'no-store',
+  })
+  
+  return res.json()
+}
+
+// Static data fetching
+async function getStaticData() {
+  const res = await fetch('https://api.example.com/static', {
+    cache: 'force-cache', // Default
+  })
+  
+  return res.json()
+}
+
+// Parallel data fetching
+export default async function Page() {
+  // Initiate both requests in parallel
+  const postsData = getPosts()
+  const usersData = getUsers()
+  
+  // Wait for both promises to resolve
+  const [posts, users] = await Promise.all([postsData, usersData])
+  
+  return (
+    <>
+      <Posts posts={posts} />
+      <Users users={users} />
+    </>
+  )
+}
+
+// Sequential data fetching when needed
+export default async function Page({ params }: { params: { id: string } }) {
+  const user = await getUser(params.id)
+  const posts = await getUserPosts(user.id)
+  
+  return <UserProfile user={user} posts={posts} />
+}
+```
+
+### 8. Streaming and Suspense
+```typescript
+// app/dashboard/page.tsx
+import { Suspense } from 'react'
+
+export default function DashboardPage() {
+  return (
+    <div>
+      <h1>Dashboard</h1>
+      
+      {/* Instantly show static content */}
+      <DashboardHeader />
+      
+      {/* Stream in dynamic content as it loads */}
+      <Suspense fallback={<StatsLoading />}>
+        <DashboardStats />
+      </Suspense>
+      
+      <div className="grid grid-cols-2 gap-4">
+        <Suspense fallback={<ChartLoading />}>
+          <RevenueChart />
+        </Suspense>
+        
+        <Suspense fallback={<ChartLoading />}>
+          <UsersChart />
+        </Suspense>
+      </div>
+      
+      <Suspense fallback={<TableLoading />}>
+        <RecentActivity />
+      </Suspense>
+    </div>
+  )
+}
+
+// Progressive enhancement with streaming
+async function DashboardStats() {
+  const stats = await getSlowStats() // Takes 2-3 seconds
+  
+  return (
+    <div className="stats-grid">
+      <StatCard title="Revenue" value={stats.revenue} />
+      <StatCard title="Users" value={stats.users} />
+      <StatCard title="Orders" value={stats.orders} />
+    </div>
+  )
+}
+```
+
+### 9. Middleware
+```typescript
+// middleware.ts
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
+import { auth } from '@/lib/auth'
+
+export async function middleware(request: NextRequest) {
+  // Auth check for protected routes
+  if (request.nextUrl.pathname.startsWith('/dashboard')) {
+    const session = await auth()
+    
+    if (!session) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+  }
+  
+  // Add security headers
+  const response = NextResponse.next()
+  
+  response.headers.set('X-Frame-Options', 'DENY')
+  response.headers.set('X-Content-Type-Options', 'nosniff')
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
+  
+  // Content Security Policy
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' blob: data: https:",
+    "font-src 'self'",
+    "connect-src 'self' https://api.example.com wss://socket.example.com",
+  ].join('; ')
+  
+  response.headers.set('Content-Security-Policy', csp)
+  
+  return response
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public files
+     */
+    '/((?!_next/static|_next/image|favicon.ico|.*\\..*).)',
+  ],
+}
+```
+
+### 10. Image Optimization
+```typescript
+import Image from 'next/image'
+
+// Local images with static imports
+import heroImage from '@/public/hero.jpg'
+
+export function HeroSection() {
+  return (
+    <div className="relative h-[600px]">
+      <Image
+        src={heroImage}
+        alt="Hero"
+        fill
+        priority // Load eagerly for above-the-fold
+        quality={90}
+        placeholder="blur" // Automatic for static imports
+        className="object-cover"
+      />
+    </div>
+  )
+}
+
+// Remote images
+export function UserAvatar({ user }: { user: User }) {
+  return (
+    <Image
+      src={user.avatar || '/default-avatar.png'}
+      alt={user.name}
+      width={40}
+      height={40}
+      className="rounded-full"
+      unoptimized={user.avatar?.includes('.gif')} // Skip optimization for GIFs
+    />
+  )
+}
+
+// Responsive images
+export function ProductImage({ product }: { product: Product }) {
+  return (
+    <Image
+      src={product.image}
+      alt={product.name}
+      width={800}
+      height={600}
+      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      className="w-full h-auto"
+    />
+  )
+}
+
+// next.config.js - Configure remote patterns
+module.exports = {
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.example.com',
+        port: '',
+        pathname: '/products/**',
+      },
+    ],
+  },
+}
+```
+
+### 11. Environment Variables
+```typescript
+// .env.local
+DATABASE_URL=postgresql://...
+NEXTAUTH_SECRET=your-secret
+NEXT_PUBLIC_API_URL=https://api.example.com
+
+// Type-safe environment variables
+// env.mjs
+import { z } from 'zod'
+
+const envSchema = z.object({
+  DATABASE_URL: z.string().url(),
+  NEXTAUTH_SECRET: z.string().min(32),
+  NEXT_PUBLIC_API_URL: z.string().url(),
+  NODE_ENV: z.enum(['development', 'production', 'test']),
+})
+
+export const env = envSchema.parse(process.env)
+
+// Usage
+import { env } from '@/env.mjs'
+
+const apiUrl = env.NEXT_PUBLIC_API_URL // Type-safe
+```
+
+### 12. Internationalization
+```typescript
+// app/[lang]/layout.tsx
+export async function generateStaticParams() {
+  return [{ lang: 'en' }, { lang: 'es' }, { lang: 'fr' }]
+}
+
+export default function LocaleLayout({
+  children,
+  params: { lang },
+}: {
+  children: React.ReactNode
+  params: { lang: string }
+}) {
+  return (
+    <html lang={lang}>
+      <body>{children}</body>
+    </html>
+  )
+}
+
+// Dictionary loader
+const dictionaries = {
+  en: () => import('./dictionaries/en.json').then((module) => module.default),
+  es: () => import('./dictionaries/es.json').then((module) => module.default),
+  fr: () => import('./dictionaries/fr.json').then((module) => module.default),
+}
+
+export const getDictionary = async (locale: string) => {
+  return dictionaries[locale]?.() ?? dictionaries.en()
+}
+
+// Usage in server component
+export default async function Page({
+  params: { lang },
+}: {
+  params: { lang: string }
+}) {
+  const dict = await getDictionary(lang)
+  
+  return <h1>{dict.welcome}</h1>
+}
+```
+
+### 13. Performance Optimization
+```typescript
+// next.config.js
+module.exports = {
+  // Enable Turbopack
+  experimental: {
+    turbo: {
+      loaders: {
+        '.svg': ['@svgr/webpack'],
+      },
+    },
+  },
+  
+  // Optimize package imports
+  optimizePackageImports: ['lodash', 'date-fns', '@mui/material'],
+  
+  // Bundle analyzer
+  webpack: (config, { isServer }) => {
+    if (process.env.ANALYZE === 'true') {
+      const { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer')
+      config.plugins.push(
+        new BundleAnalyzerPlugin({
+          analyzerMode: 'static',
+          reportFilename: isServer ? '../analyze/server.html' : '../analyze/client.html',
+        })
+      )
+    }
+    return config
+  },
+  
+  // Compress output
+  compress: true,
+  
+  // Generate source maps in production
+  productionBrowserSourceMaps: true,
+}
+
+// Optimize client bundle
+export const dynamic = 'force-dynamic' // Opt into dynamic rendering
+export const runtime = 'edge' // Use edge runtime
+export const preferredRegion = 'us-east-1' // Deploy close to data
+```
+
+Remember: Next.js 15 defaults to Server Components. Only use Client Components when you need interactivity, browser APIs, or React hooks.

@@ -1,0 +1,1057 @@
+---
+description: "Real-time Features and WebSocket Development"
+globs: 
+  - "**/websocket/**/*.{ts,js}"
+  - "**/realtime/**/*.{ts,js}"
+  - "**/socket/**/*.{ts,js}"
+  - "**/convex/**/*.{ts,js}"
+alwaysApply: true
+---
+
+# Real-time Development Rules
+
+## Real-time Architecture
+
+### 1. Convex Real-time Subscriptions
+```typescript
+// Convex provides automatic real-time subscriptions
+// Every query becomes a live subscription
+
+// convex/messages.ts
+import { query, mutation } from './_generated/server'
+import { v } from 'convex/values'
+
+// Real-time message subscription
+export const listMessages = query({
+  args: {
+    channelId: v.id('channels'),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    // This automatically becomes a real-time subscription
+    const messages = await ctx.db
+      .query('messages')
+      .withIndex('by_channel', (q) => q.eq('channelId', args.channelId))
+      .order('desc')
+      .take(args.limit || 50)
+    
+    // Enrich with user data
+    const enrichedMessages = await Promise.all(
+      messages.map(async (message) => {
+        const user = await ctx.db.get(message.userId)
+        return {
+          ...message,
+          user: user ? {
+            id: user._id,
+            name: user.name,
+            avatar: user.avatar,
+          } : null,
+        }
+      })
+    )
+    
+    return enrichedMessages.reverse()
+  },
+})
+
+// Send message mutation
+export const sendMessage = mutation({
+  args: {
+    channelId: v.id('channels'),
+    content: v.string(),
+    replyTo: v.optional(v.id('messages')),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) throw new Error('Not authenticated')
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .unique()
+    
+    if (!user) throw new Error('User not found')
+    
+    // Validate channel membership
+    const channel = await ctx.db.get(args.channelId)
+    if (!channel) throw new Error('Channel not found')
+    
+    if (channel.isPrivate && !channel.memberIds.includes(user._id)) {
+      throw new Error('Not a member of this channel')
+    }
+    
+    // Create message
+    const messageId = await ctx.db.insert('messages', {
+      channelId: args.channelId,
+      userId: user._id,
+      content: args.content,
+      replyTo: args.replyTo,
+      edited: false,
+    })
+    
+    // All subscribed clients automatically receive the update
+    return messageId
+  },
+})
+```
+
+### 2. React Integration
+```typescript
+// components/chat/MessageList.tsx
+'use client'
+
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { useEffect, useRef } from 'react'
+
+export function MessageList({ channelId }: { channelId: string }) {
+  const messages = useQuery(api.messages.listMessages, { channelId })
+  const scrollRef = useRef<HTMLDivElement>(null)
+  
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (messages && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }
+  }, [messages])
+  
+  if (!messages) return <MessageListSkeleton />
+  
+  return (
+    <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
+      {messages.map((message) => (
+        <Message key={message._id} message={message} />
+      ))}
+    </div>
+  )
+}
+
+// components/chat/MessageInput.tsx
+export function MessageInput({ channelId }: { channelId: string }) {
+  const [message, setMessage] = useState('')
+  const sendMessage = useMutation(api.messages.sendMessage)
+  const [sending, setSending] = useState(false)
+  
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!message.trim() || sending) return
+    
+    setSending(true)
+    try {
+      await sendMessage({ channelId, content: message })
+      setMessage('')
+    } catch (error) {
+      toast.error('Failed to send message')
+    } finally {
+      setSending(false)
+    }
+  }
+  
+  return (
+    <form onSubmit={handleSubmit} className="p-4 border-t">
+      <input
+        type="text"
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
+        placeholder="Type a message..."
+        disabled={sending}
+        className="w-full px-4 py-2 rounded-lg border"
+      />
+    </form>
+  )
+}
+```
+
+### 3. Presence System
+```typescript
+// convex/presence.ts
+import { mutation, query } from './_generated/server'
+import { v } from 'convex/values'
+
+// Track user presence
+export const updatePresence = mutation({
+  args: {
+    channelId: v.id('channels'),
+    status: v.union(
+      v.literal('online'),
+      v.literal('away'),
+      v.literal('offline')
+    ),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .unique()
+    
+    if (!user) return
+    
+    // Update or create presence record
+    const existing = await ctx.db
+      .query('presence')
+      .withIndex('by_user_channel', (q) =>
+        q.eq('userId', user._id).eq('channelId', args.channelId)
+      )
+      .unique()
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        status: args.status,
+        lastSeen: Date.now(),
+      })
+    } else {
+      await ctx.db.insert('presence', {
+        userId: user._id,
+        channelId: args.channelId,
+        status: args.status,
+        lastSeen: Date.now(),
+      })
+    }
+  },
+})
+
+// Get online users
+export const getOnlineUsers = query({
+  args: { channelId: v.id('channels') },
+  handler: async (ctx, args) => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000
+    
+    const presenceRecords = await ctx.db
+      .query('presence')
+      .withIndex('by_channel', (q) => q.eq('channelId', args.channelId))
+      .filter((q) =>
+        q.and(
+          q.neq(q.field('status'), 'offline'),
+          q.gte(q.field('lastSeen'), fiveMinutesAgo)
+        )
+      )
+      .collect()
+    
+    const users = await Promise.all(
+      presenceRecords.map(async (presence) => {
+        const user = await ctx.db.get(presence.userId)
+        return user ? {
+          ...user,
+          status: presence.status,
+          lastSeen: presence.lastSeen,
+        } : null
+      })
+    )
+    
+    return users.filter(Boolean)
+  },
+})
+
+// React hook for presence
+export function usePresence(channelId: string) {
+  const updatePresence = useMutation(api.presence.updatePresence)
+  const onlineUsers = useQuery(api.presence.getOnlineUsers, { channelId })
+  
+  useEffect(() => {
+    // Update presence on mount
+    updatePresence({ channelId, status: 'online' })
+    
+    // Update presence periodically
+    const interval = setInterval(() => {
+      updatePresence({ channelId, status: 'online' })
+    }, 60000) // Every minute
+    
+    // Handle page visibility
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        updatePresence({ channelId, status: 'away' })
+      } else {
+        updatePresence({ channelId, status: 'online' })
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    // Cleanup
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      updatePresence({ channelId, status: 'offline' })
+    }
+  }, [channelId, updatePresence])
+  
+  return { onlineUsers }
+}
+```
+
+### 4. Typing Indicators
+```typescript
+// convex/typing.ts
+export const setTyping = mutation({
+  args: {
+    channelId: v.id('channels'),
+    isTyping: v.boolean(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .unique()
+    
+    if (!user) return
+    
+    const key = `${user._id}:${args.channelId}`
+    
+    if (args.isTyping) {
+      // Set typing indicator with TTL
+      await ctx.db.insert('typing', {
+        key,
+        userId: user._id,
+        channelId: args.channelId,
+        expiresAt: Date.now() + 5000, // 5 seconds
+      })
+    } else {
+      // Remove typing indicator
+      const existing = await ctx.db
+        .query('typing')
+        .withIndex('by_key', (q) => q.eq('key', key))
+        .unique()
+      
+      if (existing) {
+        await ctx.db.delete(existing._id)
+      }
+    }
+  },
+})
+
+export const getTypingUsers = query({
+  args: { channelId: v.id('channels') },
+  handler: async (ctx, args) => {
+    const now = Date.now()
+    
+    // Get active typing indicators
+    const typingRecords = await ctx.db
+      .query('typing')
+      .withIndex('by_channel', (q) => q.eq('channelId', args.channelId))
+      .filter((q) => q.gt(q.field('expiresAt'), now))
+      .collect()
+    
+    // Get user details
+    const users = await Promise.all(
+      typingRecords.map(async (record) => {
+        const user = await ctx.db.get(record.userId)
+        return user
+      })
+    )
+    
+    return users.filter(Boolean)
+  },
+})
+
+// React hook for typing indicators
+export function useTypingIndicator(channelId: string) {
+  const setTyping = useMutation(api.typing.setTyping)
+  const typingUsers = useQuery(api.typing.getTypingUsers, { channelId })
+  const typingTimeoutRef = useRef<NodeJS.Timeout>()
+  
+  const handleTyping = useCallback(() => {
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current)
+    }
+    
+    // Set typing
+    setTyping({ channelId, isTyping: true })
+    
+    // Clear typing after 3 seconds of inactivity
+    typingTimeoutRef.current = setTimeout(() => {
+      setTyping({ channelId, isTyping: false })
+    }, 3000)
+  }, [channelId, setTyping])
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current)
+      }
+      setTyping({ channelId, isTyping: false })
+    }
+  }, [channelId, setTyping])
+  
+  return { handleTyping, typingUsers }
+}
+```
+
+### 5. Optimistic Updates
+```typescript
+// hooks/useOptimisticMessages.ts
+export function useOptimisticMessages(channelId: string) {
+  const messages = useQuery(api.messages.listMessages, { channelId })
+  const sendMessage = useMutation(api.messages.sendMessage)
+  const currentUser = useQuery(api.users.currentUser)
+  
+  const [optimisticMessages, setOptimisticMessages] = useState<
+    OptimisticMessage[]
+  >([])
+  
+  const sendOptimisticMessage = useCallback(
+    async (content: string) => {
+      if (!currentUser) return
+      
+      // Create optimistic message
+      const optimisticId = `optimistic-${Date.now()}`
+      const optimisticMessage: OptimisticMessage = {
+        _id: optimisticId,
+        content,
+        userId: currentUser._id,
+        channelId,
+        _creationTime: Date.now(),
+        user: {
+          id: currentUser._id,
+          name: currentUser.name,
+          avatar: currentUser.avatar,
+        },
+        isOptimistic: true,
+      }
+      
+      // Add to optimistic messages
+      setOptimisticMessages((prev) => [...prev, optimisticMessage])
+      
+      try {
+        // Send actual message
+        await sendMessage({ channelId, content })
+        
+        // Remove optimistic message on success
+        setOptimisticMessages((prev) =>
+          prev.filter((msg) => msg._id !== optimisticId)
+        )
+      } catch (error) {
+        // Mark as failed
+        setOptimisticMessages((prev) =>
+          prev.map((msg) =>
+            msg._id === optimisticId
+              ? { ...msg, failed: true }
+              : msg
+          )
+        )
+        
+        throw error
+      }
+    },
+    [channelId, currentUser, sendMessage]
+  )
+  
+  // Combine real and optimistic messages
+  const allMessages = useMemo(() => {
+    if (!messages) return optimisticMessages
+    return [...messages, ...optimisticMessages]
+  }, [messages, optimisticMessages])
+  
+  return {
+    messages: allMessages,
+    sendMessage: sendOptimisticMessage,
+    retry: (messageId: string) => {
+      const message = optimisticMessages.find((m) => m._id === messageId)
+      if (message) {
+        setOptimisticMessages((prev) =>
+          prev.filter((m) => m._id !== messageId)
+        )
+        sendOptimisticMessage(message.content)
+      }
+    },
+  }
+}
+```
+
+### 6. Real-time Collaboration
+```typescript
+// convex/collaboration.ts
+import { mutation, query } from './_generated/server'
+import { v } from 'convex/values'
+
+// Document collaboration
+export const updateDocument = mutation({
+  args: {
+    documentId: v.id('documents'),
+    operations: v.array(v.object({
+      type: v.union(v.literal('insert'), v.literal('delete')),
+      position: v.number(),
+      content: v.optional(v.string()),
+      length: v.optional(v.number()),
+    })),
+    version: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId)
+    if (!doc) throw new Error('Document not found')
+    
+    // Check version for conflict resolution
+    if (doc.version !== args.version) {
+      throw new Error('Version conflict')
+    }
+    
+    // Apply operations
+    let content = doc.content
+    for (const op of args.operations) {
+      if (op.type === 'insert') {
+        content = 
+          content.slice(0, op.position) + 
+          op.content + 
+          content.slice(op.position)
+      } else if (op.type === 'delete') {
+        content = 
+          content.slice(0, op.position) + 
+          content.slice(op.position + (op.length || 0))
+      }
+    }
+    
+    // Update document
+    await ctx.db.patch(args.documentId, {
+      content,
+      version: doc.version + 1,
+      lastModified: Date.now(),
+    })
+    
+    // Create operation log for other clients
+    await ctx.db.insert('operations', {
+      documentId: args.documentId,
+      operations: args.operations,
+      version: doc.version + 1,
+      userId: (await ctx.auth.getUserIdentity())?.subject,
+    })
+  },
+})
+
+// Get document with operations
+export const getDocument = query({
+  args: {
+    documentId: v.id('documents'),
+    afterVersion: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const doc = await ctx.db.get(args.documentId)
+    if (!doc) return null
+    
+    // Get operations after specified version
+    let operations = []
+    if (args.afterVersion !== undefined) {
+      operations = await ctx.db
+        .query('operations')
+        .withIndex('by_document_version', (q) =>
+          q
+            .eq('documentId', args.documentId)
+            .gt('version', args.afterVersion)
+        )
+        .collect()
+    }
+    
+    return { document: doc, operations }
+  },
+})
+
+// Cursor positions for collaborative editing
+export const updateCursor = mutation({
+  args: {
+    documentId: v.id('documents'),
+    position: v.number(),
+    selection: v.optional(v.object({
+      start: v.number(),
+      end: v.number(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .unique()
+    
+    if (!user) return
+    
+    // Update or create cursor
+    const existing = await ctx.db
+      .query('cursors')
+      .withIndex('by_user_document', (q) =>
+        q.eq('userId', user._id).eq('documentId', args.documentId)
+      )
+      .unique()
+    
+    const cursorData = {
+      userId: user._id,
+      documentId: args.documentId,
+      position: args.position,
+      selection: args.selection,
+      color: user.color || generateUserColor(user._id),
+      lastUpdate: Date.now(),
+    }
+    
+    if (existing) {
+      await ctx.db.patch(existing._id, cursorData)
+    } else {
+      await ctx.db.insert('cursors', cursorData)
+    }
+  },
+})
+
+export const getCursors = query({
+  args: { documentId: v.id('documents') },
+  handler: async (ctx, args) => {
+    const fiveSecondsAgo = Date.now() - 5000
+    
+    const cursors = await ctx.db
+      .query('cursors')
+      .withIndex('by_document', (q) => q.eq('documentId', args.documentId))
+      .filter((q) => q.gte(q.field('lastUpdate'), fiveSecondsAgo))
+      .collect()
+    
+    // Enrich with user data
+    return await Promise.all(
+      cursors.map(async (cursor) => {
+        const user = await ctx.db.get(cursor.userId)
+        return user ? {
+          ...cursor,
+          user: {
+            id: user._id,
+            name: user.name,
+            avatar: user.avatar,
+          },
+        } : null
+      })
+    ).then(results => results.filter(Boolean))
+  },
+})
+```
+
+### 7. Real-time Notifications
+```typescript
+// convex/notifications.ts
+export const createNotification = mutation({
+  args: {
+    userId: v.id('users'),
+    type: v.string(),
+    title: v.string(),
+    message: v.string(),
+    actionUrl: v.optional(v.string()),
+    metadata: v.optional(v.any()),
+  },
+  handler: async (ctx, args) => {
+    const notificationId = await ctx.db.insert('notifications', {
+      ...args,
+      read: false,
+      createdAt: Date.now(),
+    })
+    
+    // Send push notification if user has enabled them
+    const user = await ctx.db.get(args.userId)
+    if (user?.pushSubscription) {
+      await ctx.scheduler.runAfter(0, api.push.sendNotification, {
+        subscription: user.pushSubscription,
+        notification: {
+          title: args.title,
+          body: args.message,
+          url: args.actionUrl,
+        },
+      })
+    }
+    
+    return notificationId
+  },
+})
+
+// Real-time notification subscription
+export const getUnreadNotifications = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return []
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .unique()
+    
+    if (!user) return []
+    
+    return await ctx.db
+      .query('notifications')
+      .withIndex('by_user_read', (q) =>
+        q.eq('userId', user._id).eq('read', false)
+      )
+      .order('desc')
+      .take(20)
+  },
+})
+
+// React component for notifications
+export function NotificationBell() {
+  const notifications = useQuery(api.notifications.getUnreadNotifications)
+  const markAsRead = useMutation(api.notifications.markAsRead)
+  const [isOpen, setIsOpen] = useState(false)
+  
+  // Play sound on new notification
+  useEffect(() => {
+    if (notifications && notifications.length > 0) {
+      const lastNotification = notifications[0]
+      const lastSeenId = localStorage.getItem('lastNotificationId')
+      
+      if (lastNotification._id !== lastSeenId) {
+        // Play notification sound
+        const audio = new Audio('/notification.mp3')
+        audio.play().catch(() => {})
+        
+        // Show browser notification
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification(lastNotification.title, {
+            body: lastNotification.message,
+            icon: '/icon.png',
+          })
+        }
+        
+        localStorage.setItem('lastNotificationId', lastNotification._id)
+      }
+    }
+  }, [notifications])
+  
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="relative p-2"
+      >
+        <BellIcon className="h-6 w-6" />
+        {notifications && notifications.length > 0 && (
+          <span className="absolute top-0 right-0 h-2 w-2 bg-red-500 rounded-full" />
+        )}
+      </button>
+      
+      {isOpen && (
+        <NotificationDropdown
+          notifications={notifications || []}
+          onClose={() => setIsOpen(false)}
+          onRead={markAsRead}
+        />
+      )}
+    </div>
+  )
+}
+```
+
+### 8. Connection Management
+```typescript
+// hooks/useConnectionStatus.ts
+export function useConnectionStatus() {
+  const [isConnected, setIsConnected] = useState(true)
+  const [reconnectAttempt, setReconnectAttempt] = useState(0)
+  
+  useEffect(() => {
+    // Monitor Convex connection
+    const checkConnection = async () => {
+      try {
+        // Ping Convex
+        await fetch('/_convex/version')
+        setIsConnected(true)
+        setReconnectAttempt(0)
+      } catch {
+        setIsConnected(false)
+        setReconnectAttempt(prev => prev + 1)
+      }
+    }
+    
+    // Check immediately
+    checkConnection()
+    
+    // Check periodically
+    const interval = setInterval(checkConnection, 5000)
+    
+    // Listen to online/offline events
+    const handleOnline = () => {
+      setIsConnected(true)
+      checkConnection()
+    }
+    
+    const handleOffline = () => {
+      setIsConnected(false)
+    }
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      clearInterval(interval)
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+  
+  return { isConnected, reconnectAttempt }
+}
+
+// Connection status indicator
+export function ConnectionStatus() {
+  const { isConnected, reconnectAttempt } = useConnectionStatus()
+  
+  if (isConnected) return null
+  
+  return (
+    <div className="fixed top-0 left-0 right-0 bg-yellow-500 text-white p-2 text-center">
+      <div className="flex items-center justify-center gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>
+          Reconnecting...
+          {reconnectAttempt > 0 && ` (Attempt ${reconnectAttempt})`}
+        </span>
+      </div>
+    </div>
+  )
+}
+```
+
+### 9. Performance Optimization
+```typescript
+// Batch updates for performance
+export const batchUpdateMessages = mutation({
+  args: {
+    updates: v.array(v.object({
+      messageId: v.id('messages'),
+      content: v.optional(v.string()),
+      edited: v.optional(v.boolean()),
+    })),
+  },
+  handler: async (ctx, args) => {
+    // Validate all messages exist
+    const messages = await Promise.all(
+      args.updates.map(update => ctx.db.get(update.messageId))
+    )
+    
+    if (messages.some(msg => !msg)) {
+      throw new Error('One or more messages not found')
+    }
+    
+    // Batch update
+    await Promise.all(
+      args.updates.map(update =>
+        ctx.db.patch(update.messageId, {
+          content: update.content,
+          edited: update.edited,
+          editedAt: Date.now(),
+        })
+      )
+    )
+  },
+})
+
+// Pagination for large datasets
+export const getMessagesPaginated = query({
+  args: {
+    channelId: v.id('channels'),
+    cursor: v.optional(v.string()),
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { channelId, cursor, limit = 50 } = args
+    
+    let query = ctx.db
+      .query('messages')
+      .withIndex('by_channel', (q) => q.eq('channelId', channelId))
+      .order('desc')
+    
+    if (cursor) {
+      // Continue from cursor
+      query = query.filter((q) => q.lt(q.field('_id'), cursor))
+    }
+    
+    const messages = await query.take(limit + 1)
+    const hasMore = messages.length > limit
+    const items = hasMore ? messages.slice(0, -1) : messages
+    
+    return {
+      items: items.reverse(),
+      nextCursor: hasMore ? items[items.length - 1]._id : null,
+    }
+  },
+})
+
+// Virtualized message list
+export function VirtualizedMessageList({ channelId }: { channelId: string }) {
+  const [messages, setMessages] = useState<Message[]>([])
+  const [cursor, setCursor] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  
+  const { data } = useQuery(
+    api.messages.getMessagesPaginated,
+    { channelId, cursor, limit: 50 }
+  )
+  
+  useEffect(() => {
+    if (data) {
+      if (cursor) {
+        // Append to existing messages
+        setMessages(prev => [...data.items, ...prev])
+      } else {
+        // Replace messages
+        setMessages(data.items)
+      }
+      setHasMore(!!data.nextCursor)
+    }
+  }, [data, cursor])
+  
+  const loadMore = useCallback(() => {
+    if (data?.nextCursor && hasMore) {
+      setCursor(data.nextCursor)
+    }
+  }, [data, hasMore])
+  
+  const rowVirtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 80,
+    overscan: 5,
+  })
+  
+  return (
+    <div ref={parentRef} className="h-full overflow-auto">
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: '100%',
+          position: 'relative',
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => (
+          <div
+            key={virtualRow.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
+          >
+            <Message message={messages[virtualRow.index]} />
+          </div>
+        ))}
+      </div>
+      {hasMore && (
+        <div ref={loadMoreRef} className="h-10">
+          <Button onClick={loadMore}>Load More</Button>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+### 10. Error Handling & Recovery
+```typescript
+// Retry logic for failed operations
+export function useRetryMutation<Args extends Record<string, unknown>>(
+  mutation: FunctionReference<'mutation', Args>
+) {
+  const convexMutation = useMutation(mutation)
+  const [retryQueue, setRetryQueue] = useState<{
+    id: string
+    args: Args
+    attempts: number
+  }[]>([])
+  
+  const mutateWithRetry = useCallback(
+    async (args: Args) => {
+      const id = generateId()
+      
+      try {
+        await convexMutation(args)
+      } catch (error) {
+        // Add to retry queue
+        setRetryQueue(prev => [...prev, { id, args, attempts: 0 }])
+        throw error
+      }
+    },
+    [convexMutation]
+  )
+  
+  // Retry failed operations
+  useEffect(() => {
+    if (retryQueue.length === 0) return
+    
+    const retryOperation = async () => {
+      const [operation, ...rest] = retryQueue
+      
+      try {
+        await convexMutation(operation.args)
+        // Remove from queue on success
+        setRetryQueue(rest)
+      } catch (error) {
+        if (operation.attempts < 3) {
+          // Retry with exponential backoff
+          setTimeout(() => {
+            setRetryQueue([
+              ...rest,
+              { ...operation, attempts: operation.attempts + 1 }
+            ])
+          }, Math.pow(2, operation.attempts) * 1000)
+        } else {
+          // Give up after 3 attempts
+          console.error('Failed after 3 attempts:', error)
+          setRetryQueue(rest)
+        }
+      }
+    }
+    
+    retryOperation()
+  }, [retryQueue, convexMutation])
+  
+  return {
+    mutate: mutateWithRetry,
+    retryQueue,
+    clearRetryQueue: () => setRetryQueue([]),
+  }
+}
+
+// Connection recovery
+export function useAutoReconnect() {
+  const [reconnecting, setReconnecting] = useState(false)
+  
+  useEffect(() => {
+    let reconnectTimeout: NodeJS.Timeout
+    
+    const handleConnectionError = () => {
+      setReconnecting(true)
+      
+      // Exponential backoff
+      let delay = 1000
+      const maxDelay = 30000
+      
+      const attemptReconnect = async () => {
+        try {
+          // Test connection
+          await fetch('/_convex/version')
+          setReconnecting(false)
+        } catch {
+          delay = Math.min(delay * 2, maxDelay)
+          reconnectTimeout = setTimeout(attemptReconnect, delay)
+        }
+      }
+      
+      attemptReconnect()
+    }
+    
+    // Listen for connection errors
+    window.addEventListener('offline', handleConnectionError)
+    
+    return () => {
+      window.removeEventListener('offline', handleConnectionError)
+      clearTimeout(reconnectTimeout)
+    }
+  }, [])
+  
+  return { reconnecting }
+}
+```
+
+Remember: Real-time features should be performant, reliable, and provide a smooth user experience even with network issues.

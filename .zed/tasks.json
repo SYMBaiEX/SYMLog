@@ -1,0 +1,182 @@
+[
+  {
+    "label": "Development Server",
+    "command": "bun run dev",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["dev"]
+  },
+  {
+    "label": "Build Project", 
+    "command": "bun run build",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["build"]
+  },
+  {
+    "label": "Type Check",
+    "command": "bun run check-types",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["check"]
+  },
+  {
+    "label": "Lint & Format",
+    "command": "bun run check",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["lint"]
+  },
+  {
+    "label": "Web App Dev",
+    "command": "bun run dev:web",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["web", "dev"]
+  },
+  {
+    "label": "Auth Web Dev",
+    "command": "bun run dev",
+    "cwd": "$ZED_WORKTREE_ROOT/apps/auth-web",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["auth", "dev"]
+  },
+  {
+    "label": "Fumadocs Dev",
+    "command": "bun run dev",
+    "cwd": "$ZED_WORKTREE_ROOT/apps/fumadocs",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["docs", "dev"]
+  },
+  {
+    "label": "Tauri Desktop Dev",
+    "command": "bun run desktop:dev",
+    "cwd": "$ZED_WORKTREE_ROOT/apps/web",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["desktop", "tauri", "dev"]
+  },
+  {
+    "label": "Tauri Desktop Build",
+    "command": "bun run desktop:build",
+    "cwd": "$ZED_WORKTREE_ROOT/apps/web",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["desktop", "tauri", "build"]
+  },
+  {
+    "label": "Install Dependencies",
+    "command": "bun install",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["install"]
+  },
+  {
+    "label": "Clean Install",
+    "command": "sh -c 'rm -rf node_modules && rm -rf apps/*/node_modules && bun install'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["clean", "install"]
+  },
+  {
+    "label": "Test Current File",
+    "command": "bun test $ZED_FILE",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["test"]
+  },
+  {
+    "label": "Run All Tests",
+    "command": "bun test",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["test"]
+  },
+  {
+    "label": "Git Status",
+    "command": "git status",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["git"]
+  },
+  {
+    "label": "Git Log (Graph)",
+    "command": "git log --graph --oneline -10",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["git"]
+  },
+  {
+    "label": "Convex Dev",
+    "command": "bunx convex dev",
+    "cwd": "$ZED_WORKTREE_ROOT/apps/web",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "never",
+    "tags": ["convex", "dev"]
+  },
+  {
+    "label": "Convex Deploy",
+    "command": "bunx convex deploy",
+    "cwd": "$ZED_WORKTREE_ROOT/apps/web",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["convex", "deploy"]
+  },
+  {
+    "label": "Echo Current File Path",
+    "command": "echo 'Current file: $ZED_FILE'",
+    "cwd": "$ZED_WORKTREE_ROOT",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": true,
+    "reveal": "always",
+    "hide": "on_success",
+    "tags": ["util"]
+  }
+]

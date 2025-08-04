@@ -1,0 +1,807 @@
+---
+description: "CI/CD Pipeline Configuration and Best Practices"
+globs: 
+  - ".github/workflows/**/*.yml"
+  - ".gitlab-ci.yml"
+  - "Jenkinsfile"
+  - "**/ci/**/*"
+  - "**/cd/**/*"
+alwaysApply: true
+---
+
+# CI/CD Rules
+
+## CI/CD Philosophy
+
+### 1. GitHub Actions Workflows
+
+```yaml
+# .github/workflows/ci.yml
+name: Continuous Integration
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '18.x'
+  PNPM_VERSION: '8'
+
+jobs:
+  # Code Quality Checks
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Full history for better analysis
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Lint
+        run: pnpm lint
+      
+      - name: Type Check
+        run: pnpm type-check
+      
+      - name: Format Check
+        run: pnpm format:check
+      
+      - name: Security Audit
+        run: pnpm audit --production
+
+  # Unit Tests
+  test-unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Run Tests
+        run: pnpm test:unit --shard=${{ matrix.shard }}/4 --coverage
+      
+      - name: Upload Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unit-${{ matrix.shard }}
+
+  # Integration Tests
+  test-integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Setup Database
+        run: |
+          pnpm db:push
+          pnpm db:seed
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+      
+      - name: Run Integration Tests
+        run: pnpm test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+          REDIS_URL: redis://localhost:6379
+
+  # Build
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [quality, test-unit]
+    strategy:
+      matrix:
+        app: [web, desktop]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Build ${{ matrix.app }}
+        run: pnpm --filter @symlog/${{ matrix.app }} build
+      
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.app }}-build
+          path: apps/${{ matrix.app }}/dist
+          retention-days: 7
+
+  # E2E Tests
+  test-e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/download-artifact@v3
+        with:
+          name: web-build
+          path: apps/web/dist
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      
+      - name: Install Playwright
+        run: pnpm exec playwright install --with-deps chromium
+      
+      - name: Run E2E Tests
+        run: pnpm test:e2e
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-results
+          path: test-results/
+          retention-days: 30
+```
+
+### 2. Deployment Pipeline
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment || 'staging' }}
+  cancel-in-progress: false
+
+jobs:
+  # Pre-deployment Checks
+  pre-deploy:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Generate Version
+        id: version
+        run: |
+          VERSION=$(date +%Y%m%d%H%M%S)-${GITHUB_SHA::8}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Check Deployment Window
+        run: |
+          HOUR=$(date +%H)
+          DAY=$(date +%u)
+          
+          # No production deployments on weekends or outside business hours
+          if [[ "${{ github.event.inputs.environment }}" == "production" ]]; then
+            if [[ $DAY -ge 6 ]] || [[ $HOUR -lt 9 ]] || [[ $HOUR -gt 17 ]]; then
+              echo "Production deployments only allowed Mon-Fri 9AM-5PM"
+              exit 1
+            fi
+          fi
+
+  # Database Migrations
+  migrate:
+    name: Database Migrations
+    runs-on: ubuntu-latest
+    needs: pre-deploy
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+      
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      
+      - name: Run Migrations
+        run: |
+          pnpm db:migrate:deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # Deploy Web App
+  deploy-web:
+    name: Deploy Web Application
+    runs-on: ubuntu-latest
+    needs: [pre-deploy, migrate]
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Deploy to Vercel
+        run: |
+          npx vercel deploy \
+            --prod \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --env DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            --env REDIS_URL=${{ secrets.REDIS_URL }} \
+            --build-env NEXT_PUBLIC_API_URL=${{ vars.API_URL }}
+      
+      - name: Tag Deployment
+        run: |
+          git tag deploy-${{ github.event.inputs.environment || 'staging' }}-${{ needs.pre-deploy.outputs.version }}
+          git push origin --tags
+
+  # Deploy API
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: [pre-deploy, migrate]
+    environment: ${{ github.event.inputs.environment || 'staging' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Build Docker Image
+        run: |
+          docker build \
+            --build-arg VERSION=${{ needs.pre-deploy.outputs.version }} \
+            -t symlog-api:${{ needs.pre-deploy.outputs.version }} \
+            -f apps/api/Dockerfile .
+      
+      - name: Push to ECR
+        run: |
+          aws ecr get-login-password --region us-east-1 | \
+            docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+          
+          docker tag symlog-api:${{ needs.pre-deploy.outputs.version }} \
+            ${{ secrets.ECR_REGISTRY }}/symlog-api:${{ needs.pre-deploy.outputs.version }}
+          
+          docker push ${{ secrets.ECR_REGISTRY }}/symlog-api:${{ needs.pre-deploy.outputs.version }}
+      
+      - name: Deploy to ECS
+        run: |
+          aws ecs update-service \
+            --cluster symlog-${{ github.event.inputs.environment || 'staging' }} \
+            --service api \
+            --force-new-deployment
+
+  # Post-deployment
+  post-deploy:
+    name: Post-deployment Tasks
+    runs-on: ubuntu-latest
+    needs: [deploy-web, deploy-api]
+    if: always()
+    steps:
+      - name: Smoke Tests
+        run: |
+          # Basic health checks
+          curl -f ${{ vars.API_URL }}/health || exit 1
+          curl -f ${{ vars.WEB_URL }} || exit 1
+      
+      - name: Notify Deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Deployment to ${{ github.event.inputs.environment || 'staging' }} completed
+            Version: ${{ needs.pre-deploy.outputs.version }}
+            Actor: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+      
+      - name: Create Release Notes
+        if: github.event.inputs.environment == 'production'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ needs.pre-deploy.outputs.version }}
+          release_name: Release ${{ needs.pre-deploy.outputs.version }}
+          body: |
+            ## Changes in this Release
+            ${{ github.event.head_commit.message }}
+            
+            **Commit**: ${{ github.sha }}
+            **Deployed by**: ${{ github.actor }}
+```
+
+### 3. Rollback Strategy
+
+```yaml
+# .github/workflows/rollback.yml
+name: Rollback Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to rollback'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      version:
+        description: 'Version to rollback to'
+        required: true
+
+jobs:
+  rollback:
+    name: Rollback to ${{ github.event.inputs.version }}
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - name: Validate Version
+        run: |
+          # Check if version exists
+          if ! aws ecr describe-images \
+            --repository-name symlog-api \
+            --image-ids imageTag=${{ github.event.inputs.version }} > /dev/null; then
+            echo "Version ${{ github.event.inputs.version }} not found"
+            exit 1
+          fi
+      
+      - name: Rollback Database
+        run: |
+          # Run down migrations if needed
+          echo "Checking for migration compatibility..."
+      
+      - name: Rollback API
+        run: |
+          # Update ECS service with previous version
+          aws ecs update-service \
+            --cluster symlog-${{ github.event.inputs.environment }} \
+            --service api \
+            --task-definition symlog-api:${{ github.event.inputs.version }} \
+            --force-new-deployment
+      
+      - name: Rollback Web
+        run: |
+          # Vercel rollback
+          vercel rollback ${{ github.event.inputs.version }} \
+            --token=${{ secrets.VERCEL_TOKEN }}
+      
+      - name: Verify Rollback
+        run: |
+          # Wait for services to be healthy
+          sleep 60
+          
+          # Health checks
+          curl -f ${{ vars.API_URL }}/health || exit 1
+          curl -f ${{ vars.WEB_URL }} || exit 1
+      
+      - name: Notify Rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            ⚠️ Rollback completed
+            Environment: ${{ github.event.inputs.environment }}
+            Rolled back to: ${{ github.event.inputs.version }}
+            Initiated by: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+### 4. Feature Branch Deployments
+
+```yaml
+# .github/workflows/preview.yml
+name: Preview Deployment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create Preview Environment
+        id: preview
+        run: |
+          PREVIEW_URL=$(npx vercel deploy \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --build-env NEXT_PUBLIC_API_URL=${{ vars.PREVIEW_API_URL }})
+          
+          echo "url=$PREVIEW_URL" >> $GITHUB_OUTPUT
+      
+      - name: Comment PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `🚀 Preview deployment ready!
+            
+            **Preview URL**: ${{ steps.preview.outputs.url }}
+            **Branch**: \`${{ github.head_ref }}\`
+            **Commit**: \`${{ github.sha }}\`
+            
+            This preview will be automatically deleted when the PR is closed.`
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })
+
+  cleanup-preview:
+    name: Cleanup Preview
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - name: Delete Preview
+        run: |
+          # Cleanup Vercel preview
+          vercel remove ${{ github.event.pull_request.number }} \
+            --token=${{ secrets.VERCEL_TOKEN }} \
+            --yes
+```
+
+### 5. Security Scanning
+
+```yaml
+# Security scanning workflow
+security:
+  name: Security Scan
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Run Snyk Security Scan
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+      with:
+        args: --severity-threshold=high
+    
+    - name: OWASP Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'symlog'
+        path: '.'
+        format: 'ALL'
+```
+
+### 6. Performance Testing
+
+```yaml
+# Performance testing in CI
+performance:
+  name: Performance Tests
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Lighthouse CI
+      uses: treosh/lighthouse-ci-action@v10
+      with:
+        urls: |
+          http://localhost:3000
+          http://localhost:3000/dashboard
+          http://localhost:3000/settings
+        budgetPath: ./lighthouse-budget.json
+        uploadArtifacts: true
+        temporaryPublicStorage: true
+    
+    - name: Run Load Tests
+      run: |
+        # Using k6 for load testing
+        docker run --rm \
+          -v $PWD:/scripts \
+          grafana/k6 run /scripts/tests/load/api-test.js \
+          --vus 100 \
+          --duration 30s
+```
+
+### 7. Release Automation
+
+```typescript
+// scripts/release.ts
+import { execSync } from 'child_process'
+import { readFileSync, writeFileSync } from 'fs'
+import semver from 'semver'
+
+interface ReleaseOptions {
+  type: 'major' | 'minor' | 'patch'
+  prerelease?: string
+  dryRun?: boolean
+}
+
+async function release(options: ReleaseOptions) {
+  const { type, prerelease, dryRun = false } = options
+  
+  // Get current version
+  const packageJson = JSON.parse(readFileSync('package.json', 'utf8'))
+  const currentVersion = packageJson.version
+  
+  // Calculate new version
+  let newVersion = semver.inc(currentVersion, type)
+  if (prerelease) {
+    newVersion = semver.inc(currentVersion, 'prerelease', prerelease)
+  }
+  
+  console.log(`Releasing ${newVersion} (current: ${currentVersion})`)
+  
+  if (dryRun) {
+    console.log('Dry run - no changes will be made')
+    return
+  }
+  
+  // Update package versions
+  execSync(`pnpm version ${newVersion} --no-git-tag-version`)
+  
+  // Generate changelog
+  execSync(`pnpm changelog --release ${newVersion}`)
+  
+  // Commit changes
+  execSync(`git add .`)
+  execSync(`git commit -m "chore(release): v${newVersion}"`)
+  
+  // Create tag
+  execSync(`git tag -a v${newVersion} -m "Release v${newVersion}"`)
+  
+  // Push changes
+  execSync(`git push origin main --follow-tags`)
+  
+  console.log(`✅ Released v${newVersion}`)
+}
+
+// Run release
+const args = process.argv.slice(2)
+const releaseType = args[0] as ReleaseOptions['type']
+
+release({
+  type: releaseType,
+  dryRun: args.includes('--dry-run'),
+})
+```
+
+### 8. CI/CD Best Practices
+
+```yaml
+# Best practices configuration
+name: CI/CD Best Practices
+
+# Always use specific versions
+env:
+  NODE_VERSION: '18.17.0' # Not '18.x'
+  PNPM_VERSION: '8.6.0'   # Not '8'
+
+# Use concurrency to prevent duplicate runs
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Set job-level timeouts
+jobs:
+  build:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    
+    # Use build matrix for efficiency
+    strategy:
+      matrix:
+        node: [18, 20]
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false # Continue other jobs if one fails
+    
+    steps:
+      # Always use actions/checkout@v4 with token
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0 # For better git history
+      
+      # Cache dependencies
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.pnpm-store
+            **/node_modules
+          key: ${{ runner.os }}-pnpm-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-
+      
+      # Use if conditions effectively
+      - name: Deploy
+        if: |
+          github.ref == 'refs/heads/main' &&
+          github.event_name == 'push' &&
+          contains(github.event.head_commit.message, '[deploy]')
+        run: echo "Deploying..."
+```
+
+### 9. Monitoring CI/CD
+
+```typescript
+// Monitor CI/CD metrics
+export interface CICDMetrics {
+  pipeline: {
+    duration: number // Total pipeline time
+    queueTime: number // Time waiting to start
+    successRate: number // Percentage of successful builds
+  }
+  
+  stages: {
+    checkout: number
+    install: number
+    build: number
+    test: number
+    deploy: number
+  }
+  
+  failures: {
+    total: number
+    byStage: Record<string, number>
+    byReason: Record<string, number>
+  }
+}
+
+// Track in DataDog
+export function trackCICDMetrics(metrics: CICDMetrics) {
+  datadog.gauge('cicd.pipeline.duration', metrics.pipeline.duration)
+  datadog.gauge('cicd.pipeline.success_rate', metrics.pipeline.successRate)
+  
+  Object.entries(metrics.stages).forEach(([stage, duration]) => {
+    datadog.gauge(`cicd.stage.${stage}.duration`, duration)
+  })
+}
+```
+
+### 10. Secret Management
+
+```yaml
+# GitHub Secrets Organization
+# Required Secrets:
+# - AWS_ACCESS_KEY_ID
+# - AWS_SECRET_ACCESS_KEY
+# - DATABASE_URL
+# - REDIS_URL
+# - VERCEL_TOKEN
+# - SLACK_WEBHOOK
+# - SENTRY_DSN
+# - CODECOV_TOKEN
+
+# Environment-specific secrets
+environments:
+  staging:
+    DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+    API_URL: https://staging-api.symlog.com
+  
+  production:
+    DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+    API_URL: https://api.symlog.com
+    requires_approval: true
+    reviewers:
+      - team/senior-developers
+      - team/devops
+
+# Secret rotation reminder
+on:
+  schedule:
+    - cron: '0 0 1 * *' # Monthly
+jobs:
+  remind-secret-rotation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Secret Age
+        run: |
+          # Check when secrets were last updated
+          # Send reminders for secrets older than 90 days
+```
+
+Remember: CI/CD pipelines should be fast, reliable, and secure. Optimize for developer productivity while maintaining quality gates.

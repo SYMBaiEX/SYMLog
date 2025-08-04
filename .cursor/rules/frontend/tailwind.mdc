@@ -1,0 +1,655 @@
+---
+description: "Tailwind CSS 4 Best Practices and Design System"
+globs: 
+  - "**/*.{tsx,jsx}"
+  - "**/tailwind.config.{js,ts}"
+  - "**/globals.css"
+  - "**/index.css"
+alwaysApply: true
+---
+
+# Tailwind CSS 4 Development Rules
+
+## Tailwind CSS 4 Configuration
+
+### 1. Modern Configuration
+```typescript
+// tailwind.config.ts
+import type { Config } from 'tailwindcss'
+import { fontFamily } from 'tailwindcss/defaultTheme'
+
+const config: Config = {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  darkMode: 'class', // or 'media'
+  theme: {
+    extend: {
+      // Custom color palette
+      colors: {
+        brand: {
+          50: '#eff6ff',
+          100: '#dbeafe',
+          200: '#bfdbfe',
+          300: '#93c5fd',
+          400: '#60a5fa',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+          800: '#1e40af',
+          900: '#1e3a8a',
+          950: '#172554',
+        },
+        gray: {
+          // Custom gray scale
+          50: '#fafafa',
+          100: '#f4f4f5',
+          200: '#e4e4e7',
+          300: '#d4d4d8',
+          400: '#a1a1aa',
+          500: '#71717a',
+          600: '#52525b',
+          700: '#3f3f46',
+          800: '#27272a',
+          900: '#18181b',
+          950: '#09090b',
+        },
+      },
+      
+      // Typography
+      fontFamily: {
+        sans: ['var(--font-inter)', ...fontFamily.sans],
+        mono: ['var(--font-roboto-mono)', ...fontFamily.mono],
+      },
+      
+      // Spacing scale
+      spacing: {
+        '18': '4.5rem',
+        '88': '22rem',
+        '120': '30rem',
+      },
+      
+      // Animation
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+        'pulse-slow': 'pulse 3s infinite',
+        'bounce-slow': 'bounce 2s infinite',
+      },
+      
+      keyframes: {
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
+        },
+        slideUp: {
+          '0%': { transform: 'translateY(10px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+      },
+      
+      // Custom utilities
+      borderRadius: {
+        '4xl': '2rem',
+      },
+      
+      // Z-index scale
+      zIndex: {
+        '60': '60',
+        '70': '70',
+        '80': '80',
+        '90': '90',
+        '100': '100',
+      },
+    },
+  },
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/aspect-ratio'),
+    require('@tailwindcss/container-queries'),
+  ],
+}
+
+export default config
+```
+
+### 2. CSS Variables Integration
+```css
+/* globals.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Colors */
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    
+    --radius: 0.5rem;
+  }
+  
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+```
+
+## Component Styling Patterns
+
+### 1. Component Classes with CN
+```typescript
+import { clsx, type ClassValue } from 'clsx'
+import { twMerge } from 'tailwind-merge'
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+
+// Button component with variants
+const buttonVariants = {
+  base: 'inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  variants: {
+    variant: {
+      default: 'bg-primary text-primary-foreground hover:bg-primary/90',
+      destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
+      outline: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+      secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
+      ghost: 'hover:bg-accent hover:text-accent-foreground',
+      link: 'text-primary underline-offset-4 hover:underline',
+    },
+    size: {
+      default: 'h-10 px-4 py-2',
+      sm: 'h-9 rounded-md px-3',
+      lg: 'h-11 rounded-md px-8',
+      icon: 'h-10 w-10',
+    },
+  },
+}
+
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: keyof typeof buttonVariants.variants.variant
+  size?: keyof typeof buttonVariants.variants.size
+}
+
+export function Button({ 
+  className, 
+  variant = 'default', 
+  size = 'default', 
+  ...props 
+}: ButtonProps) {
+  return (
+    <button
+      className={cn(
+        buttonVariants.base,
+        buttonVariants.variants.variant[variant],
+        buttonVariants.variants.size[size],
+        className
+      )}
+      {...props}
+    />
+  )
+}
+```
+
+### 2. Glass Morphism Design
+```typescript
+// Glass card component
+export function GlassCard({ className, ...props }: CardProps) {
+  return (
+    <div
+      className={cn(
+        'backdrop-blur-md bg-white/10 dark:bg-black/10',
+        'border border-white/20 dark:border-white/10',
+        'rounded-lg shadow-xl',
+        'p-6',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+// Glass button
+export function GlassButton({ className, ...props }: ButtonProps) {
+  return (
+    <button
+      className={cn(
+        'backdrop-blur-sm bg-white/20 dark:bg-white/10',
+        'border border-white/30 dark:border-white/20',
+        'rounded-md px-4 py-2',
+        'text-white hover:bg-white/30 dark:hover:bg-white/20',
+        'transition-all duration-200',
+        'shadow-lg hover:shadow-xl',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+```
+
+### 3. Responsive Design
+```typescript
+// Mobile-first responsive design
+export function ResponsiveGrid({ children }: { children: React.ReactNode }) {
+  return (
+    <div className={cn(
+      // Mobile: 1 column
+      'grid grid-cols-1 gap-4',
+      // Tablet: 2 columns
+      'sm:grid-cols-2 sm:gap-6',
+      // Desktop: 3 columns
+      'lg:grid-cols-3 lg:gap-8',
+      // Wide: 4 columns
+      'xl:grid-cols-4 xl:gap-10',
+      // Container queries
+      '@container',
+    )}>
+      {children}
+    </div>
+  )
+}
+
+// Responsive typography
+export function Heading({ level = 1, children, className }: HeadingProps) {
+  const styles = {
+    1: 'text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight',
+    2: 'text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight',
+    3: 'text-xl sm:text-2xl lg:text-3xl font-medium',
+  }
+  
+  const Tag = `h${level}` as keyof JSX.IntrinsicElements
+  
+  return (
+    <Tag className={cn(styles[level], className)}>
+      {children}
+    </Tag>
+  )
+}
+```
+
+### 4. Animation Patterns
+```typescript
+// Fade in animation
+export function FadeIn({ 
+  children, 
+  delay = 0,
+  className,
+}: { 
+  children: React.ReactNode
+  delay?: number
+  className?: string
+}) {
+  return (
+    <div
+      className={cn('animate-fade-in opacity-0', className)}
+      style={{ animationDelay: `${delay}ms`, animationFillMode: 'forwards' }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// Stagger children animation
+export function StaggerChildren({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="space-y-4">
+      {React.Children.map(children, (child, index) => (
+        <FadeIn delay={index * 100}>{child}</FadeIn>
+      ))}
+    </div>
+  )
+}
+
+// Hover effects
+export function HoverCard({ children, className }: CardProps) {
+  return (
+    <div
+      className={cn(
+        'group relative overflow-hidden rounded-lg',
+        'transition-all duration-300 ease-out',
+        'hover:scale-105 hover:shadow-2xl',
+        className
+      )}
+    >
+      {/* Gradient overlay on hover */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+      {children}
+    </div>
+  )
+}
+```
+
+### 5. Form Styling
+```typescript
+// Input component
+export const Input = forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
+    return (
+      <input
+        type={type}
+        className={cn(
+          'flex h-10 w-full rounded-md border border-input',
+          'bg-background px-3 py-2 text-sm',
+          'ring-offset-background',
+          'file:border-0 file:bg-transparent file:text-sm file:font-medium',
+          'placeholder:text-muted-foreground',
+          'focus-visible:outline-none focus-visible:ring-2',
+          'focus-visible:ring-ring focus-visible:ring-offset-2',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          className
+        )}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+
+// Form field with label and error
+export function FormField({ 
+  label, 
+  error, 
+  children,
+  required,
+}: FormFieldProps) {
+  return (
+    <div className="space-y-2">
+      {label && (
+        <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          {label}
+          {required && <span className="text-destructive ml-1">*</span>}
+        </label>
+      )}
+      {children}
+      {error && (
+        <p className="text-sm text-destructive animate-slide-up">
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+```
+
+### 6. Layout Components
+```typescript
+// Container with responsive padding
+export function Container({ children, className }: ContainerProps) {
+  return (
+    <div className={cn(
+      'mx-auto w-full max-w-7xl',
+      'px-4 sm:px-6 lg:px-8',
+      className
+    )}>
+      {children}
+    </div>
+  )
+}
+
+// Section with consistent spacing
+export function Section({ children, className }: SectionProps) {
+  return (
+    <section className={cn(
+      'py-12 sm:py-16 lg:py-20',
+      className
+    )}>
+      {children}
+    </section>
+  )
+}
+
+// Sidebar layout
+export function SidebarLayout({ sidebar, children }: LayoutProps) {
+  return (
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar */}
+      <aside className={cn(
+        'w-64 flex-shrink-0',
+        'bg-card border-r border-border',
+        'hidden lg:block',
+      )}>
+        {sidebar}
+      </aside>
+      
+      {/* Main content */}
+      <main className="flex-1 overflow-y-auto">
+        {children}
+      </main>
+    </div>
+  )
+}
+```
+
+### 7. Dark Mode Support
+```typescript
+// Theme-aware components
+export function Card({ className, ...props }: CardProps) {
+  return (
+    <div
+      className={cn(
+        'rounded-lg border bg-card text-card-foreground shadow-sm',
+        'dark:border-gray-800 dark:bg-gray-900/50',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+// Theme toggle button
+export function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  
+  return (
+    <button
+      onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      className={cn(
+        'rounded-md p-2',
+        'bg-gray-100 dark:bg-gray-800',
+        'hover:bg-gray-200 dark:hover:bg-gray-700',
+        'transition-colors'
+      )}
+    >
+      {theme === 'dark' ? (
+        <SunIcon className="h-5 w-5" />
+      ) : (
+        <MoonIcon className="h-5 w-5" />
+      )}
+    </button>
+  )
+}
+```
+
+### 8. Utility Classes
+```css
+/* Custom utilities in globals.css */
+@layer utilities {
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Text gradient */
+  .text-gradient {
+    @apply bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent;
+  }
+  
+  /* Balanced text wrapping */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  /* Custom focus styles */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+  
+  /* Skeleton loading */
+  .skeleton {
+    @apply animate-pulse bg-muted;
+  }
+}
+```
+
+### 9. Performance Optimization
+```typescript
+// Purge unused styles in production
+// tailwind.config.ts
+export default {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx}',
+    // Be specific to reduce scan time
+    './src/components/**/*.{js,ts,jsx,tsx}',
+    './src/app/**/*.{js,ts,jsx,tsx}',
+  ],
+  // Safelist frequently used dynamic classes
+  safelist: [
+    'bg-red-500',
+    'bg-green-500',
+    'bg-blue-500',
+    {
+      pattern: /bg-(red|green|blue)-(100|200|300|400|500)/,
+      variants: ['hover', 'focus'],
+    },
+  ],
+}
+
+// Use CSS modules for component-specific styles
+// Button.module.css
+.button {
+  @apply px-4 py-2 rounded-md;
+}
+
+.button-primary {
+  @apply bg-primary text-white hover:bg-primary/90;
+}
+
+// Avoid inline arbitrary values in loops
+// ❌ Bad
+items.map((item, i) => (
+  <div className={`top-[${i * 50}px]`} />
+))
+
+// ✅ Good
+items.map((item, i) => (
+  <div style={{ top: `${i * 50}px` }} />
+))
+```
+
+### 10. Accessibility
+```typescript
+// Focus visible utilities
+export function AccessibleButton({ className, ...props }: ButtonProps) {
+  return (
+    <button
+      className={cn(
+        'focus-visible:outline-none',
+        'focus-visible:ring-2',
+        'focus-visible:ring-ring',
+        'focus-visible:ring-offset-2',
+        'focus-visible:ring-offset-background',
+        className
+      )}
+      {...props}
+    />
+  )
+}
+
+// Screen reader utilities
+export function ScreenReaderOnly({ children }: { children: React.ReactNode }) {
+  return (
+    <span className="sr-only">
+      {children}
+    </span>
+  )
+}
+
+// Skip to content
+export function SkipToContent() {
+  return (
+    <a
+      href="#main-content"
+      className={cn(
+        'sr-only focus:not-sr-only',
+        'focus:absolute focus:top-4 focus:left-4',
+        'bg-background px-4 py-2 rounded-md',
+        'focus-ring'
+      )}
+    >
+      Skip to main content
+    </a>
+  )
+}
+```
+
+Remember: Use Tailwind's utility classes for consistency, but don't be afraid to extract components when patterns emerge.

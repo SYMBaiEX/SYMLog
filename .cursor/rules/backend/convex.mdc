@@ -1,0 +1,827 @@
+---
+description: "Convex Database and Backend Development"
+globs: 
+  - "**/convex/**/*.{ts,js}"
+  - "**/convex.json"
+  - "**/schema.ts"
+alwaysApply: true
+---
+
+# Convex Development Rules
+
+## Convex Architecture
+
+### 1. Schema Definition
+```typescript
+// convex/schema.ts
+import { defineSchema, defineTable } from 'convex/server'
+import { v } from 'convex/values'
+
+export default defineSchema({
+  users: defineTable({
+    // Required fields
+    email: v.string(),
+    name: v.string(),
+    
+    // Optional fields
+    bio: v.optional(v.string()),
+    avatar: v.optional(v.string()),
+    walletAddress: v.optional(v.string()),
+    
+    // Enums
+    role: v.union(v.literal('user'), v.literal('admin'), v.literal('moderator')),
+    status: v.union(v.literal('active'), v.literal('inactive'), v.literal('suspended')),
+    
+    // Nested objects
+    profile: v.object({
+      twitter: v.optional(v.string()),
+      github: v.optional(v.string()),
+      website: v.optional(v.string()),
+    }),
+    
+    // Arrays
+    tags: v.array(v.string()),
+    
+    // Timestamps (automatically added)
+    // _creationTime: number
+  })
+    // Indexes for efficient queries
+    .index('by_email', ['email'])
+    .index('by_role', ['role'])
+    .index('by_status_role', ['status', 'role'])
+    .searchIndex('search_users', {
+      searchField: 'name',
+      filterFields: ['role', 'status'],
+    }),
+    
+  messages: defineTable({
+    userId: v.id('users'),
+    content: v.string(),
+    
+    // Rich content
+    attachments: v.optional(v.array(v.object({
+      url: v.string(),
+      type: v.string(),
+      size: v.number(),
+      name: v.string(),
+    }))),
+    
+    // Metadata
+    edited: v.optional(v.boolean()),
+    editedAt: v.optional(v.number()),
+    
+    // Relations
+    replyTo: v.optional(v.id('messages')),
+    channelId: v.id('channels'),
+  })
+    .index('by_user', ['userId'])
+    .index('by_channel', ['channelId'])
+    .index('by_channel_time', ['channelId', '_creationTime']),
+    
+  channels: defineTable({
+    name: v.string(),
+    description: v.optional(v.string()),
+    isPrivate: v.boolean(),
+    ownerId: v.id('users'),
+    
+    // Member management
+    memberIds: v.array(v.id('users')),
+    adminIds: v.array(v.id('users')),
+    
+    // Settings
+    settings: v.object({
+      slowMode: v.optional(v.number()), // seconds between messages
+      readOnly: v.optional(v.boolean()),
+    }),
+  })
+    .index('by_owner', ['ownerId'])
+    .searchIndex('search_channels', {
+      searchField: 'name',
+      filterFields: ['isPrivate'],
+    }),
+})
+
+// Type exports for TypeScript
+import { Doc, Id } from './_generated/dataModel'
+export type User = Doc<'users'>
+export type Message = Doc<'messages'>
+export type Channel = Doc<'channels'>
+export type UserId = Id<'users'>
+export type MessageId = Id<'messages'>
+export type ChannelId = Id<'channels'>
+```
+
+### 2. Query Functions
+```typescript
+// convex/users.ts
+import { query } from './_generated/server'
+import { v } from 'convex/values'
+
+// Basic query
+export const get = query({
+  args: { userId: v.id('users') },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.userId)
+  },
+})
+
+// Query with index
+export const getByEmail = query({
+  args: { email: v.string() },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', args.email))
+      .unique()
+  },
+})
+
+// Paginated query
+export const list = query({
+  args: {
+    paginationOpts: paginationOptsValidator,
+    role: v.optional(v.string()),
+    status: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    let query = ctx.db.query('users')
+    
+    // Apply filters
+    if (args.role && args.status) {
+      query = query.withIndex('by_status_role', (q) =>
+        q.eq('status', args.status).eq('role', args.role)
+      )
+    } else if (args.role) {
+      query = query.withIndex('by_role', (q) => q.eq('role', args.role))
+    }
+    
+    // Paginate results
+    return await query.paginate(args.paginationOpts)
+  },
+})
+
+// Search query
+export const search = query({
+  args: {
+    searchText: v.string(),
+    role: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    return await ctx.db
+      .query('users')
+      .withSearchIndex('search_users', (q) => {
+        let search = q.search('name', args.searchText)
+        
+        if (args.role) {
+          search = search.eq('role', args.role)
+        }
+        
+        return search
+      })
+      .take(10)
+  },
+})
+
+// Aggregation query
+export const stats = query({
+  handler: async (ctx) => {
+    const users = await ctx.db.query('users').collect()
+    
+    const stats = users.reduce((acc, user) => {
+      acc.total++
+      acc.byRole[user.role] = (acc.byRole[user.role] || 0) + 1
+      acc.byStatus[user.status] = (acc.byStatus[user.status] || 0) + 1
+      return acc
+    }, {
+      total: 0,
+      byRole: {} as Record<string, number>,
+      byStatus: {} as Record<string, number>,
+    })
+    
+    return stats
+  },
+})
+
+// Relational query
+export const getUserWithMessages = query({
+  args: { userId: v.id('users') },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId)
+    if (!user) return null
+    
+    const messages = await ctx.db
+      .query('messages')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .order('desc')
+      .take(10)
+    
+    return { user, messages }
+  },
+})
+```
+
+### 3. Mutation Functions
+```typescript
+// convex/users.ts
+import { mutation } from './_generated/server'
+import { v } from 'convex/values'
+import { ConvexError } from 'convex/values'
+
+// Create mutation
+export const create = mutation({
+  args: {
+    email: v.string(),
+    name: v.string(),
+    role: v.optional(v.union(v.literal('user'), v.literal('admin'))),
+  },
+  handler: async (ctx, args) => {
+    // Check for existing user
+    const existing = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', args.email))
+      .unique()
+    
+    if (existing) {
+      throw new ConvexError('User with this email already exists')
+    }
+    
+    // Create user
+    const userId = await ctx.db.insert('users', {
+      email: args.email,
+      name: args.name,
+      role: args.role || 'user',
+      status: 'active',
+      profile: {}, // Empty profile
+      tags: [], // Empty tags
+    })
+    
+    return userId
+  },
+})
+
+// Update mutation
+export const update = mutation({
+  args: {
+    userId: v.id('users'),
+    updates: v.object({
+      name: v.optional(v.string()),
+      bio: v.optional(v.string()),
+      avatar: v.optional(v.string()),
+      profile: v.optional(v.object({
+        twitter: v.optional(v.string()),
+        github: v.optional(v.string()),
+        website: v.optional(v.string()),
+      })),
+    }),
+  },
+  handler: async (ctx, args) => {
+    const { userId, updates } = args
+    
+    // Check if user exists
+    const user = await ctx.db.get(userId)
+    if (!user) {
+      throw new ConvexError('User not found')
+    }
+    
+    // Update user
+    await ctx.db.patch(userId, updates)
+    
+    return userId
+  },
+})
+
+// Delete mutation
+export const remove = mutation({
+  args: { userId: v.id('users') },
+  handler: async (ctx, args) => {
+    // Check if user exists
+    const user = await ctx.db.get(args.userId)
+    if (!user) {
+      throw new ConvexError('User not found')
+    }
+    
+    // Delete related data
+    const messages = await ctx.db
+      .query('messages')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .collect()
+    
+    for (const message of messages) {
+      await ctx.db.delete(message._id)
+    }
+    
+    // Delete user
+    await ctx.db.delete(args.userId)
+  },
+})
+
+// Batch mutation
+export const batchUpdate = mutation({
+  args: {
+    updates: v.array(v.object({
+      userId: v.id('users'),
+      data: v.any(),
+    })),
+  },
+  handler: async (ctx, args) => {
+    const results = []
+    
+    for (const update of args.updates) {
+      try {
+        await ctx.db.patch(update.userId, update.data)
+        results.push({ success: true, userId: update.userId })
+      } catch (error) {
+        results.push({
+          success: false,
+          userId: update.userId,
+          error: error.message,
+        })
+      }
+    }
+    
+    return results
+  },
+})
+```
+
+### 4. Actions (External API Calls)
+```typescript
+// convex/actions.ts
+import { action } from './_generated/server'
+import { v } from 'convex/values'
+import { api } from './_generated/api'
+
+// Action for external API calls
+export const sendEmail = action({
+  args: {
+    to: v.string(),
+    subject: v.string(),
+    body: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Actions can make external API calls
+    const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        personalizations: [{ to: [{ email: args.to }] }],
+        from: { email: 'noreply@symlog.ai' },
+        subject: args.subject,
+        content: [{ type: 'text/plain', value: args.body }],
+      }),
+    })
+    
+    if (!response.ok) {
+      throw new Error(`Failed to send email: ${response.statusText}`)
+    }
+    
+    // Actions can call mutations
+    await ctx.runMutation(api.notifications.create, {
+      type: 'email_sent',
+      userId: args.to,
+      metadata: { subject: args.subject },
+    })
+  },
+})
+
+// Action with file upload
+export const uploadFile = action({
+  args: {
+    file: v.bytes(),
+    filename: v.string(),
+    contentType: v.string(),
+  },
+  handler: async (ctx, args) => {
+    // Store file in Convex storage
+    const storageId = await ctx.storage.store(args.file)
+    
+    // Create file record
+    const fileId = await ctx.runMutation(api.files.create, {
+      storageId,
+      filename: args.filename,
+      contentType: args.contentType,
+      size: args.file.length,
+    })
+    
+    return { fileId, url: await ctx.storage.getUrl(storageId) }
+  },
+})
+
+// Scheduled action
+export const dailyReport = action({
+  handler: async (ctx) => {
+    const stats = await ctx.runQuery(api.users.stats)
+    
+    // Send report email
+    await ctx.runAction(api.actions.sendEmail, {
+      to: 'admin@symlog.ai',
+      subject: 'Daily User Report',
+      body: `Total users: ${stats.total}`,
+    })
+  },
+})
+```
+
+### 5. Real-time Subscriptions
+```typescript
+// convex/subscriptions.ts
+import { query } from './_generated/server'
+import { v } from 'convex/values'
+
+// Real-time messages subscription
+export const messages = query({
+  args: { channelId: v.id('channels') },
+  handler: async (ctx, args) => {
+    // This query automatically becomes a real-time subscription
+    return await ctx.db
+      .query('messages')
+      .withIndex('by_channel_time', (q) => 
+        q.eq('channelId', args.channelId)
+      )
+      .order('desc')
+      .take(50)
+  },
+})
+
+// Real-time user presence
+export const presence = query({
+  args: { channelId: v.id('channels') },
+  handler: async (ctx, args) => {
+    const channel = await ctx.db.get(args.channelId)
+    if (!channel) return []
+    
+    // Get online users in channel
+    const onlineUsers = await Promise.all(
+      channel.memberIds.map(async (userId) => {
+        const user = await ctx.db.get(userId)
+        // Check if user has recent activity
+        const recentActivity = await ctx.db
+          .query('activities')
+          .withIndex('by_user', (q) => q.eq('userId', userId))
+          .order('desc')
+          .first()
+        
+        const isOnline = recentActivity && 
+          Date.now() - recentActivity._creationTime < 5 * 60 * 1000 // 5 minutes
+        
+        return isOnline ? user : null
+      })
+    )
+    
+    return onlineUsers.filter(Boolean)
+  },
+})
+```
+
+### 6. Authentication Integration
+```typescript
+// convex/auth.ts
+import { mutation, query } from './_generated/server'
+import { v } from 'convex/values'
+
+// Clerk authentication integration
+export const store = mutation({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new ConvexError('Not authenticated')
+    }
+    
+    // Check if user exists
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => 
+        q.eq('email', identity.email!)
+      )
+      .unique()
+    
+    if (user) {
+      // Update last seen
+      await ctx.db.patch(user._id, {
+        lastSeen: Date.now(),
+      })
+      return user._id
+    }
+    
+    // Create new user
+    return await ctx.db.insert('users', {
+      email: identity.email!,
+      name: identity.name || identity.email!,
+      role: 'user',
+      status: 'active',
+      profile: {
+        avatar: identity.pictureUrl,
+      },
+      tags: [],
+      clerkId: identity.subject,
+    })
+  },
+})
+
+// Get current user
+export const currentUser = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) return null
+    
+    return await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => 
+        q.eq('email', identity.email!)
+      )
+      .unique()
+  },
+})
+
+// Role-based access control
+export const requireRole = (allowedRoles: string[]) => {
+  return async (ctx: any) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new ConvexError('Not authenticated')
+    }
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => 
+        q.eq('email', identity.email!)
+      )
+      .unique()
+    
+    if (!user || !allowedRoles.includes(user.role)) {
+      throw new ConvexError('Insufficient permissions')
+    }
+    
+    return user
+  }
+}
+
+// Protected mutation example
+export const adminAction = mutation({
+  args: { action: v.string() },
+  handler: async (ctx, args) => {
+    const user = await requireRole(['admin'])(ctx)
+    
+    // Perform admin action
+    await ctx.db.insert('auditLog', {
+      userId: user._id,
+      action: args.action,
+      timestamp: Date.now(),
+    })
+  },
+})
+```
+
+### 7. File Storage
+```typescript
+// convex/files.ts
+import { mutation, query } from './_generated/server'
+import { v } from 'convex/values'
+
+// Upload file
+export const generateUploadUrl = mutation({
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new ConvexError('Not authenticated')
+    }
+    
+    // Generate a short-lived upload URL
+    return await ctx.storage.generateUploadUrl()
+  },
+})
+
+// Store file metadata
+export const createFile = mutation({
+  args: {
+    storageId: v.id('_storage'),
+    filename: v.string(),
+    contentType: v.string(),
+    size: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity()
+    if (!identity) {
+      throw new ConvexError('Not authenticated')
+    }
+    
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity.email!))
+      .unique()
+    
+    return await ctx.db.insert('files', {
+      ...args,
+      userId: user!._id,
+      uploadedAt: Date.now(),
+    })
+  },
+})
+
+// Get file URL
+export const getFileUrl = query({
+  args: { fileId: v.id('files') },
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId)
+    if (!file) return null
+    
+    return {
+      ...file,
+      url: await ctx.storage.getUrl(file.storageId),
+    }
+  },
+})
+
+// Delete file
+export const deleteFile = mutation({
+  args: { fileId: v.id('files') },
+  handler: async (ctx, args) => {
+    const file = await ctx.db.get(args.fileId)
+    if (!file) {
+      throw new ConvexError('File not found')
+    }
+    
+    // Check permissions
+    const identity = await ctx.auth.getUserIdentity()
+    const user = await ctx.db
+      .query('users')
+      .withIndex('by_email', (q) => q.eq('email', identity!.email!))
+      .unique()
+    
+    if (file.userId !== user!._id && user!.role !== 'admin') {
+      throw new ConvexError('Insufficient permissions')
+    }
+    
+    // Delete from storage
+    await ctx.storage.delete(file.storageId)
+    
+    // Delete metadata
+    await ctx.db.delete(args.fileId)
+  },
+})
+```
+
+### 8. Scheduled Functions
+```typescript
+// convex/crons.ts
+import { cronJobs } from 'convex/server'
+import { api } from './_generated/api'
+
+const crons: cronJobs.CronJobs = {
+  // Run every hour
+  'cleanup-old-files': {
+    schedule: '0 * * * *', // Every hour at minute 0
+    handler: api.maintenance.cleanupOldFiles,
+  },
+  
+  // Run daily at 2 AM
+  'daily-report': {
+    schedule: '0 2 * * *', // 2:00 AM every day
+    handler: api.reports.generateDailyReport,
+  },
+  
+  // Run every Monday at 9 AM
+  'weekly-digest': {
+    schedule: '0 9 * * 1', // 9:00 AM every Monday
+    handler: api.notifications.sendWeeklyDigest,
+  },
+}
+
+export default crons
+
+// convex/maintenance.ts
+export const cleanupOldFiles = mutation({
+  handler: async (ctx) => {
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000
+    
+    // Find old temporary files
+    const oldFiles = await ctx.db
+      .query('files')
+      .filter((q) => 
+        q.and(
+          q.eq(q.field('temporary'), true),
+          q.lt(q.field('uploadedAt'), thirtyDaysAgo)
+        )
+      )
+      .collect()
+    
+    // Delete old files
+    for (const file of oldFiles) {
+      await ctx.storage.delete(file.storageId)
+      await ctx.db.delete(file._id)
+    }
+    
+    return { deleted: oldFiles.length }
+  },
+})
+```
+
+### 9. Error Handling
+```typescript
+// convex/errors.ts
+import { ConvexError } from 'convex/values'
+
+// Custom error types
+export class ValidationError extends ConvexError<{
+  field: string
+  message: string
+}> {
+  constructor(field: string, message: string) {
+    super({ field, message })
+  }
+}
+
+export class NotFoundError extends ConvexError<string> {
+  constructor(resource: string) {
+    super(`${resource} not found`)
+  }
+}
+
+export class PermissionError extends ConvexError<string> {
+  constructor(action: string) {
+    super(`Insufficient permissions for ${action}`)
+  }
+}
+
+// Error handling in mutations
+export const updateUser = mutation({
+  args: {
+    userId: v.id('users'),
+    email: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId)
+    if (!user) {
+      throw new NotFoundError('User')
+    }
+    
+    if (args.email) {
+      // Validate email format
+      if (!args.email.includes('@')) {
+        throw new ValidationError('email', 'Invalid email format')
+      }
+      
+      // Check if email is taken
+      const existing = await ctx.db
+        .query('users')
+        .withIndex('by_email', (q) => q.eq('email', args.email))
+        .unique()
+      
+      if (existing && existing._id !== args.userId) {
+        throw new ValidationError('email', 'Email already in use')
+      }
+    }
+    
+    await ctx.db.patch(args.userId, { email: args.email })
+  },
+})
+```
+
+### 10. Testing
+```typescript
+// convex/tests/users.test.ts
+import { expect, test } from 'vitest'
+import { convexTest } from 'convex-test'
+import schema from '../schema'
+import { api } from '../_generated/api'
+
+test('create user', async () => {
+  const t = convexTest(schema)
+  
+  const userId = await t.mutation(api.users.create, {
+    email: 'test@example.com',
+    name: 'Test User',
+  })
+  
+  expect(userId).toBeDefined()
+  
+  const user = await t.query(api.users.get, { userId })
+  expect(user?.email).toBe('test@example.com')
+  expect(user?.name).toBe('Test User')
+})
+
+test('prevent duplicate emails', async () => {
+  const t = convexTest(schema)
+  
+  // Create first user
+  await t.mutation(api.users.create, {
+    email: 'test@example.com',
+    name: 'User 1',
+  })
+  
+  // Try to create second user with same email
+  await expect(
+    t.mutation(api.users.create, {
+      email: 'test@example.com',
+      name: 'User 2',
+    })
+  ).rejects.toThrow('User with this email already exists')
+})
+```
+
+Remember: Convex is reactive by default. All queries automatically become real-time subscriptions.

@@ -1,0 +1,266 @@
+---
+description: "SYMLog Platform Global Development Rules"
+alwaysApply: true
+scope: "global"
+context_files:
+  - "@README.md"
+  - "@package.json"
+  - "@tsconfig.json"
+  - "@biome.json"
+memories:
+  - type: "platform_architecture"
+    scope: "project"
+  - type: "coding_patterns"
+    scope: "team"
+agent_capabilities:
+  - terminal_access: true
+  - planning_mode: structured
+  - memory_enabled: true
+mcp_servers:
+  - name: "github"
+    config: { "auto_pr_review": true }
+  - name: "convex"
+    config: { "real_time_sync": true }
+---
+
+# SYMLog Platform Development Rules
+
+## Project Overview
+SYMLog is a modern digital platform built with Next.js 15, Convex, Tauri 2, and Web3 integration. Follow these rules to maintain consistency and quality across the codebase.
+
+## Core Principles
+
+### 1. Type Safety First
+- Use TypeScript strict mode for all code
+- No implicit `any` types
+- Prefer interfaces over types for object shapes
+- Use const assertions and satisfies operator
+- Implement Result/Either patterns for error handling
+
+### 2. Modern JavaScript/TypeScript
+- Use ES2024+ features
+- Prefer functional programming patterns
+- Avoid classes except for error types
+- Use async/await over promises
+- Implement proper error boundaries
+
+### 3. Code Organization
+- Feature-based folder structure
+- Colocate related files (component, styles, tests, types)
+- Use barrel exports for clean imports
+- Keep files under 300 lines
+- Single responsibility principle
+
+### 4. Performance Standards
+- **Load Time**: <3s on 3G, <1s on WiFi
+- **Bundle Size**: <500KB initial, <2MB total
+- **API Response**: <200ms average, <500ms max
+- **Test Coverage**: ≥80% unit tests, ≥70% integration
+- **Core Web Vitals**: LCP <2.5s, FID <100ms, CLS <0.1
+
+### 5. Security Requirements
+- Validate all inputs with Zod schemas
+- Use environment variables for secrets
+- Implement proper authentication flows
+- Follow OWASP security guidelines
+- Never expose sensitive data in logs
+
+## Development Workflow
+
+### Git Conventions
+```bash
+# Commit message format
+feat(scope): add new feature
+fix(scope): resolve bug issue
+docs(scope): update documentation
+refactor(scope): improve code structure
+test(scope): add test coverage
+style(scope): format code
+chore(scope): update dependencies
+```
+
+### Code Review Checklist
+- [ ] TypeScript types are properly defined
+- [ ] Tests are included for new features
+- [ ] Documentation is updated
+- [ ] Performance impact is considered
+- [ ] Security implications are reviewed
+- [ ] Accessibility standards are met
+
+### Quality Gates
+1. **Syntax Check**: Biome/Ultracite validation
+2. **Type Check**: TypeScript strict mode
+3. **Lint**: Code quality rules
+4. **Test**: Unit and integration tests
+5. **Build**: Production build success
+6. **Bundle**: Size limits respected
+7. **Security**: No vulnerabilities
+8. **Deploy**: Vercel/Tauri checks
+
+## Technology Stack Rules
+
+### Frontend (Next.js 15 + React)
+- Use App Router for all new pages
+- Implement Server Components by default
+- Use Client Components only when necessary
+- Follow React 19 best practices
+- Optimize for Core Web Vitals
+
+### Backend (Convex)
+- Use reactive queries for real-time data
+- Implement proper schema validation
+- Follow Convex best practices
+- Use mutations for data changes
+- Implement proper error handling
+
+### Desktop (Tauri 2)
+- Use native APIs when available
+- Implement proper IPC communication
+- Follow platform-specific guidelines
+- Optimize for each OS (Windows, macOS, Linux)
+- Test on all target platforms
+
+### Web3 (Solana)
+- Use Phantom/Crossmint for wallet integration
+- Implement proper transaction signing
+- Follow Solana security best practices
+- Handle network errors gracefully
+- Test on devnet before mainnet
+
+## AI Assistant Guidelines
+
+### Code Generation
+- Follow existing patterns in the codebase
+- Use project-specific utilities and helpers
+- Implement comprehensive error handling
+- Add proper TypeScript types
+- Include tests for generated code
+
+### Context Awareness
+- Reference architecture documentation
+- Use established coding patterns
+- Consider performance implications
+- Follow security best practices
+- Maintain consistency with existing code
+
+### Communication Style
+- Be concise and technical
+- Provide code examples
+- Explain complex decisions
+- Suggest improvements
+- Document assumptions
+
+## Package Management
+
+### Using Bun
+```bash
+# Install dependencies
+bun install
+
+# Add new dependency
+bun add package-name
+
+# Add dev dependency
+bun add -d package-name
+
+# Run scripts
+bun run dev
+bun run build
+bun run test
+```
+
+### Monorepo Structure
+- Use workspace protocol for internal packages
+- Keep shared code in packages/
+- App-specific code in apps/
+- Follow Turborepo conventions
+- Maintain dependency consistency
+
+## Testing Standards
+
+### Unit Tests
+- Test individual functions and components
+- Mock external dependencies
+- Use descriptive test names
+- Follow AAA pattern (Arrange, Act, Assert)
+- Aim for >80% coverage
+
+### Integration Tests
+- Test feature workflows
+- Use realistic data
+- Test error scenarios
+- Validate API contracts
+- Test cross-component interactions
+
+### E2E Tests
+- Test critical user paths
+- Run on multiple browsers
+- Test responsive behavior
+- Validate performance
+- Test error recovery
+
+## Documentation Requirements
+
+### Code Documentation
+- Use JSDoc for public APIs
+- Write self-documenting code
+- Add inline comments for complex logic
+- Keep README files updated
+- Document architectural decisions
+
+### API Documentation
+- Use OpenAPI/Swagger for REST APIs
+- Document all endpoints
+- Include request/response examples
+- Document error responses
+- Keep versioning clear
+
+## Deployment Guidelines
+
+### Vercel (Web)
+- Use preview deployments for PRs
+- Configure environment variables
+- Set up proper redirects
+- Monitor Core Web Vitals
+- Use ISR for dynamic content
+
+### Tauri (Desktop)
+- Test on all platforms before release
+- Sign binaries properly
+- Use auto-updater for patches
+- Test offline functionality
+- Monitor crash reports
+
+## Monitoring & Observability
+
+### Logging
+- Use structured logging
+- Include correlation IDs
+- Log at appropriate levels
+- Never log sensitive data
+- Use proper log rotation
+
+### Metrics
+- Monitor API response times
+- Track error rates
+- Monitor bundle sizes
+- Track user engagement
+- Set up alerts for anomalies
+
+## Team Collaboration
+
+### Code Ownership
+- Use CODEOWNERS file
+- Require PR reviews
+- Document decisions in ADRs
+- Share knowledge in team meetings
+- Maintain coding standards
+
+### Communication
+- Use clear PR descriptions
+- Document breaking changes
+- Communicate blockers early
+- Share learnings with team
+- Keep documentation current
+
+Remember: These rules are living guidelines. Propose changes through PRs when improvements are identified.

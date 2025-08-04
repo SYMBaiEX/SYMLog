@@ -1,0 +1,486 @@
+# SYMLog Platform - Windsurf Cascade Configuration
+# AI-Native IDE Configuration for Next.js 15, React 19, TypeScript, and Tauri Development
+
+# Project Context
+project_name: "SYMLog"
+project_type: "monorepo"
+package_manager: "bun"
+workspace_manager: "turborepo"
+primary_language: "typescript"
+frameworks: ["nextjs-15", "react-19", "tauri-2"]
+styling: "tailwindcss-4"
+backend: "convex"
+quality_tools: ["biome", "ultracite"]
+
+# Windsurf AI Configuration
+ai_features:
+  cascade:
+    enabled: true
+    mode: "intelligent" # conservative, intelligent, aggressive
+    context_depth: "deep" # shallow, medium, deep, comprehensive
+    auto_execution: true
+    iterative_debugging: true
+    multi_file_operations: true
+    production_safe: true
+    
+  supercomplete:
+    enabled: true
+    mind_reading_mode: true
+    multi_cursor_suggestions: true
+    context_aware: true
+    framework_patterns: true
+    
+  ai_flows:
+    enabled: true
+    workflow_automation: true
+    high_level_prompts: true
+    step_by_step_execution: true
+    interactive_preview: true
+
+# Project Structure Awareness
+monorepo_structure:
+  root: "/SYMLog"
+  apps:
+    - name: "auth-web"
+      path: "apps/auth-web"
+      type: "nextjs"
+      purpose: "Authentication service"
+    - name: "fumadocs"
+      path: "apps/fumadocs"
+      type: "nextjs-docs"
+      purpose: "Documentation platform"
+    - name: "web"
+      path: "apps/web"
+      type: "nextjs-tauri"
+      purpose: "Main application with desktop support"
+  packages:
+    path: "packages"
+    type: "shared-libraries"
+
+# Framework-Specific Patterns
+patterns:
+  nextjs:
+    version: "15.x"
+    app_router: true
+    server_components: true
+    client_components: "use client directive"
+    api_routes: "app/api/*/route.ts"
+    middleware: "middleware.ts"
+    
+  react:
+    version: "19.x"
+    concurrent_features: true
+    server_components: true
+    hooks_modern: true
+    suspense_patterns: true
+    
+  typescript:
+    strict_mode: true
+    no_any_types: true
+    prefer_interfaces: true
+    import_type: true
+    
+  tailwind:
+    version: "4.x"
+    utility_first: true
+    design_system: "shadcn/ui"
+    responsive_first: true
+    
+  tauri:
+    version: "2.x"
+    commands_path: "src-tauri/src"
+    config_path: "src-tauri/tauri.conf.json"
+    frontend_integration: true
+
+# Context Understanding
+context_areas:
+  authentication:
+    convex_auth: "convex/auth.ts"
+    middleware: "src/middleware.ts"
+    crossmint_integration: "components/crossmint-*.tsx"
+    patterns: ["auth callbacks", "session management", "wallet auth"]
+    
+  ui_components:
+    shadcn_ui: "components/ui/**/*.tsx"
+    custom_components: "components/**/*.tsx"
+    theme_system: "theme-provider.tsx"
+    patterns: ["polymorphic", "forwardRef", "className merging"]
+    
+  data_management:
+    convex_queries: "useQuery patterns"
+    convex_mutations: "useMutation patterns"
+    schema: "convex/schema.ts"
+    patterns: ["optimistic updates", "real-time subscriptions"]
+    
+  desktop_integration:
+    tauri_commands: "src-tauri/src/**/*.rs"
+    frontend_hooks: "components/tauri-*.tsx"
+    patterns: ["command invocation", "event handling", "window management"]
+
+# Code Generation Preferences
+code_generation:
+  component_style: "functional_with_typescript"
+  import_style: "absolute_paths_with_aliases"
+  export_style: "named_exports"
+  prop_types: "interface_based"
+  styling: "tailwind_with_cn_utility"
+  error_handling: "comprehensive_try_catch"
+  accessibility: "aria_attributes_included"
+  
+  templates:
+    react_component: |
+      interface {ComponentName}Props {
+        className?: string;
+        children?: React.ReactNode;
+      }
+
+      export function {ComponentName}({ className, children, ...props }: {ComponentName}Props) {
+        return (
+          <div className={cn("", className)} {...props}>
+            {children}
+          </div>
+        );
+      }
+    
+    nextjs_page: |
+      export default async function {PageName}Page() {
+        return (
+          <div className="container mx-auto py-8">
+            <h1 className="text-4xl font-bold">{Page Title}</h1>
+          </div>
+        );
+      }
+    
+    api_route: |
+      export async function {HTTP_METHOD}(request: Request) {
+        try {
+          // Implementation
+          return NextResponse.json({ success: true });
+        } catch (error) {
+          console.error('API Error:', error);
+          return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+        }
+      }
+
+# Smart Import Management
+imports:
+  auto_imports: true
+  prefer_absolute: true
+  alias_mapping:
+    "@/": "./src/"
+    "@/components": "./src/components"
+    "@/lib": "./src/lib"
+    "@/hooks": "./src/hooks"
+    "@/types": "./src/types"
+  
+  common_imports:
+    react: 'import { useState, useEffect, useCallback } from "react"'
+    next_image: 'import Image from "next/image"'
+    next_link: 'import Link from "next/link"'
+    next_navigation: 'import { useRouter, usePathname } from "next/navigation"'
+    cn_utility: 'import { cn } from "@/lib/utils"'
+    convex_react: 'import { useQuery, useMutation } from "convex/react"'
+    convex_api: 'import { api } from "@/convex/_generated/api"'
+    tauri_api: 'import { invoke } from "@tauri-apps/api/tauri"'
+
+# Performance Optimization
+performance:
+  indexing:
+    enabled: true
+    include_patterns:
+      - "src/**/*.{ts,tsx,js,jsx}"
+      - "app/**/*.{ts,tsx}"
+      - "components/**/*.{ts,tsx}"
+      - "lib/**/*.{ts,tsx}"
+      - "hooks/**/*.{ts,tsx}"
+      - "convex/**/*.ts"
+      - "src-tauri/src/**/*.rs"
+      - "*.config.{js,ts,mjs}"
+      - "package.json"
+      - "tsconfig.json"
+    exclude_patterns:
+      - "node_modules/**"
+      - ".next/**"
+      - "dist/**"
+      - "build/**"
+      - "target/**"
+      - ".git/**"
+      - "*.min.js"
+      - "coverage/**"
+      - "_generated/**"
+    priority_files:
+      - "src/app/layout.tsx"
+      - "src/middleware.ts"
+      - "convex/schema.ts"
+      - "convex/auth.ts"
+      - "src-tauri/tauri.conf.json"
+  
+  caching:
+    enabled: true
+    ai_responses: "1h"
+    context_cache: "session"
+    pattern_cache: true
+    frequent_patterns_priority: true
+  
+  resource_management:
+    max_concurrent_requests: 3
+    request_timeout: "30s"
+    background_analysis: true
+    preemptive_suggestions: true
+    adaptive_model_selection: true
+
+# Quality Assurance Integration
+quality:
+  linting:
+    biome: true
+    config_path: "biome.json"
+    auto_fix: true
+    
+  formatting:
+    biome: true
+    format_on_save: true
+    format_on_paste: true
+    
+  type_checking:
+    typescript_strict: true
+    no_implicit_any: true
+    strict_null_checks: true
+    
+  testing:
+    framework: "jest"
+    coverage_threshold: 80
+    auto_test_generation: true
+    
+  security:
+    dependency_scanning: true
+    vulnerability_alerts: true
+    secure_coding_patterns: true
+
+# Development Workflow Integration
+workflows:
+  git_integration:
+    auto_commit_messages: true
+    branch_awareness: true
+    conflict_resolution: "ai_assisted"
+    
+  debugging:
+    nextjs_debugging: true
+    tauri_debugging: true
+    rust_debugging: true
+    breakpoint_intelligence: true
+    
+  deployment:
+    vercel_integration: true
+    tauri_bundling: true
+    environment_awareness: true
+    
+  collaboration:
+    code_review_assistance: true
+    documentation_generation: true
+    onboarding_support: true
+
+# AI Model Configuration
+ai_models:
+  primary: "claude-3.5-sonnet"  # For complex reasoning
+  secondary: "gpt-4-turbo"      # For quick suggestions
+  
+  task_routing:
+    typescript_analysis: "claude-3.5-sonnet"
+    react_patterns: "claude-3.5-sonnet"
+    tailwind_suggestions: "gpt-4-turbo"
+    rust_tauri: "claude-3.5-sonnet"
+    api_design: "claude-3.5-sonnet"
+    documentation: "gpt-4"
+    
+  response_preferences:
+    verbosity: "balanced"
+    include_explanations: true
+    suggest_alternatives: true
+    highlight_best_practices: true
+    
+  code_style:
+    typescript_strict: true
+    functional_components: true
+    modern_react_patterns: true
+    tailwind_utility_first: true
+    comprehensive_error_handling: true
+
+# Interactive Development Features
+interactive:
+  live_preview:
+    nextjs_dev_server: "http://localhost:3000"
+    auto_refresh: true
+    hot_reload: true
+    error_overlay: true
+    
+  tauri_preview:
+    desktop_debugging: true
+    auto_launch: false
+    debug_mode: true
+    
+  collaboration_mode:
+    pair_programming: "collaborative"
+    code_review: "auto_suggest"
+    real_time_feedback: true
+
+# Context-Aware Suggestions
+suggestions:
+  component_patterns:
+    - "Use forwardRef for reusable components"
+    - "Add className prop for styling flexibility"
+    - "Include proper TypeScript interfaces"
+    - "Use cn() utility for className merging"
+    
+  nextjs_patterns:
+    - "Use Server Components by default"
+    - "Add 'use client' only when necessary"
+    - "Implement proper error boundaries"
+    - "Use async/await for data fetching"
+    
+  performance_patterns:
+    - "Implement React.memo for expensive components"
+    - "Use useCallback for event handlers"
+    - "Lazy load components with dynamic imports"
+    - "Optimize images with Next.js Image component"
+    
+  accessibility_patterns:
+    - "Include ARIA labels for interactive elements"
+    - "Ensure proper heading hierarchy"
+    - "Add focus management for modals"
+    - "Use semantic HTML elements"
+
+# Windsurf-Specific Optimizations
+windsurf:
+  cascade_optimization:
+    deep_codebase_understanding: true
+    multi_file_refactoring: true
+    context_preservation: true
+    intelligent_suggestions: true
+    
+  supercomplete_tuning:
+    framework_awareness: true
+    pattern_recognition: true
+    type_inference: true
+    import_intelligence: true
+    
+  flow_automation:
+    component_scaffolding: true
+    api_route_generation: true
+    test_file_creation: true
+    documentation_updates: true
+
+# Custom Commands and Shortcuts
+commands:
+  create_component:
+    description: "Create a new React component with TypeScript and Tailwind"
+    template: "react_component"
+    location: "components/"
+    
+  create_page:
+    description: "Create a new Next.js page with metadata and layout"
+    template: "nextjs_page"
+    location: "app/"
+    
+  create_api_route:
+    description: "Create a new API route with validation and error handling"
+    template: "api_route"
+    location: "app/api/"
+    
+  create_hook:
+    description: "Create a custom React hook with TypeScript"
+    template: "custom_hook"
+    location: "hooks/"
+    
+  create_convex_function:
+    description: "Create a new Convex function (query/mutation/action)"
+    template: "convex_function"
+    location: "convex/"
+
+# Error Handling and Recovery
+error_handling:
+  automatic_debugging: true
+  iterative_fixes: true
+  context_aware_solutions: true
+  stack_trace_analysis: true
+  
+  common_fixes:
+    typescript_errors: "auto_import_types"
+    react_errors: "component_lifecycle_fixes"
+    nextjs_errors: "routing_and_rendering_fixes"
+    tailwind_errors: "class_name_suggestions"
+    tauri_errors: "command_binding_fixes"
+
+# Version Control Integration
+version_control:
+  git_aware: true
+  branch_context: true
+  commit_intelligence: true
+  merge_conflict_resolution: true
+  
+  commit_message_patterns:
+    feat: "New feature implementation"
+    fix: "Bug fix"
+    docs: "Documentation update"
+    style: "Code style changes"
+    refactor: "Code refactoring"
+    perf: "Performance improvements"
+    test: "Test additions or changes"
+    build: "Build system changes"
+
+# Documentation Generation
+documentation:
+  auto_generate: true
+  update_on_change: true
+  include_examples: true
+  api_documentation: true
+  component_props: true
+  usage_examples: true
+  
+  formats:
+    - "markdown"
+    - "jsdoc"
+    - "typescript_declarations"
+
+# Security Guidelines
+security:
+  secure_coding: true
+  vulnerability_detection: true
+  dependency_scanning: true
+  input_validation: true
+  authentication_patterns: true
+  
+  security_checks:
+    - "SQL injection prevention"
+    - "XSS protection"
+    - "CSRF protection"
+    - "Input sanitization"
+    - "Secure authentication flows"
+
+# Deployment and Build Optimization
+deployment:
+  build_optimization: true
+  bundle_analysis: true
+  performance_monitoring: true
+  environment_configuration: true
+  
+  targets:
+    web: "vercel"
+    desktop: "tauri-bundle"
+    documentation: "static-site"
+
+# Learning and Adaptation
+learning:
+  pattern_recognition: true
+  user_preference_learning: true
+  codebase_evolution: true
+  best_practice_updates: true
+  
+  feedback_integration:
+    code_acceptance_rate: true
+    user_corrections: true
+    error_patterns: true
+    success_patterns: true
+
+# This configuration enables Windsurf's AI features to provide intelligent, 
+# context-aware assistance specifically optimized for the SYMLog platform's 
+# modern web development stack.
