@@ -35,16 +35,9 @@ export function Navigation() {
   const navRefs = React.useRef<(HTMLAnchorElement | null)[]>([])
 
   // Check if user is authenticated
-  let isAuthenticated = false
-  try {
-    const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
-    if (clientApiKey && clientApiKey !== 'your_client_api_key_here') {
-      const auth = useAuth()
-      isAuthenticated = !!auth.jwt && !!auth.user
-    }
-  } catch (error) {
-    // Crossmint not available
-  }
+  const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
+  const auth = useAuth()
+  const isAuthenticated = clientApiKey && clientApiKey !== 'your_client_api_key_here' && !!auth.jwt && !!auth.user
 
   // Build navigation items including AI Chat for authenticated users
   const navItems = [
