@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
-import { Menu, X, Brain, Settings, BookOpen, FlaskConical, MessageSquare } from "lucide-react"
+import { Menu, X, Brain, Settings, BookOpen, FlaskConical, MessageSquare, Sparkles } from "lucide-react"
 
 import {
   NavigationMenu,
@@ -39,10 +39,13 @@ export function Navigation() {
   const auth = useAuth()
   const isAuthenticated = clientApiKey && clientApiKey !== 'your_client_api_key_here' && !!auth.jwt && !!auth.user
 
-  // Build navigation items including AI Chat for authenticated users
+  // Build navigation items including AI Chat and Agent Dashboard for authenticated users
   const navItems = [
     ...navigation,
-    ...(isAuthenticated ? [{ name: "AI Chat", href: "/chat", icon: MessageSquare }] : [])
+    ...(isAuthenticated ? [
+      { name: "AI Chat", href: "/chat", icon: MessageSquare },
+      { name: "Agent Dashboard", href: "/agents", icon: Sparkles }
+    ] : [])
   ]
 
   // Keyboard navigation
@@ -83,8 +86,8 @@ export function Navigation() {
         ;(document.activeElement as HTMLElement)?.blur()
       }
 
-      // Number keys for quick navigation (1-4)
-      if (e.key >= "1" && e.key <= "5" && !e.metaKey && !e.ctrlKey) {
+      // Number keys for quick navigation (1-6 for authenticated users, 1-4 for guests)
+      if (e.key >= "1" && e.key <= (isAuthenticated ? "6" : "4") && !e.metaKey && !e.ctrlKey) {
         const index = parseInt(e.key) - 1
         if (index < navItems.length) {
           router.push(navItems[index].href)
@@ -94,7 +97,7 @@ export function Navigation() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [focusedIndex, router])
+  }, [focusedIndex, router, isAuthenticated, navItems.length])
 
   return (
     <header className="navigation sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-border">

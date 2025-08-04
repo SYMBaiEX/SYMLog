@@ -29,6 +29,7 @@ export interface ModelConfig {
   id: string
   displayName: string
   role: ModelRole
+  description: string // Detailed capability description for tooltips
   capabilities: ModelCapabilities
   pricing: {
     input: number    // Per 1M tokens
@@ -40,7 +41,12 @@ export interface ModelConfig {
     reasoning?: number
     math?: number
     elo?: number
+    mmlu?: number
+    gpqa?: number
+    aime?: number
   }
+  useCase: string // Primary use case summary
+  requiresExplicitSelection?: boolean // For expensive reasoning models
 }
 
 // Latest OpenAI Model Configuration (August 2025)
@@ -49,8 +55,9 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
     id: 'gpt-4.1-nano',
     displayName: 'GPT-4.1 Nano',
     role: 'conversation',
+    description: 'Fastest and most cost-effective model. Ideal for classification, autocompletion, and general conversation. Responds in under 5 seconds with 1M token context.',
     capabilities: {
-      reasoning: true,
+      reasoning: false, // Basic reasoning only
       vision: true,
       functionCalling: true,
       multiModal: true,
@@ -59,14 +66,16 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
       costTier: 'nano'
     },
     pricing: { input: 0.1, output: 0.4, cached: 0.025 },
-    benchmarks: { elo: 1280 }
+    benchmarks: { elo: 1280, coding: 9.8, mmlu: 80.1 },
+    useCase: 'General chat, classification, autocompletion'
   },
   'gpt-4.1-nano-2025-04-14': {
     id: 'gpt-4.1-nano-2025-04-14',
     displayName: 'GPT-4.1 Nano (Apr 2025)',
     role: 'coding',
+    description: 'Optimized for code generation and programming tasks. Fast responses with 1M token context. Good balance of speed and coding capability.',
     capabilities: {
-      reasoning: true,
+      reasoning: false, // Basic reasoning
       vision: true,
       functionCalling: true,
       multiModal: true,
@@ -74,14 +83,17 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
       maxOutput: 32768,
       costTier: 'nano'
     },
-    pricing: { input: 0.1, output: 0.4, cached: 0.025 }
+    pricing: { input: 0.1, output: 0.4, cached: 0.025 },
+    benchmarks: { coding: 12.5, mmlu: 80.1 },
+    useCase: 'Code generation, programming assistance'
   },
   'gpt-4.1-mini-2025-04-14': {
     id: 'gpt-4.1-mini-2025-04-14',
     displayName: 'GPT-4.1 Mini (Apr 2025)',
     role: 'conversation',
+    description: 'Balanced performance and cost for general tasks. Better reasoning than nano models with 200K context. Good for complex conversations.',
     capabilities: {
-      reasoning: true,
+      reasoning: true, // Better reasoning than nano
       vision: true,
       functionCalling: true,
       multiModal: true,
@@ -89,44 +101,53 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
       maxOutput: 65536,
       costTier: 'mini'
     },
-    pricing: { input: 0.5, output: 2.0, cached: 0.125 }
+    pricing: { input: 0.5, output: 2.0, cached: 0.125 },
+    benchmarks: { mmlu: 85.2, coding: 15.8 },
+    useCase: 'Complex conversations, balanced tasks'
   },
   'o3-mini': {
     id: 'o3-mini',
     displayName: 'o3-mini',
     role: 'reasoning',
+    description: '⚠️ EXPENSIVE: Advanced reasoning model that "thinks" before responding. Excels at complex math, logic, and step-by-step problem solving. 10x cost of nano models.',
     capabilities: {
-      reasoning: true,
+      reasoning: true, // Advanced reasoning capabilities
       vision: false,
       functionCalling: true,
       multiModal: false,
       contextWindow: 200000,
       maxOutput: 100000,
-      costTier: 'mini'
+      costTier: 'premium'
     },
     pricing: { input: 1.1, output: 4.4, cached: 0.55 },
-    benchmarks: { reasoning: 1305, math: 85 }
+    benchmarks: { reasoning: 1305, math: 85, gpqa: 78.5 },
+    useCase: 'Complex reasoning, advanced math, logical analysis',
+    requiresExplicitSelection: true
   },
   'o4-mini': {
     id: 'o4-mini',
     displayName: 'o4-mini',
     role: 'reasoning',
+    description: '⚠️ EXPENSIVE: Latest reasoning model with vision. Can "think with images" and excel at visual reasoning, math (99.5% AIME), and coding. Premium pricing.',
     capabilities: {
-      reasoning: true,
-      vision: true,
+      reasoning: true, // Most advanced reasoning
+      vision: true, // Can reason with images
       functionCalling: true,
       multiModal: true,
       contextWindow: 200000,
       maxOutput: 100000,
-      costTier: 'mini'
+      costTier: 'premium'
     },
     pricing: { input: 1.1, output: 4.4, cached: 0.275 },
-    benchmarks: { reasoning: 1320, coding: 90 }
+    benchmarks: { reasoning: 1320, coding: 90, aime: 99.5, math: 95.2 },
+    useCase: 'Advanced reasoning with images, complex math, expert-level coding',
+    requiresExplicitSelection: true
   },
   'text-embedding-3-large': {
     id: 'text-embedding-3-large',
     displayName: 'Text Embedding 3 Large',
     role: 'embedding',
+    description: 'Specialized for semantic search and text similarity. Converts text to high-dimensional vectors (3072 dimensions) for advanced search and recommendations.',
     capabilities: {
       reasoning: false,
       vision: false,
@@ -136,22 +157,27 @@ export const MODEL_CONFIGS: Record<string, ModelConfig> = {
       maxOutput: 3072, // Embedding dimensions
       costTier: 'standard'
     },
-    pricing: { input: 0.13, output: 0 }
+    pricing: { input: 0.13, output: 0 },
+    benchmarks: { },
+    useCase: 'Semantic search, text similarity, recommendations'
   },
   'gpt-4o-mini': {
     id: 'gpt-4o-mini',
     displayName: 'GPT-4o Mini',
     role: 'conversation',
+    description: 'Multimodal model with strong vision capabilities. Good for image analysis, document processing, and general tasks. Proven reliable performance.',
     capabilities: {
-      reasoning: true,
-      vision: true,
+      reasoning: true, // Good reasoning
+      vision: true, // Strong vision capabilities
       functionCalling: true,
       multiModal: true,
       contextWindow: 128000,
       maxOutput: 16384,
       costTier: 'mini'
     },
-    pricing: { input: 0.15, output: 0.6, cached: 0.075 }
+    pricing: { input: 0.15, output: 0.6, cached: 0.075 },
+    benchmarks: { mmlu: 82.0, coding: 18.1 },
+    useCase: 'Image analysis, document processing, multimodal tasks'
   }
 }
 
@@ -172,53 +198,60 @@ export class ModelOrchestrator {
   }
 
   /**
-   * Smart model selection based on task type and context
+   * Get model suggestions based on task type and context (no automatic selection)
    */
-  selectOptimalModel(task: {
+  getModelSuggestions(task: {
     type: ModelRole
     complexity: 'low' | 'medium' | 'high'
     requiresVision?: boolean
     requiresFunctions?: boolean
     maxTokens?: number
     budget?: 'minimal' | 'balanced' | 'premium'
-  }): string {
-    const candidates = Object.values(MODEL_CONFIGS)
-      .filter(model => {
-        // Filter by role compatibility
-        if (task.type === 'reasoning' && !model.capabilities.reasoning) return false
-        if (task.requiresVision && !model.capabilities.vision) return false
-        if (task.requiresFunctions && !model.capabilities.functionCalling) return false
-        if (task.maxTokens && model.capabilities.maxOutput < task.maxTokens) return false
-        
-        // Filter by budget
-        if (task.budget === 'minimal' && model.capabilities.costTier !== 'nano') return false
-        if (task.budget === 'balanced' && !['nano', 'mini'].includes(model.capabilities.costTier)) return false
-        
-        return true
-      })
+  }): { recommended: ModelConfig[], reasoning: ModelConfig[] } {
+    const allModels = Object.values(MODEL_CONFIGS)
+    
+    // Filter models that meet basic requirements
+    const compatibleModels = allModels.filter(model => {
+      if (task.requiresVision && !model.capabilities.vision) return false
+      if (task.requiresFunctions && !model.capabilities.functionCalling) return false
+      if (task.maxTokens && model.capabilities.maxOutput < task.maxTokens) return false
+      return true
+    })
+
+    // Separate reasoning models (require explicit selection)
+    const reasoningModels = compatibleModels.filter(model => 
+      model.requiresExplicitSelection && model.capabilities.reasoning
+    )
+    
+    // Get recommended models (exclude expensive reasoning models)
+    const recommendedModels = compatibleModels
+      .filter(model => !model.requiresExplicitSelection)
       .sort((a, b) => {
-        // Primary: Cost efficiency for task complexity
-        const costScore = (model: ModelConfig) => {
-          const baseCost = model.pricing.input + model.pricing.output
-          const complexityMultiplier = task.complexity === 'high' ? 0.5 : 
-                                     task.complexity === 'medium' ? 0.7 : 1.0
-          return baseCost * complexityMultiplier
+        // Sort by appropriateness for task
+        const getTaskScore = (model: ModelConfig) => {
+          let score = 0
+          
+          // Role matching
+          if (model.role === task.type) score += 3
+          
+          // Budget considerations
+          if (task.budget === 'minimal' && model.capabilities.costTier === 'nano') score += 2
+          if (task.budget === 'balanced' && ['nano', 'mini'].includes(model.capabilities.costTier)) score += 1
+          
+          // Capability matching
+          if (task.requiresVision && model.capabilities.vision) score += 1
+          if (task.requiresFunctions && model.capabilities.functionCalling) score += 1
+          
+          return score
         }
-
-        // Secondary: Performance benchmarks
-        const performanceScore = (model: ModelConfig) => {
-          if (task.type === 'reasoning') return model.benchmarks?.reasoning || 1000
-          if (task.type === 'coding') return model.benchmarks?.coding || 50
-          return model.benchmarks?.elo || 1200
-        }
-
-        const scoreA = costScore(a) / performanceScore(a) * 1000
-        const scoreB = costScore(b) / performanceScore(b) * 1000
         
-        return scoreA - scoreB
+        return getTaskScore(b) - getTaskScore(a)
       })
 
-    return candidates[0]?.id || 'gpt-4.1-nano'
+    return {
+      recommended: recommendedModels.slice(0, 3),
+      reasoning: reasoningModels
+    }
   }
 
   /**
@@ -404,3 +437,5 @@ export class ModelOrchestrator {
 
 // Export singleton instance
 export const modelOrchestrator = ModelOrchestrator.getInstance()
+
+// MODEL_CONFIGS is already exported at line 53

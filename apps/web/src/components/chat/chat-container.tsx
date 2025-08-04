@@ -13,7 +13,8 @@ import { TreeVisualization, ChatSettingsModal } from "@/components/dynamic"
 import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Badge } from "@/components/ui/badge"
-import { Brain, Settings, Sparkles, Menu, X, GitBranch, Network } from "lucide-react"
+import { Brain, Settings, Sparkles, Menu, X, GitBranch, Network, AlertTriangle, DollarSign } from "lucide-react"
+import { MODEL_CONFIGS } from "@/lib/ai/model-orchestration"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
@@ -25,7 +26,7 @@ interface ChatContainerProps {
 
 export function ChatContainer({ sessionToken, userId, userEmail }: ChatContainerProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<string>()
+  const [selectedModel, setSelectedModel] = useState<string>('gpt-4.1-nano') // Default to nano model
   const [systemPromptType, setSystemPromptType] = useState<'default' | 'technical' | 'creative'>('default')
   const [enableBranching, setEnableBranching] = useState<boolean>(false)
   const [showTreeVisualization, setShowTreeVisualization] = useState<boolean>(false)
@@ -176,6 +177,22 @@ export function ChatContainer({ sessionToken, userId, userEmail }: ChatContainer
                 <Sparkles className="h-3 w-3" />
                 {systemPromptType}
               </Badge>
+              
+              {/* Model info badge */}
+              {selectedModel && MODEL_CONFIGS[selectedModel] && (
+                <Badge 
+                  variant={MODEL_CONFIGS[selectedModel].requiresExplicitSelection ? "destructive" : "secondary"} 
+                  className="gap-1"
+                >
+                  {MODEL_CONFIGS[selectedModel].requiresExplicitSelection && (
+                    <AlertTriangle className="h-3 w-3" />
+                  )}
+                  {MODEL_CONFIGS[selectedModel].displayName.replace(/^gpt-/, 'GPT-').replace(/^o(\d)/, 'o$1')}
+                  {MODEL_CONFIGS[selectedModel].requiresExplicitSelection && (
+                    <span className="text-xs">~${(MODEL_CONFIGS[selectedModel].pricing.input + MODEL_CONFIGS[selectedModel].pricing.output).toFixed(1)}/1M</span>
+                  )}
+                </Badge>
+              )}
               
               {/* Branching toggle */}
               <GlassButton

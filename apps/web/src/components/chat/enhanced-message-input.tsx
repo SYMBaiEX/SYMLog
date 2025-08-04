@@ -34,7 +34,13 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { FileUpload } from "./file-upload"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
-import { SmartModelSelector } from "./smart-model-selector"
+import { MODEL_CONFIGS } from "@/lib/ai/model-orchestration"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 interface EnhancedMessageInputProps {
   isLoading: boolean
@@ -140,57 +146,25 @@ export function EnhancedMessageInput({
     { value: 'creative', label: 'Creative', icon: Palette, description: 'Ideas & innovation' },
   ] as const
 
-  const models = [
-    { 
-      value: 'gpt-4.1-nano', 
-      label: 'GPT-4.1 Nano', 
-      provider: 'OpenAI',
-      tier: 'nano',
-      description: 'Fast, cost-effective for general tasks'
-    },
-    { 
-      value: 'o3-mini', 
-      label: 'o3-mini', 
-      provider: 'OpenAI',
-      tier: 'reasoning',
-      description: 'Advanced reasoning and problem solving'
-    },
-    { 
-      value: 'o4-mini', 
-      label: 'o4-mini', 
-      provider: 'OpenAI',
-      tier: 'reasoning',
-      description: 'Latest reasoning with vision capabilities'
-    },
-    { 
-      value: 'gpt-4.1-nano-2025-04-14', 
-      label: 'GPT-4.1 Nano (Apr 2025)', 
-      provider: 'OpenAI',
-      tier: 'coding',
-      description: 'Optimized for code generation'
-    },
-    { 
-      value: 'gpt-4.1-mini-2025-04-14', 
-      label: 'GPT-4.1 Mini (Apr 2025)', 
-      provider: 'OpenAI',
-      tier: 'balanced',
-      description: 'Balanced performance and cost'
-    },
-    { 
-      value: 'gpt-4o-mini', 
-      label: 'GPT-4o Mini', 
-      provider: 'OpenAI',
-      tier: 'vision',
-      description: 'Multimodal with vision support'
-    },
-    { 
-      value: 'text-embedding-3-large', 
-      label: 'Text Embedding 3 Large', 
-      provider: 'OpenAI',
-      tier: 'embedding',
-      description: 'High-dimensional semantic search'
-    },
-  ]
+  // Get models from orchestration config with proper capabilities
+  const models = Object.values(MODEL_CONFIGS).map(config => ({
+    value: config.id,
+    label: config.displayName,
+    provider: 'OpenAI',
+    tier: config.capabilities.costTier,
+    description: config.description,
+    useCase: config.useCase,
+    requiresExplicitSelection: config.requiresExplicitSelection,
+    benchmarks: config.benchmarks,
+    pricing: config.pricing
+  })).sort((a, b) => {
+    // Sort: regular models first, then expensive reasoning models
+    if (a.requiresExplicitSelection && !b.requiresExplicitSelection) return 1
+    if (!a.requiresExplicitSelection && b.requiresExplicitSelection) return -1
+    // Then by cost (nano -> mini -> premium)
+    const tierOrder = { nano: 1, mini: 2, standard: 3, premium: 4 }
+    return tierOrder[a.tier] - tierOrder[b.tier]
+  })
 
   const markdownTools = [
     { label: 'Heading', icon: Hash, action: () => insertMarkdownBlock('# ') },
@@ -255,57 +229,146 @@ export function EnhancedMessageInput({
           </DropdownMenu>
 
           {/* Model selector */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <GlassButton variant="ghost" size="sm" className="gap-2">
-                <Sparkles className="h-4 w-4" />
-                Model
-                <ChevronDown className="h-3 w-3" />
-              </GlassButton>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="glass min-w-[200px]">
-              <DropdownMenuLabel>AI Model Selection</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {models.map((model) => (
-                <DropdownMenuItem
-                  key={model.value}
-                  onClick={() => onModelChange(model.value)}
-                  className={cn(
-                    "gap-3 min-h-[60px] items-start",
-                    currentModel === model.value && "bg-accent"
-                  )}
-                >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="font-medium">{model.label}</div>
-                      <Badge 
-                        variant="outline" 
+          <TooltipProvider>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <GlassButton variant="ghost" size="sm" className="gap-2">
+                  <Sparkles className="h-4 w-4" />
+                  {currentModel ? models.find(m => m.value === currentModel)?.label?.replace(/^gpt-/, 'GPT-').replace(/^o(\d)/, 'o$1') || 'Model' : 'Select Model'}
+                  <ChevronDown className="h-3 w-3" />
+                </GlassButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="glass min-w-[400px] max-h-[500px] overflow-y-auto">
+                <DropdownMenuLabel>AI Model Selection</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                
+                {/* Regular Models */}
+                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">
+                  Recommended Models
+                </div>
+                {models.filter(model => !model.requiresExplicitSelection).map((model) => (
+                  <Tooltip key={model.value}>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuItem
+                        onClick={() => onModelChange(model.value)}
                         className={cn(
-                          "text-xs",
-                          model.tier === 'nano' && "border-green-500/50 text-green-400",
-                          model.tier === 'reasoning' && "border-purple-500/50 text-purple-400",
-                          model.tier === 'coding' && "border-blue-500/50 text-blue-400",
-                          model.tier === 'vision' && "border-orange-500/50 text-orange-400",
-                          model.tier === 'embedding' && "border-cyan-500/50 text-cyan-400",
-                          model.tier === 'balanced' && "border-yellow-500/50 text-yellow-400"
+                          "gap-3 min-h-[70px] items-start cursor-pointer",
+                          currentModel === model.value && "bg-accent"
                         )}
                       >
-                        {model.tier}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {model.provider} • {model.description}
-                    </div>
-                  </div>
-                  {currentModel === model.value && (
-                    <Badge variant="secondary" className="text-xs mt-1">
-                      Active
-                    </Badge>
-                  )}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="font-medium text-sm">{model.label}</div>
+                            <Badge 
+                              variant="outline" 
+                              className={cn(
+                                "text-xs",
+                                model.tier === 'nano' && "border-green-500/50 text-green-400",
+                                model.tier === 'mini' && "border-yellow-500/50 text-yellow-400",
+                                model.tier === 'standard' && "border-blue-500/50 text-blue-400",
+                                model.tier === 'premium' && "border-red-500/50 text-red-400"
+                              )}
+                            >
+                              {model.tier}
+                            </Badge>
+                            <div className="text-xs text-muted-foreground">
+                              ${model.pricing.input}/1M + ${model.pricing.output}/1M
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {model.useCase}
+                          </div>
+                        </div>
+                        {currentModel === model.value && (
+                          <Badge variant="secondary" className="text-xs mt-1">
+                            Active
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="glass max-w-xs">
+                      <div className="space-y-2">
+                        <div className="font-medium">{model.label}</div>
+                        <div className="text-sm">{model.description}</div>
+                        <div className="flex gap-4 text-xs">
+                          <span>Input: ${model.pricing.input}/1M</span>
+                          <span>Output: ${model.pricing.output}/1M</span>
+                          {model.pricing.cached && <span>Cached: ${model.pricing.cached}/1M</span>}
+                        </div>
+                        {model.benchmarks && Object.keys(model.benchmarks).length > 0 && (
+                          <div className="text-xs">
+                            <strong>Benchmarks:</strong> {Object.entries(model.benchmarks).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+                
+                <DropdownMenuSeparator />
+                
+                {/* Expensive Reasoning Models */}
+                <div className="px-2 py-1 text-xs font-medium text-orange-400 flex items-center gap-1">
+                  <span>⚠️</span> Advanced Reasoning Models (Expensive)
+                </div>
+                {models.filter(model => model.requiresExplicitSelection).map((model) => (
+                  <Tooltip key={model.value}>
+                    <TooltipTrigger asChild>
+                      <DropdownMenuItem
+                        onClick={() => onModelChange(model.value)}
+                        className={cn(
+                          "gap-3 min-h-[70px] items-start cursor-pointer border-l-2 border-orange-500/50",
+                          currentModel === model.value && "bg-accent"
+                        )}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <div className="font-medium text-sm">{model.label}</div>
+                            <Badge variant="outline" className="text-xs border-red-500/50 text-red-400">
+                              PREMIUM
+                            </Badge>
+                            <div className="text-xs text-orange-400 font-medium">
+                              ~10x cost
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-1">
+                            {model.useCase}
+                          </div>
+                          <div className="text-xs text-orange-400">
+                            Requires explicit selection • ${model.pricing.input}/1M + ${model.pricing.output}/1M
+                          </div>
+                        </div>
+                        {currentModel === model.value && (
+                          <Badge variant="secondary" className="text-xs mt-1">
+                            Active
+                          </Badge>
+                        )}
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="left" className="glass max-w-xs">
+                      <div className="space-y-2">
+                        <div className="font-medium text-orange-400">{model.label}</div>
+                        <div className="text-sm">{model.description}</div>
+                        <div className="text-xs text-orange-300">
+                          <strong>⚠️ High Cost:</strong> This model is significantly more expensive than standard models. Use only when advanced reasoning is required.
+                        </div>
+                        <div className="flex gap-4 text-xs">
+                          <span>Input: ${model.pricing.input}/1M</span>
+                          <span>Output: ${model.pricing.output}/1M</span>
+                          {model.pricing.cached && <span>Cached: ${model.pricing.cached}/1M</span>}
+                        </div>
+                        {model.benchmarks && Object.keys(model.benchmarks).length > 0 && (
+                          <div className="text-xs">
+                            <strong>Benchmarks:</strong> {Object.entries(model.benchmarks).map(([key, value]) => `${key}: ${value}`).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TooltipProvider>
 
           <div className="flex-1" />
 
@@ -414,16 +477,13 @@ export function EnhancedMessageInput({
         </div>
       </div>
 
-      {/* Smart model suggestions */}
-      {input.trim() && (
+      {/* Model selection help */}
+      {!currentModel && (
         <div className="px-4 pb-2">
-          <SmartModelSelector
-            message={input}
-            attachments={attachments}
-            currentModel={currentModel}
-            onModelSelect={onModelChange}
-            systemPromptType={currentPromptType}
-          />
+          <div className="text-xs text-muted-foreground flex items-center gap-2">
+            <Sparkles className="h-3 w-3" />
+            <span>Select a model above to start chatting. Use GPT-4.1 Nano for general tasks, or reasoning models for complex problems.</span>
+          </div>
         </div>
       )}
       

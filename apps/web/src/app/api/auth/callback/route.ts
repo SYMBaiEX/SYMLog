@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sanitizeErrorParam } from '@/lib/security/sanitize'
 import { logSecurityEvent, extractClientInfo } from '@/lib/logger'
 import { randomBytes } from 'crypto'
-import { api } from "@/convex/_generated/api"
+import { api } from "../../../../../convex/_generated/api"
 import { validateCSRFToken } from '@/lib/convex-csrf'
 import { getConvexClient } from '@/lib/convex-client'
 

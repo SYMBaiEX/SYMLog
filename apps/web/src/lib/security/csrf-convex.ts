@@ -3,7 +3,7 @@
  * This module provides async versions of CSRF functions using Convex
  */
 
-import { api } from "@/convex/_generated/api"
+import { api } from "../../../convex/_generated/api"
 import { NextRequest } from 'next/server'
 import { getConvexClient } from '../convex-client'
 

@@ -36,4 +36,134 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_user", ["userId"])
     .index("by_expiry", ["expiresAt"]),
+
+  // Agent data tables for user-facing knowledge and memory viewing
+  agents: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    description: v.optional(v.string()),
+    model: v.string(),
+    systemPrompt: v.optional(v.string()),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.object({
+      tags: v.optional(v.array(v.string())),
+      category: v.optional(v.string()),
+      version: v.optional(v.string())
+    }))
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_active", ["userId", "isActive"])
+    .index("by_user_updated", ["userId", "updatedAt"]),
+
+  agentMemories: defineTable({
+    userId: v.string(),
+    agentId: v.id("agents"),
+    type: v.union(
+      v.literal("conversation"),
+      v.literal("learning"), 
+      v.literal("reflection"),
+      v.literal("context"),
+      v.literal("preference")
+    ),
+    content: v.string(),
+    timestamp: v.number(),
+    expiresAt: v.optional(v.number()),
+    metadata: v.optional(v.object({
+      importance: v.optional(v.number()), // 1-10 scale
+      tags: v.optional(v.array(v.string())),
+      source: v.optional(v.string()),
+      relatedMemoryIds: v.optional(v.array(v.id("agentMemories")))
+    }))
+  })
+    .index("by_user_agent", ["userId", "agentId"])
+    .index("by_agent_type", ["agentId", "type"])
+    .index("by_timestamp", ["timestamp"])
+    .index("by_expiry", ["expiresAt"]),
+
+  agentKnowledge: defineTable({
+    userId: v.string(),
+    agentId: v.id("agents"),
+    title: v.string(),
+    content: v.string(),
+    category: v.union(
+      v.literal("facts"),
+      v.literal("skills"),
+      v.literal("preferences"),
+      v.literal("relationships"),
+      v.literal("procedures"),
+      v.literal("concepts")
+    ),
+    confidence: v.number(), // 0-1 scale
+    createdAt: v.number(),
+    updatedAt: v.number(),
+    metadata: v.optional(v.object({
+      tags: v.optional(v.array(v.string())),
+      source: v.optional(v.string()),
+      usageCount: v.optional(v.number()),
+      lastUsed: v.optional(v.number())
+    }))
+  })
+    .index("by_user_agent", ["userId", "agentId"])
+    .index("by_agent_category", ["agentId", "category"])
+    .index("by_agent_confidence", ["agentId", "confidence"])
+    .index("by_agent_updated", ["agentId", "updatedAt"]),
+
+  conversations: defineTable({
+    userId: v.string(),
+    agentId: v.id("agents"),
+    title: v.string(),
+    status: v.union(v.literal("active"), v.literal("completed"), v.literal("archived")),
+    startedAt: v.number(),
+    lastMessageAt: v.number(),
+    messageCount: v.number(),
+    metadata: v.optional(v.object({
+      tags: v.optional(v.array(v.string())),
+      summary: v.optional(v.string()),
+      totalTokens: v.optional(v.number())
+    }))
+  })
+    .index("by_user_agent", ["userId", "agentId"])
+    .index("by_agent_status", ["agentId", "status"])
+    .index("by_user_recent", ["userId", "lastMessageAt"]),
+
+  conversationMessages: defineTable({
+    conversationId: v.id("conversations"),
+    role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+    content: v.string(),
+    timestamp: v.number(),
+    metadata: v.optional(v.object({
+      model: v.optional(v.string()),
+      tokens: v.optional(v.number()),
+      attachments: v.optional(v.array(v.string()))
+    }))
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_conversation_time", ["conversationId", "timestamp"]),
+
+  agentLearningEvents: defineTable({
+    userId: v.string(),
+    agentId: v.id("agents"),
+    eventType: v.union(
+      v.literal("knowledge_gained"),
+      v.literal("memory_created"),
+      v.literal("skill_improved"),
+      v.literal("preference_learned"),
+      v.literal("mistake_corrected")
+    ),
+    description: v.string(),
+    impact: v.number(), // 1-10 scale representing learning impact
+    timestamp: v.number(),
+    metadata: v.optional(v.object({
+      relatedKnowledgeId: v.optional(v.id("agentKnowledge")),
+      relatedMemoryId: v.optional(v.id("agentMemories")),
+      context: v.optional(v.string()),
+      confidence: v.optional(v.number())
+    }))
+  })
+    .index("by_user_agent", ["userId", "agentId"])
+    .index("by_agent_type", ["agentId", "eventType"])
+    .index("by_agent_time", ["agentId", "timestamp"])
+    .index("by_impact", ["impact"])
 });
