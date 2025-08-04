@@ -62,7 +62,7 @@ export async function embedText(
   const sanitizedText = sanitizeTextForEmbedding(text)
   
   // Check cache first
-  const cacheKey = `${model}:${dimensions || 'default'}:${sanitizedText}`
+  const cacheKey = `${model}:${dimensions || 'default'}:${hashText(sanitizedText)}`
   if (useCache) {
     const cached = embeddingCache.get(cacheKey)
     if (cached) {
@@ -141,7 +141,7 @@ export async function embedTexts(
     
     if (useCache) {
       sanitizedBatch.forEach((text, index) => {
-        const cacheKey = `${model}:${dimensions || 'default'}:${text}`
+        const cacheKey = `${model}:${dimensions || 'default'}:${hashText(text)}`
         const cached = embeddingCache.get(cacheKey)
         if (cached) {
           batchResults[index] = {
@@ -182,7 +182,7 @@ export async function embedTexts(
           }
           
           if (useCache) {
-            const cacheKey = `${model}:${dimensions || 'default'}:${text}`
+            const cacheKey = `${model}:${dimensions || 'default'}:${hashText(text)}`
             embeddingCache.set(cacheKey, embedding)
           }
         })
@@ -498,6 +498,23 @@ export async function clusterTexts(
   }
   
   return clusters.map(({ texts, indices }) => ({ texts, indices }))
+}
+
+/**
+ * Fast non-cryptographic hash function using FNV-1a algorithm for cache keys
+ */
+function hashText(text: string): string {
+  const FNV_OFFSET_BASIS = 2166136261
+  const FNV_PRIME = 16777619
+  
+  let hash = FNV_OFFSET_BASIS
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i)
+    hash = Math.imul(hash, FNV_PRIME)
+  }
+  
+  // Convert to positive 32-bit integer and then to base36
+  return (hash >>> 0).toString(36)
 }
 
 // Export singleton instance for convenience

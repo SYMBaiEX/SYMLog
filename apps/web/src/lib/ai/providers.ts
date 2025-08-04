@@ -1,16 +1,43 @@
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
-import { experimental_createProviderRegistry as createProviderRegistry } from 'ai'
+import { 
+  experimental_createProviderRegistry as createProviderRegistry,
+  wrapProvider,
+  type LanguageModelRequestMetadata,
+  type LanguageModelResponseMetadata,
+  type ProviderMetadata 
+} from 'ai'
 import { config } from '../config'
+import { loggingMiddleware, performanceMiddleware, securityMiddleware, createCachingMiddleware } from './middleware'
 
-// Create provider registry with fallback support
+// Create enhanced provider registry with middleware support
 export const registry = createProviderRegistry({
-  openai,
-  anthropic,
+  // Wrap OpenAI provider with middleware
+  openai: wrapProvider({
+    provider: openai,
+    languageModelMiddleware: [
+      loggingMiddleware,
+      performanceMiddleware,
+      securityMiddleware
+    ]
+  }),
+  
+  // Wrap Anthropic provider with middleware
+  anthropic: wrapProvider({
+    provider: anthropic,
+    languageModelMiddleware: [
+      loggingMiddleware,
+      performanceMiddleware,
+      createCachingMiddleware() // Add caching for Anthropic
+    ]
+  }),
 })
 
 // Model configuration with fallback chain
-export const getAIModel = (preferredModel?: string) => {
+export const getAIModel = (
+  preferredModel?: string,
+  metadata?: LanguageModelRequestMetadata
+) => {
   const models = {
     // Latest models as of August 2025
     primary: 'gpt-4.1-nano',  // OpenAI's efficient nano model
@@ -24,15 +51,19 @@ export const getAIModel = (preferredModel?: string) => {
   // Return the preferred model or use the primary model
   const modelToUse = preferredModel || models.primary
   
-  // Map model names to provider-specific formats
-  if (modelToUse.includes('gpt') || modelToUse.includes('o1')) {
-    return openai(modelToUse)
-  } else if (modelToUse.includes('claude')) {
-    return anthropic(modelToUse)
+  // Get model from registry with metadata
+  const model = registry.languageModel(modelToUse)
+  
+  // Add provider metadata and options
+  if (metadata) {
+    return model.withMetadata({
+      ...metadata,
+      application: 'SYMLog',
+      version: '1.0.0',
+    })
   }
   
-  // Default to OpenAI for stability
-  return openai(models.primary)
+  return model
 }
 
 // Rate limiting configuration
