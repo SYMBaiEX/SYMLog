@@ -7,6 +7,7 @@ import { logSecurityEvent, logAPIError } from '@/lib/logger'
 import { config } from '@/lib/config'
 import { db } from '@/lib/db'
 import { modelOrchestrator, ModelRole, MODEL_CONFIGS } from '@/lib/ai/model-orchestration'
+import { tokenReservationService } from '@/lib/convex-token-limits'
 import type { FileAttachment } from '@/types/attachments'
 
 interface ChatRequest {
@@ -99,7 +100,8 @@ export class ChatService {
   async processChat(
     request: ChatRequest,
     session: ChatSession,
-    clientInfo?: { ip: string | null; userAgent: string | null }
+    clientInfo?: { ip: string | null; userAgent: string | null },
+    tokenReservationId?: string
   ) {
     // Validate and use explicitly selected model (no automatic selection)
     const selectedModel = this.validateModelSelection(request.model)
@@ -117,11 +119,24 @@ export class ChatService {
       const lastMessageIndex = processedMessages.length - 1
       if (lastMessageIndex >= 0 && processedMessages[lastMessageIndex].role === 'user') {
         const lastMessage = processedMessages[lastMessageIndex]
-        const { systemPrompt: attachmentContext } = processAttachmentsForAI(request.attachments, '')
-        attachmentSystemPrompt = attachmentContext
+        const attachmentResult = await processAttachmentsForAI(
+          request.attachments, 
+          '',
+          session.userId
+        )
+        
+        if (attachmentResult.error) {
+          throw new Error(attachmentResult.error)
+        }
+        
+        attachmentSystemPrompt = attachmentResult.systemPrompt
         
         // Add attachments to the message
-        processedMessages[lastMessageIndex] = addAttachmentsToMessage(lastMessage, request.attachments)
+        processedMessages[lastMessageIndex] = await addAttachmentsToMessage(
+          lastMessage, 
+          request.attachments,
+          session.userId
+        )
       }
     }
     
@@ -155,6 +170,14 @@ export class ChatService {
         
         // Log token usage for monitoring
         if (usage) {
+          // Complete token reservation with actual usage
+          if (tokenReservationId) {
+            await tokenReservationService.completeReservation(
+              tokenReservationId,
+              usage.totalTokens
+            )
+          }
+          
           // Calculate estimated cost
           const cost = modelOrchestrator.estimateCost(
             selectedModel,

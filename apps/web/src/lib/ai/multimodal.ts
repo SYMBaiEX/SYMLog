@@ -1,18 +1,32 @@
 import type { CoreMessage } from 'ai'
 import type { FileAttachment } from '@/types/attachments'
+import { validateAttachments, scanForMaliciousContent } from '@/lib/security/attachment-validator'
 
-export function processAttachmentsForAI(
+export async function processAttachmentsForAI(
   attachments: FileAttachment[],
-  messageText: string
-): { systemPrompt: string; messageContent: string } {
+  messageText: string,
+  userId?: string
+): Promise<{ systemPrompt: string; messageContent: string; error?: string }> {
   if (!attachments || attachments.length === 0) {
     return { systemPrompt: '', messageContent: messageText }
   }
 
+  // Validate attachments first
+  const validation = await validateAttachments(attachments, userId)
+  if (!validation.valid) {
+    return {
+      systemPrompt: '',
+      messageContent: messageText,
+      error: validation.error
+    }
+  }
+
+  const safeAttachments = validation.sanitizedAttachments!
+
   let systemPrompt = '\n\nAttached files:'
   let messageContent = messageText
 
-  attachments.forEach((attachment, index) => {
+  safeAttachments.forEach((attachment, index) => {
     const attachmentInfo = `
 File ${index + 1}: ${attachment.name} (${attachment.type}, ${Math.round(attachment.size / 1024)}KB)`
 
@@ -27,7 +41,14 @@ File ${index + 1}: ${attachment.name} (${attachment.type}, ${Math.round(attachme
     else if (attachment.type.startsWith('text/') && attachment.base64) {
       try {
         const content = atob(attachment.base64.split(',')[1])
-        messageContent += `\n\n[File: ${attachment.name}]\n\`\`\`\n${content}\n\`\`\``
+        
+        // Scan for malicious content
+        const scanResult = scanForMaliciousContent(content, attachment.type)
+        if (!scanResult.safe) {
+          messageContent += `\n\n[File: ${attachment.name} - Blocked: ${scanResult.reason}]`
+        } else {
+          messageContent += `\n\n[File: ${attachment.name}]\n\`\`\`\n${content}\n\`\`\``
+        }
       } catch (error) {
         messageContent += `\n\n[File: ${attachment.name} - Unable to read content]`
       }
@@ -42,13 +63,26 @@ File ${index + 1}: ${attachment.name} (${attachment.type}, ${Math.round(attachme
   return { systemPrompt, messageContent }
 }
 
-export function addAttachmentsToMessage(
+export async function addAttachmentsToMessage(
   message: CoreMessage,
-  attachments: FileAttachment[]
-): CoreMessage {
+  attachments: FileAttachment[],
+  userId?: string
+): Promise<CoreMessage> {
   if (!attachments || attachments.length === 0) {
     return message
   }
+
+  // Validate attachments first
+  const validation = await validateAttachments(attachments, userId)
+  if (!validation.valid) {
+    // Return message with error notification
+    return {
+      ...message,
+      content: `${message.content}\n\n[Attachment Error: ${validation.error}]`
+    }
+  }
+
+  const safeAttachments = validation.sanitizedAttachments!
 
   const parts: any[] = []
   
@@ -58,7 +92,7 @@ export function addAttachmentsToMessage(
   }
 
   // Add attachments
-  attachments.forEach((attachment) => {
+  safeAttachments.forEach((attachment) => {
     if (attachment.type.startsWith('image/') && attachment.base64) {
       parts.push({
         type: 'image',
@@ -67,10 +101,20 @@ export function addAttachmentsToMessage(
     } else if (attachment.type.startsWith('text/') && attachment.base64) {
       try {
         const content = atob(attachment.base64.split(',')[1])
-        parts.push({
-          type: 'text',
-          text: `File: ${attachment.name}\n\`\`\`\n${content}\n\`\`\``
-        })
+        
+        // Scan for malicious content
+        const scanResult = scanForMaliciousContent(content, attachment.type)
+        if (!scanResult.safe) {
+          parts.push({
+            type: 'text',
+            text: `File: ${attachment.name} (Blocked: ${scanResult.reason})`
+          })
+        } else {
+          parts.push({
+            type: 'text',
+            text: `File: ${attachment.name}\n\`\`\`\n${content}\n\`\`\``
+          })
+        }
       } catch (error) {
         parts.push({
           type: 'text',

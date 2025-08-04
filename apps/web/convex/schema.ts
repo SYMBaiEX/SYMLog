@@ -36,6 +36,21 @@ export default defineSchema({
     .index("by_token", ["token"])
     .index("by_user", ["userId"])
     .index("by_expiry", ["expiresAt"]),
+  
+  tokenUsage: defineTable({
+    userId: v.string(),
+    timestamp: v.number(),
+    estimatedTokens: v.number(),
+    actualTokens: v.number(),
+    status: v.union(v.literal("reserved"), v.literal("completed"), v.literal("cancelled")),
+    expiresAt: v.number(),
+    completedAt: v.optional(v.number()),
+    cancelledAt: v.optional(v.number()),
+    cancellationReason: v.optional(v.string()),
+  })
+    .index("by_user_and_date", ["userId", "timestamp"])
+    .index("by_status_and_expiry", ["status", "expiresAt"])
+    .index("by_user", ["userId"]),
 
   // Agent data tables for user-facing knowledge and memory viewing
   agents: defineTable({

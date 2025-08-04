@@ -3,6 +3,7 @@ import { validateChatAuth, checkRateLimit, createAuthenticatedResponse } from '@
 import { logSecurityEvent, logAPIError, extractClientInfo } from '@/lib/logger'
 import { chatService } from '@/services/chat.service'
 import { config } from '@/lib/config'
+import { tokenReservationService } from '@/lib/convex-token-limits'
 
 // Allow streaming responses up to 30 seconds
 export const maxDuration = 30
@@ -43,28 +44,55 @@ export async function POST(req: NextRequest) {
       return new Response(validation.error, { status: 400 })
     }
 
-    // Check daily token limit
-    const hasTokensRemaining = await chatService.checkDailyTokenLimit(userSession.userId)
-    if (!hasTokensRemaining) {
+    // Reserve tokens atomically to prevent concurrent bypass
+    const reservation = await tokenReservationService.reserveTokens(
+      userSession.userId,
+      messages,
+      attachments
+    )
+    
+    if (!reservation.success) {
       logSecurityEvent({
         type: 'RATE_LIMIT_EXCEEDED',
         userId: userSession.userId,
-        metadata: { reason: 'daily_token_limit' },
+        metadata: { 
+          reason: 'daily_token_limit',
+          currentUsage: reservation.currentUsage,
+          limit: reservation.limit,
+          remaining: reservation.remaining
+        },
         ...extractClientInfo(req)
       })
-      return new Response('Daily token limit exceeded', { status: 429 })
+      return new Response(reservation.error || 'Daily token limit exceeded', { 
+        status: 429,
+        headers: {
+          'X-Token-Limit': reservation.limit.toString(),
+          'X-Token-Usage': reservation.currentUsage.toString(),
+          'X-Token-Remaining': reservation.remaining.toString(),
+        }
+      })
     }
 
-    // Process chat through service
-    const result = await chatService.processChat(
-      { messages, model: requestedModel, systemPromptType, attachments },
-      userSession,
-      extractClientInfo(req)
-    )
+    // Process chat through service with reservation ID
+    let result;
+    try {
+      result = await chatService.processChat(
+        { messages, model: requestedModel, systemPromptType, attachments },
+        userSession,
+        extractClientInfo(req),
+        reservation.reservationId // Pass reservation ID to chat service
+      )
 
-    // Convert to UI message stream response with rate limit headers
-    const response = result.toUIMessageStreamResponse()
-    return createAuthenticatedResponse(response, remaining)
+      // Convert to UI message stream response with rate limit headers
+      const response = result.toUIMessageStreamResponse()
+      return createAuthenticatedResponse(response, remaining)
+    } catch (error) {
+      // Cancel reservation if chat processing fails
+      if (reservation.reservationId) {
+        await tokenReservationService.cancelReservation(reservation.reservationId)
+      }
+      throw error
+    }
 
   } catch (error) {
     const clientInfo = extractClientInfo(req)

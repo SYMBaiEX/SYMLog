@@ -3,6 +3,7 @@ import { PublicKey } from '@solana/web3.js'
 import nacl from 'tweetnacl'
 import { validateChatAuth } from '@/lib/ai/auth-middleware'
 import { logSecurityEvent, extractClientInfo } from '@/lib/logger'
+import { validateCors, createCorsResponse, handleCorsOptions } from '@/lib/security/cors'
 
 interface WalletVerifyRequest {
   walletAddress: string
@@ -14,6 +15,20 @@ export async function POST(request: NextRequest) {
   try {
     const clientInfo = extractClientInfo(request)
     
+    // Validate CORS
+    const corsValidation = validateCors(request)
+    if (!corsValidation.valid) {
+      logSecurityEvent({
+        type: 'CORS_VIOLATION',
+        metadata: { 
+          reason: corsValidation.error,
+          origin: request.headers.get('origin')
+        },
+        ...clientInfo
+      })
+      return new NextResponse('Forbidden', { status: 403 })
+    }
+    
     // Validate authentication
     const userSession = await validateChatAuth(request)
     if (!userSession) {
@@ -22,7 +37,11 @@ export async function POST(request: NextRequest) {
         metadata: { reason: 'unauthorized' },
         ...clientInfo
       })
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return createCorsResponse(
+        JSON.stringify({ error: 'Unauthorized' }), 
+        { status: 401, headers: { 'Content-Type': 'application/json' } },
+        request
+      )
     }
     
     const body: WalletVerifyRequest = await request.json()
@@ -36,9 +55,11 @@ export async function POST(request: NextRequest) {
         metadata: { reason: 'missing_fields' },
         ...clientInfo
       })
-      return NextResponse.json({ 
-        error: 'Missing required fields' 
-      }, { status: 400 })
+      return createCorsResponse(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+        request
+      )
     }
     
     try {
@@ -66,9 +87,11 @@ export async function POST(request: NextRequest) {
           },
           ...clientInfo
         })
-        return NextResponse.json({ 
-          error: 'Invalid signature' 
-        }, { status: 400 })
+        return createCorsResponse(
+          JSON.stringify({ error: 'Invalid signature' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+          request
+        )
       }
       
       // Parse the message to verify it's recent and for this service
@@ -95,9 +118,11 @@ export async function POST(request: NextRequest) {
             },
             ...clientInfo
           })
-          return NextResponse.json({ 
-            error: 'Signature expired' 
-          }, { status: 400 })
+          return createCorsResponse(
+            JSON.stringify({ error: 'Signature expired' }),
+            { status: 400, headers: { 'Content-Type': 'application/json' } },
+            request
+          )
         }
       }
       
@@ -112,9 +137,11 @@ export async function POST(request: NextRequest) {
           },
           ...clientInfo
         })
-        return NextResponse.json({ 
-          error: 'Invalid message context' 
-        }, { status: 400 })
+        return createCorsResponse(
+          JSON.stringify({ error: 'Invalid message context' }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } },
+          request
+        )
       }
       
       // Store verification status (in production, use database)
@@ -129,12 +156,16 @@ export async function POST(request: NextRequest) {
         ...clientInfo
       })
       
-      return NextResponse.json({
-        success: true,
-        message: 'Wallet verified successfully',
-        walletAddress,
-        verifiedAt: new Date().toISOString()
-      })
+      return createCorsResponse(
+        JSON.stringify({
+          success: true,
+          message: 'Wallet verified successfully',
+          walletAddress,
+          verifiedAt: new Date().toISOString()
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+        request
+      )
       
     } catch (error) {
       console.error('Wallet verification error:', error)
@@ -149,27 +180,24 @@ export async function POST(request: NextRequest) {
         ...clientInfo
       })
       
-      return NextResponse.json({ 
-        error: 'Verification failed' 
-      }, { status: 400 })
+      return createCorsResponse(
+        JSON.stringify({ error: 'Verification failed' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } },
+        request
+      )
     }
     
   } catch (error) {
     console.error('Wallet verify endpoint error:', error)
-    return NextResponse.json({ 
-      error: 'Internal server error' 
-    }, { status: 500 })
+    return createCorsResponse(
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+      request
+    )
   }
 }
 
-// Handle CORS
+// Handle CORS preflight
 export async function OPTIONS(request: NextRequest) {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  })
+  return handleCorsOptions(request)
 }
