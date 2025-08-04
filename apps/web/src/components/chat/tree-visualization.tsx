@@ -101,8 +101,7 @@ export function TreeVisualization({ className, compact = false, onNodeSelect }: 
       parentX?: number
     ): TreeLayoutNode {
       const branch = branchMap.get(
-        branches.find(b => b.leafNodeId === node.id || 
-          b.nodeIds?.includes(node.id))?.id || ''
+        branches.find(b => b.leafNodeId === node.id)?.id || ''
       ) || branches[0]
 
       // Calculate position
@@ -174,7 +173,7 @@ export function TreeVisualization({ className, compact = false, onNodeSelect }: 
     const node = nodes.find(n => n.id === nodeId)
     if (node) {
       const branch = branches.find(b => 
-        b.leafNodeId === nodeId || b.nodeIds?.includes(nodeId)
+        b.leafNodeId === nodeId
       )
       if (branch) {
         switchToBranch(branch.id)

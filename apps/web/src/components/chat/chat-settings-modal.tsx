@@ -42,6 +42,7 @@ import {
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
+import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 
 interface ChatSettings {
   // Model Settings
@@ -105,6 +106,7 @@ export function ChatSettingsModal({
 }: ChatSettingsModalProps) {
   const [settings, setSettings] = useState<ChatSettings>({ ...defaultSettings, ...currentSettings })
   const [hasChanges, setHasChanges] = useState(false)
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false)
 
   // Update settings when props change
   useEffect(() => {
@@ -171,12 +173,15 @@ export function ChatSettingsModal({
 
   const handleClose = () => {
     if (hasChanges) {
-      if (confirm('You have unsaved changes. Are you sure you want to close?')) {
-        onClose()
-      }
+      setShowCloseConfirm(true)
     } else {
       onClose()
     }
+  }
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirm(false)
+    onClose()
   }
 
   return (
@@ -549,6 +554,18 @@ export function ChatSettingsModal({
           </div>
         </div>
       </DialogContent>
+      
+      {/* Confirmation Dialog for Unsaved Changes */}
+      <ConfirmationDialog
+        isOpen={showCloseConfirm}
+        onClose={() => setShowCloseConfirm(false)}
+        onConfirm={handleConfirmClose}
+        title="Unsaved Changes"
+        description="You have unsaved changes. Are you sure you want to close without saving?"
+        confirmText="Close Without Saving"
+        cancelText="Keep Editing"
+        variant="warning"
+      />
     </Dialog>
   )
 }

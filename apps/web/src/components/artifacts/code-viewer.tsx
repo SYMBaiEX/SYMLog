@@ -178,6 +178,6 @@ export function CodeViewer({
 // Add global Prism type
 declare global {
   interface Window {
-    Prism: any
+    Prism: typeof import('prismjs')
   }
 }

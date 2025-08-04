@@ -7,7 +7,8 @@ import type {
   TreeNavigationState,
   MessageEdit,
   BranchingAction,
-  TreeStateChange
+  TreeStateChange,
+  BranchComparison
 } from '@/types/conversation-tree'
 import type { FileAttachment } from '@/types/attachments'
 
@@ -471,8 +472,8 @@ export class ConversationTreeManager {
     if (strategy === 'append') {
       // Append unique nodes from source to target
       const sourceUniqueNodes = comparison.differences
-        .filter(diff => diff.branch === 'A')
-        .map(diff => diff.nodeId)
+        .filter((diff: any) => diff.branch === 'A')
+        .map((diff: any) => diff.nodeId)
       
       let currentParentId = targetBranch.leafNodeId
       

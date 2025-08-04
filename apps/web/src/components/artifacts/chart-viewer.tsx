@@ -14,7 +14,7 @@ interface ChartViewerProps {
 
 export function ChartViewer({ artifact, className }: ChartViewerProps) {
   const chartRef = useRef<HTMLCanvasElement>(null)
-  const chartInstanceRef = useRef<any>(null)
+  const chartInstanceRef = useRef<import('chart.js').Chart | null>(null)
 
   useEffect(() => {
     const loadChart = async () => {

@@ -79,14 +79,14 @@ export function DataViewer({ artifact, className }: DataViewerProps) {
     if (typeof value === "string") {
       const highlighted = searchTerm
         ? value.replace(
-            new RegExp(`(${searchTerm})`, "gi"),
+            new RegExp(`(${searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, "gi"),
             '<mark class="bg-yellow-400/30 text-yellow-300">$1</mark>'
           )
         : value
       return (
         <span
           className="text-orange-400"
-          dangerouslySetInnerHTML={{ __html: `"${highlighted}"` }}
+          dangerouslySetInnerHTML={{ __html: `&quot;${highlighted}&quot;` }}
         />
       )
     }
@@ -147,7 +147,7 @@ export function DataViewer({ artifact, className }: DataViewerProps) {
               <div className="ml-4 mt-1">
                 {keys.map((key) => (
                   <div key={key} className="my-1">
-                    <span className="text-purple-400">"{key}"</span>
+                    <span className="text-purple-400">&quot;{key}&quot;</span>
                     <span className="text-gray-400 mx-1">:</span>
                     {renderValue(value[key], `${path}.${key}`, depth + 1)}
                   </div>

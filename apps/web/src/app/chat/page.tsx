@@ -9,6 +9,14 @@ import { GlassButton } from "@/components/ui/glass-button"
 import { Brain, Lock, Loader2 } from "lucide-react"
 import Link from "next/link"
 
+// Extended user type for Crossmint authentication
+interface ExtendedUser {
+  id?: string
+  sub?: string
+  email?: string
+  walletAddress?: string
+}
+
 export default function ChatPage() {
   const router = useRouter()
   const [sessionToken, setSessionToken] = useState<string | null>(null)
@@ -39,7 +47,7 @@ export default function ChatPage() {
           },
           body: JSON.stringify({
             token: jwt,
-            walletAddress: (user as any).walletAddress,
+            walletAddress: (user as ExtendedUser).walletAddress,
           }),
         })
 
@@ -132,7 +140,7 @@ export default function ChatPage() {
     <div className="min-h-screen bg-background">
       <ChatContainer
         sessionToken={sessionToken}
-        userId={user.id || (user as any).sub}
+        userId={user.id || (user as ExtendedUser).sub || 'unknown'}
         userEmail={user.email}
       />
     </div>
