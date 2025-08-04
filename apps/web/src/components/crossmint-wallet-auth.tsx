@@ -38,9 +38,16 @@ export function CrossmintWalletAuth() {
   const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
   const isCrossmintEnabled = clientApiKey && clientApiKey !== 'your_client_api_key_here'
 
-  // Use Crossmint hooks
-  const { login, logout, jwt, user } = useAuth()
-  const { wallet, status: walletStatus } = useWallet()
+  // Only use Crossmint hooks if enabled
+  const auth = useAuth()
+  const walletHooks = useWallet()
+  
+  const login = isCrossmintEnabled ? auth.login : undefined
+  const logout = isCrossmintEnabled ? auth.logout : undefined
+  const jwt = isCrossmintEnabled ? auth.jwt : undefined
+  const user = isCrossmintEnabled ? auth.user : undefined
+  const wallet = isCrossmintEnabled ? walletHooks.wallet : undefined
+  const walletStatus = isCrossmintEnabled ? walletHooks.status : undefined
 
   const isLoggedIn = !!jwt && !!user
   const isWalletReady = walletStatus === 'loaded' && wallet

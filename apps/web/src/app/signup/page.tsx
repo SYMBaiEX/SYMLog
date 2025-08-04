@@ -15,20 +15,11 @@ export default function SignupPage() {
   const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
   const isCrossmintEnabled = clientApiKey && clientApiKey !== 'your_client_api_key_here'
 
-  let login: any
-  let jwt: string | undefined
-  let user: any | undefined
-  
-  try {
-    if (isCrossmintEnabled) {
-      const auth = useAuth()
-      login = auth.login
-      jwt = auth.jwt
-      user = auth.user
-    }
-  } catch (error) {
-    console.warn("Crossmint not available:", error)
-  }
+  // Always call the hook, but only use the result if Crossmint is enabled
+  const auth = useAuth()
+  const login = isCrossmintEnabled ? auth.login : undefined
+  const jwt = isCrossmintEnabled ? auth.jwt : undefined
+  const user = isCrossmintEnabled ? auth.user : undefined
 
   // Redirect if already logged in
   useEffect(() => {
@@ -39,7 +30,9 @@ export default function SignupPage() {
 
   const handleSocialLogin = async (provider: string) => {
     try {
-      await login()
+      if (login) {
+        await login()
+      }
     } catch (error) {
       console.error(`${provider} signup failed:`, error)
     }
