@@ -121,6 +121,35 @@ export function logPerformance(
 }
 
 /**
+ * Log general errors
+ */
+export function logError(
+  context: string,
+  error: unknown,
+  metadata?: Record<string, any>
+): void {
+  const errorData = {
+    category: 'ERROR',
+    context,
+    timestamp: new Date().toISOString(),
+    ...metadata
+  }
+
+  if (error instanceof Error) {
+    logger.error({
+      ...errorData,
+      error: error.message,
+      stack: error.stack
+    }, `Error in ${context}: ${error.message}`)
+  } else {
+    logger.error({
+      ...errorData,
+      error: String(error)
+    }, `Error in ${context}`)
+  }
+}
+
+/**
  * Extract client info from request
  */
 export function extractClientInfo(request: Request): {

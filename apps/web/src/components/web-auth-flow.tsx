@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useMutation } from "convex/react"
+import { logError } from "@/lib/logger"
 import { api } from "../../convex/_generated/api"
 import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
@@ -48,6 +49,8 @@ export function WebAuthFlow() {
   const [authCode, setAuthCode] = useState("")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [copiedAddress, setCopiedAddress] = useState(false)
+  const isMountedRef = useRef(true)
+  const popupCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [isValidatingCode, setIsValidatingCode] = useState(false)
   const [authPopupWindow, setAuthPopupWindow] = useState<Window | null>(null)
 
@@ -61,7 +64,7 @@ export function WebAuthFlow() {
       try {
         setUser(JSON.parse(savedUser))
       } catch (error) {
-        console.error('Failed to parse saved user:', error)
+        logError('WebAuthFlow.loadSavedUser', error)
         localStorage.removeItem('symlog_auth_user')
       }
     }
@@ -83,7 +86,7 @@ export function WebAuthFlow() {
           })
         }
       } catch (error) {
-        console.error('Failed to setup deep link listener:', error)
+        logError('WebAuthFlow.setupDeepLinkListener', error)
       }
     }
 
@@ -159,6 +162,17 @@ export function WebAuthFlow() {
     }
   }, [])
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      // Clear any popup check intervals
+      if (popupCheckIntervalRef.current) {
+        clearInterval(popupCheckIntervalRef.current)
+      }
+    }
+  }, [])
+
   const handleAuthCode = async (code: string) => {
     if (!code || code.trim() === "") {
       toast.error("Please enter a valid authentication code")
@@ -168,6 +182,9 @@ export function WebAuthFlow() {
     setIsValidatingCode(true)
     try {
       const result = await validateAuthCode({ authCode: code.trim() })
+      
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return
       
       const newUser: AuthUser = {
         id: result.userId,
@@ -184,7 +201,7 @@ export function WebAuthFlow() {
         description: `Welcome back, ${newUser.email}`
       })
     } catch (error: any) {
-      console.error("Auth code validation failed:", error)
+      logError('WebAuthFlow.handleAuthCode', error, { authCode: code.substring(0, 10) + '...' })
       
       // Handle Convex connection errors gracefully
       if (error?.message?.includes('ConvexError') || error?.message?.includes('Connection failed')) {
@@ -197,7 +214,9 @@ export function WebAuthFlow() {
         })
       }
     } finally {
-      setIsValidatingCode(false)
+      if (isMountedRef.current) {
+        setIsValidatingCode(false)
+      }
     }
   }
 
@@ -215,13 +234,17 @@ export function WebAuthFlow() {
       if (typeof window !== 'undefined' && window.__TAURI__) {
         // In Tauri, use shell plugin through IPC
         window.__TAURI__.invoke('plugin:shell|open', { path: authUrl }).then(() => {
-          setShowAuthDialog(true)
-          setIsLoading(false)
+          if (isMountedRef.current) {
+            setShowAuthDialog(true)
+            setIsLoading(false)
+          }
         }).catch(() => {
           // Fallback to window.open if Tauri API is not available
           window.open(authUrl, '_blank')
-          setShowAuthDialog(true)
-          setIsLoading(false)
+          if (isMountedRef.current) {
+            setShowAuthDialog(true)
+            setIsLoading(false)
+          }
         })
       } else {
         // In web browser, open popup and store reference
@@ -232,18 +255,30 @@ export function WebAuthFlow() {
         
         // Monitor popup for closure
         if (popup) {
-          const checkClosed = setInterval(() => {
-            if (popup.closed) {
-              setAuthPopupWindow(null)
-              clearInterval(checkClosed)
+          // Clear any existing interval
+          if (popupCheckIntervalRef.current) {
+            clearInterval(popupCheckIntervalRef.current)
+          }
+          
+          popupCheckIntervalRef.current = setInterval(() => {
+            if (popup.closed || !isMountedRef.current) {
+              if (isMountedRef.current) {
+                setAuthPopupWindow(null)
+              }
+              if (popupCheckIntervalRef.current) {
+                clearInterval(popupCheckIntervalRef.current)
+                popupCheckIntervalRef.current = null
+              }
             }
           }, 1000)
         }
       }
     } catch (error) {
-      console.error("Failed to open auth popup:", error)
-      toast.error("Failed to open authentication page")
-      setIsLoading(false)
+      logError('WebAuthFlow.openAuthPopup', error)
+      if (isMountedRef.current) {
+        toast.error("Failed to open authentication page")
+        setIsLoading(false)
+      }
     }
   }
 
@@ -251,14 +286,22 @@ export function WebAuthFlow() {
     setIsLoggingOut(true)
     try {
       await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return
+      
       localStorage.removeItem('symlog_auth_user')
       setUser(null)
       setShowAccountDialog(false)
       toast.info("Signed out successfully")
     } catch (error) {
-      toast.error("Logout failed")
+      if (isMountedRef.current) {
+        toast.error("Logout failed")
+      }
     } finally {
-      setIsLoggingOut(false)
+      if (isMountedRef.current) {
+        setIsLoggingOut(false)
+      }
     }
   }
 
@@ -270,11 +313,19 @@ export function WebAuthFlow() {
     if (user?.walletAddress) {
       try {
         await navigator.clipboard.writeText(user.walletAddress)
-        setCopiedAddress(true)
-        toast.success("Address copied to clipboard")
-        setTimeout(() => setCopiedAddress(false), 2000)
+        if (isMountedRef.current) {
+          setCopiedAddress(true)
+          toast.success("Address copied to clipboard")
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              setCopiedAddress(false)
+            }
+          }, 2000)
+        }
       } catch (error) {
-        toast.error("Failed to copy address")
+        if (isMountedRef.current) {
+          toast.error("Failed to copy address")
+        }
       }
     }
   }
@@ -293,6 +344,7 @@ export function WebAuthFlow() {
           size="sm"
           onClick={() => setShowAccountDialog(true)}
           className="flex items-center gap-2 w-full md:w-auto glass-hover"
+          aria-label="Open account menu"
         >
           <Avatar className="h-6 w-6">
             <AvatarFallback className="text-xs bg-primary/20 text-primary">
@@ -359,6 +411,7 @@ export function WebAuthFlow() {
                             size="sm"
                             onClick={copyAddressToClipboard}
                             className="p-1 h-auto"
+                            aria-label="Copy wallet address to clipboard"
                           >
                             {copiedAddress ? (
                               <CheckCircle2 className="h-4 w-4 text-secondary" />
@@ -409,6 +462,7 @@ export function WebAuthFlow() {
                   variant="ghost"
                   className="flex-1"
                   onClick={() => window.open('https://www.crossmint.com/', '_blank')}
+                  aria-label="Learn more about Crossmint - opens in new tab"
                 >
                   <Globe className="mr-2 h-4 w-4" />
                   About Crossmint
@@ -418,6 +472,7 @@ export function WebAuthFlow() {
                   className="flex-1 border-red-400/30 text-red-400 hover:bg-red-400/10"
                   onClick={handleLogout}
                   disabled={isLoggingOut}
+                  aria-label="Sign out of your account"
                 >
                   {isLoggingOut ? (
                     <>
@@ -448,6 +503,7 @@ export function WebAuthFlow() {
         onClick={openAuthPopup}
         disabled={isLoading}
         className="flex w-full md:w-auto items-center gap-2 glow-primary"
+        aria-label="Authenticate with wallet"
       >
         {isLoading ? (
           <>
@@ -503,7 +559,13 @@ export function WebAuthFlow() {
                 placeholder="SYM_XXXXXXXXXXXXXXXX"
                 className="w-full px-3 py-2 bg-background/50 border border-border rounded-lg text-white placeholder:text-white/50 focus:outline-none focus:ring-2 focus:ring-primary/50 font-mono"
                 onKeyDown={(e) => e.key === 'Enter' && handleManualCodeSubmit()}
+                aria-label="Authentication code"
+                aria-describedby="auth-code-description"
+                aria-invalid={false}
               />
+              <span id="auth-code-description" className="sr-only">
+                Enter the authentication code that starts with SYM underscore followed by characters
+              </span>
             </div>
             
             <div className="flex gap-3">

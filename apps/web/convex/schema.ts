@@ -35,7 +35,8 @@ export default defineSchema({
   })
     .index("by_token", ["token"])
     .index("by_user", ["userId"])
-    .index("by_expiry", ["expiresAt"]),
+    .index("by_expiry", ["expiresAt"])
+    .index("by_used_and_expiry", ["used", "expiresAt"]), // For efficient cleanup of expired tokens
   
   tokenUsage: defineTable({
     userId: v.string(),
@@ -94,8 +95,13 @@ export default defineSchema({
   })
     .index("by_user_agent", ["userId", "agentId"])
     .index("by_agent_type", ["agentId", "type"])
+    .index("by_user_agent_type", ["userId", "agentId", "type"]) // Compound index for efficient filtering
     .index("by_timestamp", ["timestamp"])
-    .index("by_expiry", ["expiresAt"]),
+    .index("by_expiry", ["expiresAt"])
+    .searchIndex("search_content", {
+      searchField: "content",
+      filterFields: ["userId", "agentId", "type"]
+    }),
 
   agentKnowledge: defineTable({
     userId: v.string(),
@@ -122,8 +128,17 @@ export default defineSchema({
   })
     .index("by_user_agent", ["userId", "agentId"])
     .index("by_agent_category", ["agentId", "category"])
+    .index("by_user_agent_category", ["userId", "agentId", "category"]) // Compound index for filtering
     .index("by_agent_confidence", ["agentId", "confidence"])
-    .index("by_agent_updated", ["agentId", "updatedAt"]),
+    .index("by_agent_updated", ["agentId", "updatedAt"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["userId", "agentId", "category"]
+    })
+    .searchIndex("search_content", {
+      searchField: "content", 
+      filterFields: ["userId", "agentId", "category"]
+    }),
 
   conversations: defineTable({
     userId: v.string(),
@@ -141,7 +156,12 @@ export default defineSchema({
   })
     .index("by_user_agent", ["userId", "agentId"])
     .index("by_agent_status", ["agentId", "status"])
-    .index("by_user_recent", ["userId", "lastMessageAt"]),
+    .index("by_user_agent_status", ["userId", "agentId", "status"]) // Compound index for filtering
+    .index("by_user_recent", ["userId", "lastMessageAt"])
+    .searchIndex("search_title", {
+      searchField: "title",
+      filterFields: ["userId", "agentId", "status"]
+    }),
 
   conversationMessages: defineTable({
     conversationId: v.id("conversations"),
@@ -179,6 +199,12 @@ export default defineSchema({
   })
     .index("by_user_agent", ["userId", "agentId"])
     .index("by_agent_type", ["agentId", "eventType"])
+    .index("by_user_agent_type", ["userId", "agentId", "eventType"]) // Compound index for filtering
     .index("by_agent_time", ["agentId", "timestamp"])
+    .index("by_user_agent_time", ["userId", "agentId", "timestamp"]) // Compound index for recent events
     .index("by_impact", ["impact"])
+    .searchIndex("search_description", {
+      searchField: "description",
+      filterFields: ["userId", "agentId", "eventType"]
+    })
 });

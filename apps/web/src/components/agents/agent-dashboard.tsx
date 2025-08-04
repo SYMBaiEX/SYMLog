@@ -186,6 +186,8 @@ export function AgentDashboard({ userId, className }: AgentDashboardProps) {
                 variant="outline"
                 onClick={() => setCurrentView(option.key as DashboardView)}
                 className="h-auto p-4 flex-col gap-2"
+                aria-label={`View ${option.label}`}
+                aria-current={currentView === option.key ? "page" : undefined}
               >
                 <Icon className="h-6 w-6" />
                 <span className="text-sm">{option.label}</span>
@@ -268,6 +270,8 @@ export function AgentDashboard({ userId, className }: AgentDashboardProps) {
               variant={currentView === option.key ? "default" : "ghost"}
               onClick={() => setCurrentView(option.key as DashboardView)}
               className="gap-2 whitespace-nowrap"
+              aria-label={`View ${option.label}`}
+              aria-current={currentView === option.key ? "page" : undefined}
             >
               <Icon className="h-4 w-4" />
               {option.label}

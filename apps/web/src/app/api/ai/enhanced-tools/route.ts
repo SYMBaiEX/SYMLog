@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enhancedArtifactTools, toolExecutionService, type EnhancedToolResult } from '@/lib/ai/tools/enhanced-tools'
 import { z } from 'zod'
+import { generateSecureId } from '@/lib/utils/id-generator'
+import { logAPIError } from '@/lib/logger'
 
 // API request schema for tool execution
 const executeToolRequestSchema = z.object({
@@ -79,7 +81,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Generate execution ID if not provided
-    const executionId = options.executionId || `exec_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+    const executionId = options.executionId || generateSecureId('exec')
 
     // Execute tool with enhanced error handling
     const result = await toolExecutionService.executeToolWithCancellation(
@@ -105,7 +107,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       status: result.success ? 200 : 500
     })
   } catch (error) {
-    console.error('Enhanced tool execution error:', error)
+    logAPIError('/api/ai/enhanced-tools', error, { method: 'POST', toolName })
     
     return NextResponse.json(
       {
@@ -140,7 +142,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       message: cancelled ? 'Execution cancelled' : 'Execution not found or already completed'
     })
   } catch (error) {
-    console.error('Tool cancellation error:', error)
+    logAPIError('/api/ai/enhanced-tools', error, { method: 'DELETE', executionId })
     
     return NextResponse.json(
       {
@@ -178,7 +180,7 @@ export async function GET(): Promise<NextResponse> {
       }
     })
   } catch (error) {
-    console.error('Get tools info error:', error)
+    logAPIError('/api/ai/enhanced-tools', error, { method: 'GET' })
     
     return NextResponse.json(
       {

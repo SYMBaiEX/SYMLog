@@ -5,10 +5,12 @@ import type {
   TreeStateChange
 } from '@/types/conversation-tree'
 import type { UIMessage } from '@ai-sdk/react'
+import { generateSecureId } from '@/lib/utils/id-generator'
+import { logError } from '@/lib/logger'
 
 export class TreeUtils {
   static generateId(): string {
-    return `node_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    return generateSecureId('node')
   }
 
   static getMessageContent(message: UIMessage): string {
@@ -113,26 +115,26 @@ export class TreeUtils {
   static validateTree(tree: ConversationTree): boolean {
     // Check if root exists
     if (tree.rootId && !tree.nodes.has(tree.rootId)) {
-      console.error('Root node not found')
+      logError('TreeUtils.validateTree', new Error('Root node not found'), { rootId: tree.rootId })
       return false
     }
     
     // Check if current node exists
     if (tree.currentNodeId && !tree.nodes.has(tree.currentNodeId)) {
-      console.error('Current node not found')
+      logError('TreeUtils.validateTree', new Error('Current node not found'), { currentNodeId: tree.currentNodeId })
       return false
     }
     
     // Check parent-child relationships
     for (const [nodeId, node] of tree.nodes) {
       if (node.parentId && !tree.nodes.has(node.parentId)) {
-        console.error(`Parent ${node.parentId} not found for node ${nodeId}`)
+        logError('TreeUtils.validateTree', new Error(`Parent ${node.parentId} not found for node ${nodeId}`), { nodeId, parentId: node.parentId })
         return false
       }
       
       for (const childId of node.children) {
         if (!tree.nodes.has(childId)) {
-          console.error(`Child ${childId} not found for node ${nodeId}`)
+          logError('TreeUtils.validateTree', new Error(`Child ${childId} not found for node ${nodeId}`), { nodeId, childId })
           return false
         }
       }
@@ -141,11 +143,11 @@ export class TreeUtils {
     // Check branches
     for (const branch of tree.branches) {
       if (!tree.nodes.has(branch.rootNodeId)) {
-        console.error(`Branch root ${branch.rootNodeId} not found`)
+        logError('TreeUtils.validateTree', new Error(`Branch root ${branch.rootNodeId} not found`), { branchId: branch.id, rootNodeId: branch.rootNodeId })
         return false
       }
       if (!tree.nodes.has(branch.leafNodeId)) {
-        console.error(`Branch leaf ${branch.leafNodeId} not found`)
+        logError('TreeUtils.validateTree', new Error(`Branch leaf ${branch.leafNodeId} not found`), { branchId: branch.id, leafNodeId: branch.leafNodeId })
         return false
       }
     }

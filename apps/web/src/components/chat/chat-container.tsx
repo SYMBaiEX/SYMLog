@@ -121,6 +121,8 @@ export function ChatContainer({ sessionToken, userId, userEmail }: ChatContainer
           size="icon"
           className="absolute top-4 left-4 z-50 md:hidden"
           onClick={() => setSidebarOpen(!sidebarOpen)}
+          aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+          aria-expanded={sidebarOpen}
         >
           {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </GlassButton>
@@ -201,6 +203,8 @@ export function ChatContainer({ sessionToken, userId, userEmail }: ChatContainer
                 onClick={() => setEnableBranching(!enableBranching)}
                 className="gap-1"
                 title={enableBranching ? "Disable conversation branching" : "Enable conversation branching"}
+                aria-label={enableBranching ? "Disable conversation branching" : "Enable conversation branching"}
+                aria-pressed={enableBranching}
               >
                 <GitBranch className="h-3 w-3" />
                 {enableBranching ? "Branching" : "Linear"}
@@ -214,6 +218,8 @@ export function ChatContainer({ sessionToken, userId, userEmail }: ChatContainer
                   onClick={() => setShowTreeVisualization(!showTreeVisualization)}
                   className="gap-1"
                   title={showTreeVisualization ? "Hide tree visualization" : "Show tree visualization"}
+                  aria-label={showTreeVisualization ? "Hide tree visualization" : "Show tree visualization"}
+                  aria-pressed={showTreeVisualization}
                 >
                   <Network className="h-3 w-3" />
                   Tree
@@ -227,6 +233,7 @@ export function ChatContainer({ sessionToken, userId, userEmail }: ChatContainer
                   setShowSettings(true)
                 }}
                 title="Chat Settings"
+                aria-label="Open chat settings"
               >
                 <Settings className="h-4 w-4" />
               </GlassButton>

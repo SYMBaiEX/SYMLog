@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { enhancedArtifactTools, toolExecutionService, type EnhancedToolResult } from '@/lib/ai/tools/enhanced-tools'
 import { z } from 'zod'
+import { generateSecureId } from '@/lib/utils/id-generator'
+import { logAPIError } from '@/lib/logger'
 
 // Workflow execution request schema
 const executeWorkflowRequestSchema = z.object({
@@ -87,7 +89,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     // Generate execution ID
-    const executionId = `workflow_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+    const executionId = generateSecureId('workflow')
 
     // Execute workflow using the executeWorkflow tool
     const result = await toolExecutionService.executeToolWithCancellation(
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       status: result.success ? 200 : 500
     })
   } catch (error) {
-    console.error('Workflow execution error:', error)
+    logAPIError('/api/ai/enhanced-tools/workflow', error, { method: 'POST', workflowName: name })
     
     return NextResponse.json(
       {
@@ -152,7 +154,7 @@ export async function DELETE(request: NextRequest): Promise<NextResponse> {
       message: cancelled ? 'Workflow execution cancelled' : 'Workflow execution not found or already completed'
     })
   } catch (error) {
-    console.error('Workflow cancellation error:', error)
+    logAPIError('/api/ai/enhanced-tools/workflow', error, { method: 'DELETE', executionId })
     
     return NextResponse.json(
       {
@@ -242,7 +244,7 @@ export async function GET(): Promise<NextResponse> {
       }
     })
   } catch (error) {
-    console.error('Get workflow templates error:', error)
+    logAPIError('/api/ai/enhanced-tools/workflow', error, { method: 'GET' })
     
     return NextResponse.json(
       {

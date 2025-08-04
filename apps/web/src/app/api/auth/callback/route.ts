@@ -43,10 +43,7 @@ export async function GET(request: NextRequest) {
         walletAddress: 'pending',
       })
       
-      // Store the actual auth code mapping in memory temporarily
-      // This will be replaced when we integrate with the full auth flow
-      const authCodeMap = new Map<string, string>()
-      authCodeMap.set(sessionId, code)
+      // Auth code is already stored in Convex above
       
       logSecurityEvent({
         type: 'AUTH_SUCCESS',

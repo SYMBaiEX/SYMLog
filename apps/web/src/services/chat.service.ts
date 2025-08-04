@@ -8,6 +8,7 @@ import { config } from '@/lib/config'
 import { db } from '@/lib/db'
 import { modelOrchestrator, ModelRole, MODEL_CONFIGS } from '@/lib/ai/model-orchestration'
 import { tokenReservationService } from '@/lib/convex-token-limits'
+import { generateSecureId } from '@/lib/utils/id-generator'
 import type { FileAttachment } from '@/types/attachments'
 
 interface ChatRequest {
@@ -236,9 +237,9 @@ export class ChatService {
       })
       return result.id
     } catch (error) {
-      console.error('Failed to create conversation:', error)
+      logAPIError('chatService.createConversation', error, { userId, title })
       // Generate fallback ID
-      return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      return generateSecureId('conv')
     }
   }
 
@@ -274,7 +275,7 @@ export class ChatService {
         created_at: new Date()
       })
     } catch (error) {
-      console.error('Failed to record metrics:', error)
+      logAPIError('chatService.recordConversationMetrics', error, { conversationId })
     }
   }
 
@@ -302,7 +303,7 @@ export class ChatService {
         conversationCount: row?.conversation_count || 0
       }
     } catch (error) {
-      console.error('Failed to get user token usage:', error)
+      logAPIError('chatService.getUserTokenUsage', error, { userId })
       return { totalTokens: 0, conversationCount: 0 }
     }
   }
@@ -354,7 +355,7 @@ export class ChatService {
       
       return result.rows
     } catch (error) {
-      console.error('Failed to get model usage insights:', error)
+      logAPIError('chatService.getModelUsageInsights', error, { userId, days })
       return []
     }
   }

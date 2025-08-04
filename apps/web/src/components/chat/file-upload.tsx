@@ -7,6 +7,8 @@ import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Badge } from "@/components/ui/badge"
 import { LazyImage } from "@/components/ui/lazy-image"
+import { generateSecureId } from "@/lib/utils/id-generator"
+import { logError } from "@/lib/logger"
 import { 
   Paperclip, 
   X, 
@@ -32,7 +34,7 @@ export function FileUpload({ attachments, onAttachmentsChange, disabled }: FileU
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const generateFileId = () => `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  const generateFileId = () => generateSecureId('file')
 
   const getFileIcon = (type: string) => {
     const attachmentType = getAttachmentType(type)
@@ -92,7 +94,7 @@ export function FileUpload({ attachments, onAttachmentsChange, disabled }: FileU
 
       return attachment
     } catch (error) {
-      console.error('Error processing file:', error)
+      logError('FileUpload.processFile', error, { fileName: file.name, fileType: file.type })
       toast.error(`Failed to process file ${file.name}`)
       return null
     }
