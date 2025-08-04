@@ -176,6 +176,8 @@ export function FileUpload({ attachments, onAttachmentsChange, disabled }: FileU
         accept="image/*,.pdf,.txt,.md,.csv,.json,.html,.css,.js,.ts,.py,.java,.cpp,.c,.cs,.go,.rs,.php,.rb,.swift,.kt"
         onChange={handleFileInput}
         className="hidden"
+        aria-label="Upload files"
+        id="file-upload-input"
       />
 
       {/* Upload Button */}
@@ -186,6 +188,8 @@ export function FileUpload({ attachments, onAttachmentsChange, disabled }: FileU
         className="h-8 w-8"
         disabled={disabled}
         onClick={openFileDialog}
+        aria-describedby="file-upload-input"
+        aria-label="Upload files"
       >
         <Paperclip className="h-4 w-4" />
       </GlassButton>
