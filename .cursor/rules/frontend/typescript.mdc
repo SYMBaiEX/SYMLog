@@ -1,0 +1,541 @@
+---
+description: "TypeScript Best Practices and Standards"
+globs: 
+  - "**/*.{ts,tsx}"
+  - "**/tsconfig.json"
+  - "**/*.d.ts"
+alwaysApply: true
+---
+
+# TypeScript Development Rules
+
+## TypeScript Configuration
+
+### 1. Strict Configuration
+```json
+// tsconfig.json
+{
+  "compilerOptions": {
+    // Type Checking
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    
+    // Module Resolution
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    
+    // Language and Environment
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    
+    // Output
+    "noEmit": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    
+    // Interop Constraints
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    
+    // Path Mapping
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@/components/*": ["./src/components/*"],
+      "@/lib/*": ["./src/lib/*"],
+      "@/types/*": ["./src/types/*"]
+    }
+  },
+  "include": ["src", "next-env.d.ts"],
+  "exclude": ["node_modules", "dist", ".next"]
+}
+```
+
+## Type Design Principles
+
+### 1. Use Specific Types
+```typescript
+// ❌ Bad: Too generic
+type Data = any
+type Item = object
+type Handler = Function
+
+// ✅ Good: Specific and meaningful
+type User = {
+  id: string
+  email: string
+  profile: UserProfile
+}
+
+type ClickHandler = (event: React.MouseEvent<HTMLButtonElement>) => void
+type AsyncData<T> = { status: 'loading' } | { status: 'success'; data: T } | { status: 'error'; error: Error }
+```
+
+### 2. Prefer Interfaces for Objects
+```typescript
+// ✅ Interfaces for object shapes
+interface User {
+  id: string
+  email: string
+  createdAt: Date
+}
+
+interface UserProfile extends User {
+  bio?: string
+  avatar?: string
+  preferences: UserPreferences
+}
+
+// ✅ Types for unions, intersections, and aliases
+type Status = 'idle' | 'loading' | 'success' | 'error'
+type ID = string | number
+type Nullable<T> = T | null
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+}
+```
+
+### 3. Const Assertions and Satisfies
+```typescript
+// Use const assertions for literal types
+const ROUTES = {
+  home: '/',
+  login: '/login',
+  dashboard: '/dashboard',
+  profile: (id: string) => `/profile/${id}`,
+} as const
+
+type Route = typeof ROUTES[keyof typeof ROUTES]
+
+// Use satisfies for type validation without widening
+const config = {
+  api: {
+    url: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000',
+    timeout: 5000,
+  },
+  features: {
+    darkMode: true,
+    analytics: false,
+    beta: process.env.NODE_ENV === 'development',
+  },
+} satisfies AppConfig
+
+// Ensure exhaustive handling
+function assertNever(x: never): never {
+  throw new Error('Unexpected value: ' + x)
+}
+
+function handleStatus(status: Status) {
+  switch (status) {
+    case 'idle':
+      return 'Ready'
+    case 'loading':
+      return 'Loading...'
+    case 'success':
+      return 'Complete'
+    case 'error':
+      return 'Failed'
+    default:
+      return assertNever(status) // Ensures all cases handled
+  }
+}
+```
+
+### 4. Generic Types
+```typescript
+// Flexible generic types
+interface ApiResponse<T> {
+  data: T
+  status: number
+  message: string
+  timestamp: Date
+}
+
+// Constrained generics
+interface Repository<T extends { id: string }> {
+  findById(id: string): Promise<T | null>
+  findAll(): Promise<T[]>
+  create(data: Omit<T, 'id'>): Promise<T>
+  update(id: string, data: Partial<T>): Promise<T>
+  delete(id: string): Promise<void>
+}
+
+// Multiple generic parameters
+type KeyValuePair<K extends string | number, V> = {
+  key: K
+  value: V
+}
+
+// Generic constraints with conditional types
+type AsyncReturnType<T extends (...args: any[]) => Promise<any>> = 
+  T extends (...args: any[]) => Promise<infer R> ? R : never
+
+// Usage
+type UserData = AsyncReturnType<typeof fetchUser> // Infers return type
+```
+
+### 5. Utility Types
+```typescript
+// Built-in utility types
+type ReadonlyUser = Readonly<User>
+type PartialUser = Partial<User>
+type RequiredUser = Required<User>
+type UserWithoutEmail = Omit<User, 'email'>
+type UserIdOnly = Pick<User, 'id'>
+
+// Custom utility types
+type Mutable<T> = {
+  -readonly [P in keyof T]: T[P]
+}
+
+type DeepReadonly<T> = {
+  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P]
+}
+
+type Nullable<T> = T | null
+type Optional<T> = T | undefined
+type Maybe<T> = T | null | undefined
+
+type ValueOf<T> = T[keyof T]
+type Entries<T> = [keyof T, ValueOf<T>][]
+
+// Extract promise type
+type Unpromise<T> = T extends Promise<infer U> ? U : T
+
+// Function types
+type ArgumentTypes<T> = T extends (...args: infer A) => any ? A : never
+type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never
+```
+
+### 6. Discriminated Unions
+```typescript
+// Result type for error handling
+type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E }
+
+// State machine types
+type ConnectionState =
+  | { status: 'disconnected' }
+  | { status: 'connecting'; attempt: number }
+  | { status: 'connected'; socket: WebSocket; since: Date }
+  | { status: 'error'; error: Error; retryAt: Date }
+
+// Event types
+type AppEvent =
+  | { type: 'USER_LOGIN'; payload: { userId: string } }
+  | { type: 'USER_LOGOUT' }
+  | { type: 'DATA_FETCH_START'; payload: { endpoint: string } }
+  | { type: 'DATA_FETCH_SUCCESS'; payload: { data: unknown } }
+  | { type: 'DATA_FETCH_ERROR'; payload: { error: Error } }
+
+// Type guards
+function isSuccess<T>(result: Result<T>): result is { success: true; data: T } {
+  return result.success === true
+}
+
+function isConnected(state: ConnectionState): state is { status: 'connected'; socket: WebSocket; since: Date } {
+  return state.status === 'connected'
+}
+```
+
+### 7. Type Guards and Assertions
+```typescript
+// Type predicates
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function isUser(value: unknown): value is User {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'id' in value &&
+    'email' in value &&
+    typeof (value as any).id === 'string' &&
+    typeof (value as any).email === 'string'
+  )
+}
+
+// Array type guards
+function isNonNullable<T>(value: T): value is NonNullable<T> {
+  return value !== null && value !== undefined
+}
+
+// Filter with type guard
+const users = [user1, null, user2, undefined, user3]
+const validUsers = users.filter(isNonNullable) // Type: User[]
+
+// Assertion functions
+function assertDefined<T>(value: T | undefined, message?: string): asserts value is T {
+  if (value === undefined) {
+    throw new Error(message || 'Value is undefined')
+  }
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unexpected value: ${value}`)
+}
+
+// Usage
+function processValue(value: string | undefined) {
+  assertDefined(value, 'Value must be defined')
+  // TypeScript now knows value is string
+  return value.toUpperCase()
+}
+```
+
+### 8. Module Declarations
+```typescript
+// Ambient module declarations for libraries without types
+declare module 'untyped-library' {
+  export function doSomething(value: string): void
+  export class SomeClass {
+    constructor(options: { timeout?: number })
+    method(): Promise<string>
+  }
+}
+
+// Extend existing modules
+declare module 'existing-library' {
+  interface ExistingInterface {
+    newProperty?: string
+  }
+}
+
+// Global augmentation
+declare global {
+  interface Window {
+    analytics: {
+      track(event: string, properties?: Record<string, any>): void
+    }
+  }
+  
+  namespace NodeJS {
+    interface ProcessEnv {
+      NODE_ENV: 'development' | 'production' | 'test'
+      NEXT_PUBLIC_API_URL: string
+      DATABASE_URL: string
+    }
+  }
+}
+
+// CSS modules
+declare module '*.module.css' {
+  const classes: { readonly [key: string]: string }
+  export default classes
+}
+
+// Image imports
+declare module '*.svg' {
+  const content: React.FC<React.SVGProps<SVGSVGElement>>
+  export default content
+}
+```
+
+### 9. Advanced Type Patterns
+```typescript
+// Template literal types
+type EventName = `on${Capitalize<string>}`
+type ApiEndpoint = `/api/${string}`
+
+type PropEventHandlers<T> = {
+  [K in keyof T as K extends `on${string}` ? K : never]: T[K]
+}
+
+// Mapped types with template literals
+type Getters<T> = {
+  [K in keyof T as `get${Capitalize<string & K>}`]: () => T[K]
+}
+
+type Setters<T> = {
+  [K in keyof T as `set${Capitalize<string & K>}`]: (value: T[K]) => void
+}
+
+// Recursive types
+type DeepPartial<T> = {
+  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P]
+}
+
+type DeepRequired<T> = {
+  [P in keyof T]-?: T[P] extends object ? DeepRequired<T[P]> : T[P]
+}
+
+// Conditional types
+type IsArray<T> = T extends any[] ? true : false
+type ElementType<T> = T extends (infer E)[] ? E : T
+
+type FunctionArgs<T> = T extends (...args: infer A) => any ? A : never
+type PromiseType<T> = T extends Promise<infer U> ? U : T
+
+// Branded types for type safety
+type Brand<K, T> = K & { __brand: T }
+type UserId = Brand<string, 'UserId'>
+type PostId = Brand<string, 'PostId'>
+
+function getUserById(id: UserId): User {
+  // Can only be called with UserId, not any string
+}
+```
+
+### 10. React TypeScript Patterns
+```typescript
+// Component props with children
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger'
+  size?: 'sm' | 'md' | 'lg'
+  loading?: boolean
+  icon?: React.ReactNode
+}
+
+// Forward ref with generics
+const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ variant = 'primary', size = 'md', loading, children, ...props }, ref) => {
+    return (
+      <button ref={ref} {...props}>
+        {loading ? <Spinner /> : children}
+      </button>
+    )
+  }
+)
+
+// Generic components
+interface ListProps<T> {
+  items: T[]
+  renderItem: (item: T, index: number) => React.ReactNode
+  keyExtractor?: (item: T, index: number) => string
+  emptyMessage?: string
+}
+
+function List<T>({ items, renderItem, keyExtractor, emptyMessage }: ListProps<T>) {
+  if (items.length === 0) {
+    return <div>{emptyMessage || 'No items'}</div>
+  }
+  
+  return (
+    <ul>
+      {items.map((item, index) => (
+        <li key={keyExtractor ? keyExtractor(item, index) : index}>
+          {renderItem(item, index)}
+        </li>
+      ))}
+    </ul>
+  )
+}
+
+// Hook return types
+interface UseApiReturn<T> {
+  data: T | null
+  loading: boolean
+  error: Error | null
+  refetch: () => Promise<void>
+}
+
+function useApi<T>(endpoint: string): UseApiReturn<T> {
+  // Implementation
+}
+```
+
+### 11. Error Handling Types
+```typescript
+// Custom error classes
+class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public code: string,
+    public details?: unknown
+  ) {
+    super(message)
+    this.name = 'ApiError'
+  }
+}
+
+class ValidationError extends Error {
+  constructor(
+    message: string,
+    public errors: Record<string, string[]>
+  ) {
+    super(message)
+    this.name = 'ValidationError'
+  }
+}
+
+// Error handling with types
+async function tryCatch<T, E = Error>(
+  promise: Promise<T>
+): Promise<Result<T, E>> {
+  try {
+    const data = await promise
+    return { success: true, data }
+  } catch (error) {
+    return { 
+      success: false, 
+      error: error as E 
+    }
+  }
+}
+
+// Type-safe error boundaries
+interface ErrorBoundaryState {
+  hasError: boolean
+  error: Error | null
+}
+
+class ErrorBoundary extends Component<
+  { children: ReactNode; fallback: ComponentType<{ error: Error }> },
+  ErrorBoundaryState
+> {
+  // Implementation
+}
+```
+
+### 12. Performance Types
+```typescript
+// Lazy loading types
+const LazyComponent = lazy(() => import('./HeavyComponent'))
+
+// Memo with custom comparison
+const MemoizedComponent = memo<ComponentProps>(
+  Component,
+  (prevProps, nextProps) => {
+    return prevProps.id === nextProps.id
+  }
+)
+
+// Debounce/throttle types
+type DebouncedFunction<T extends (...args: any[]) => any> = {
+  (...args: Parameters<T>): void
+  cancel: () => void
+  flush: () => void
+}
+
+function debounce<T extends (...args: any[]) => any>(
+  func: T,
+  wait: number
+): DebouncedFunction<T> {
+  // Implementation
+}
+```
+
+Remember: TypeScript is a tool for catching errors early and documenting intent. Use it to make invalid states unrepresentable.

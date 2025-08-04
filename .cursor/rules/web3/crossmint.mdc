@@ -1,0 +1,896 @@
+---
+description: "Crossmint NFT and Wallet Integration"
+globs: 
+  - "**/crossmint/**/*.{ts,js}"
+  - "**/nft/**/*.{ts,js}"
+  - "**/web3/crossmint/**/*.{ts,js}"
+alwaysApply: true
+---
+
+# Crossmint Integration Rules
+
+## Crossmint Architecture
+
+### 1. SDK Setup and Configuration
+```typescript
+// lib/crossmint/config.ts
+import { CrossmintAASDK } from '@crossmint/aa-sdk'
+import { CrossmintEVMAAWallet } from '@crossmint/aa-sdk'
+import { createWalletClient, custom } from 'viem'
+import { polygon, polygonMumbai } from 'viem/chains'
+
+const CROSSMINT_PROJECT_ID = process.env.NEXT_PUBLIC_CROSSMINT_PROJECT_ID!
+const CROSSMINT_CLIENT_SECRET = process.env.CROSSMINT_CLIENT_SECRET!
+
+// Initialize Crossmint SDK
+export const crossmintSDK = new CrossmintAASDK({
+  projectId: CROSSMINT_PROJECT_ID,
+  chain: process.env.NODE_ENV === 'production' ? polygon : polygonMumbai,
+})
+
+// Wallet configuration
+export interface CrossmintWalletConfig {
+  email?: string
+  phoneNumber?: string
+  socialProvider?: 'google' | 'twitter' | 'discord'
+}
+
+export async function createCrossmintWallet(config: CrossmintWalletConfig) {
+  const wallet = await CrossmintEVMAAWallet.init({
+    projectId: CROSSMINT_PROJECT_ID,
+    chain: process.env.NODE_ENV === 'production' ? polygon : polygonMumbai,
+    signer: config,
+  })
+  
+  return wallet
+}
+
+// Create wallet client for transactions
+export function createWalletClientFromCrossmint(wallet: CrossmintEVMAAWallet) {
+  return createWalletClient({
+    account: wallet.address,
+    chain: wallet.chain,
+    transport: custom(wallet),
+  })
+}
+```
+
+### 2. Authentication Flow
+```typescript
+// lib/crossmint/auth.ts
+import { CrossmintAuth } from '@crossmint/connect'
+import { useEffect, useState } from 'react'
+
+export interface CrossmintUser {
+  id: string
+  email?: string
+  phoneNumber?: string
+  wallet: {
+    address: string
+    chain: string
+  }
+}
+
+// Initialize Crossmint Auth
+export const crossmintAuth = new CrossmintAuth({
+  projectId: CROSSMINT_PROJECT_ID,
+  baseUrl: process.env.NEXT_PUBLIC_APP_URL,
+})
+
+// React hook for Crossmint authentication
+export function useCrossmintAuth() {
+  const [user, setUser] = useState<CrossmintUser | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  
+  useEffect(() => {
+    checkAuthStatus()
+  }, [])
+  
+  const checkAuthStatus = async () => {
+    try {
+      const session = await crossmintAuth.getSession()
+      if (session) {
+        setUser(session.user)
+      }
+    } catch (error) {
+      console.error('Auth check failed:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const login = async (method: 'email' | 'phone' | 'social', identifier?: string) => {
+    setLoading(true)
+    setError(null)
+    
+    try {
+      let result
+      
+      switch (method) {
+        case 'email':
+          result = await crossmintAuth.loginWithEmail(identifier!)
+          break
+        case 'phone':
+          result = await crossmintAuth.loginWithPhone(identifier!)
+          break
+        case 'social':
+          result = await crossmintAuth.loginWithOAuth(identifier as any)
+          break
+      }
+      
+      if (result.user) {
+        setUser(result.user)
+      }
+      
+      return result
+    } catch (error) {
+      setError(error.message)
+      throw error
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const logout = async () => {
+    try {
+      await crossmintAuth.logout()
+      setUser(null)
+    } catch (error) {
+      console.error('Logout failed:', error)
+    }
+  }
+  
+  return {
+    user,
+    loading,
+    error,
+    login,
+    logout,
+    checkAuthStatus,
+  }
+}
+```
+
+### 3. NFT Minting
+```typescript
+// lib/crossmint/nft.ts
+import { CrossmintNFTAPI } from '@crossmint/nft-api'
+
+const nftAPI = new CrossmintNFTAPI({
+  projectId: CROSSMINT_PROJECT_ID,
+  clientSecret: CROSSMINT_CLIENT_SECRET,
+})
+
+export interface NFTMetadata {
+  name: string
+  description: string
+  image: string | File
+  attributes?: Array<{
+    trait_type: string
+    value: string | number
+  }>
+}
+
+export interface MintConfig {
+  recipientEmail?: string
+  recipientAddress?: string
+  quantity?: number
+}
+
+// Mint NFT with email delivery
+export async function mintNFT(
+  metadata: NFTMetadata,
+  config: MintConfig
+) {
+  try {
+    // Upload image if file
+    let imageUrl = metadata.image
+    if (metadata.image instanceof File) {
+      const formData = new FormData()
+      formData.append('file', metadata.image)
+      
+      const uploadResponse = await fetch('/api/crossmint/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      
+      const { url } = await uploadResponse.json()
+      imageUrl = url
+    }
+    
+    // Prepare metadata
+    const nftMetadata = {
+      name: metadata.name,
+      description: metadata.description,
+      image: imageUrl,
+      attributes: metadata.attributes || [],
+    }
+    
+    // Mint NFT
+    const mintResponse = await nftAPI.mint({
+      recipient: config.recipientEmail || config.recipientAddress!,
+      metadata: nftMetadata,
+      quantity: config.quantity || 1,
+    })
+    
+    return mintResponse
+  } catch (error) {
+    console.error('Minting failed:', error)
+    throw error
+  }
+}
+
+// Batch mint NFTs
+export async function batchMintNFTs(
+  recipients: Array<{
+    email?: string
+    address?: string
+    metadata: NFTMetadata
+  }>
+) {
+  const mintJobs = recipients.map(recipient => ({
+    recipient: recipient.email || recipient.address!,
+    metadata: recipient.metadata,
+  }))
+  
+  const batchResponse = await nftAPI.batchMint(mintJobs)
+  
+  return batchResponse
+}
+
+// Get NFT status
+export async function getNFTStatus(mintId: string) {
+  const status = await nftAPI.getMintStatus(mintId)
+  return status
+}
+
+// Get user's NFTs
+export async function getUserNFTs(email: string) {
+  const nfts = await nftAPI.getNFTsByEmail(email)
+  return nfts
+}
+```
+
+### 4. Crossmint Checkout
+```typescript
+// components/crossmint/CheckoutButton.tsx
+import { CrossmintPayButton } from '@crossmint/client-sdk-react-ui'
+
+interface CheckoutButtonProps {
+  collectionId: string
+  mintConfig: {
+    type: string
+    quantity?: number
+    totalPrice?: string
+    _mintCompleteEventTitle?: string
+  }
+  onSuccess?: (event: any) => void
+  onError?: (error: any) => void
+}
+
+export function CrossmintCheckoutButton({
+  collectionId,
+  mintConfig,
+  onSuccess,
+  onError,
+}: CheckoutButtonProps) {
+  return (
+    <CrossmintPayButton
+      collectionId={collectionId}
+      projectId={CROSSMINT_PROJECT_ID}
+      mintConfig={mintConfig}
+      environment={
+        process.env.NODE_ENV === 'production' ? 'production' : 'staging'
+      }
+      successCallbackURL={`${process.env.NEXT_PUBLIC_APP_URL}/success`}
+      failureCallbackURL={`${process.env.NEXT_PUBLIC_APP_URL}/failure`}
+      onSuccess={onSuccess}
+      onError={onError}
+      theme={{
+        colors: {
+          background: '#ffffff',
+          textPrimary: '#000000',
+          textSecondary: '#666666',
+          accent: '#007bff',
+          onAccent: '#ffffff',
+          interactive: '#007bff',
+          interactiveHover: '#0056b3',
+          danger: '#dc3545',
+        },
+        borderRadius: 'medium',
+        fontFamily: 'system-ui',
+      }}
+    />
+  )
+}
+
+// Custom checkout component
+export function CustomCheckout() {
+  const { user } = useCrossmintAuth()
+  const [loading, setLoading] = useState(false)
+  
+  const handleCheckout = async () => {
+    setLoading(true)
+    
+    try {
+      const response = await fetch('/api/crossmint/create-checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: user?.id,
+          items: [
+            {
+              collectionId: 'your-collection-id',
+              quantity: 1,
+              metadata: {
+                name: 'Custom NFT',
+                description: 'A custom NFT minted for you',
+              },
+            },
+          ],
+        }),
+      })
+      
+      const { checkoutUrl } = await response.json()
+      window.location.href = checkoutUrl
+    } catch (error) {
+      console.error('Checkout failed:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return (
+    <Button
+      onClick={handleCheckout}
+      disabled={loading || !user}
+      className="w-full"
+    >
+      {loading ? 'Creating checkout...' : 'Checkout with Crossmint'}
+    </Button>
+  )
+}
+```
+
+### 5. Wallet Operations
+```typescript
+// lib/crossmint/wallet.ts
+import { CrossmintEVMAAWallet } from '@crossmint/aa-sdk'
+import { parseEther, formatEther } from 'viem'
+
+export class CrossmintWalletService {
+  private wallet: CrossmintEVMAAWallet
+  
+  constructor(wallet: CrossmintEVMAAWallet) {
+    this.wallet = wallet
+  }
+  
+  // Get wallet balance
+  async getBalance() {
+    const balance = await this.wallet.getBalance()
+    return formatEther(balance)
+  }
+  
+  // Send transaction
+  async sendTransaction(to: string, value: string) {
+    const tx = await this.wallet.sendTransaction({
+      to,
+      value: parseEther(value),
+    })
+    
+    return tx
+  }
+  
+  // Sign message
+  async signMessage(message: string) {
+    const signature = await this.wallet.signMessage(message)
+    return signature
+  }
+  
+  // Deploy smart account
+  async deploySmartAccount() {
+    const address = await this.wallet.deployAccount()
+    return address
+  }
+  
+  // Get transaction history
+  async getTransactionHistory() {
+    const history = await this.wallet.getTransactions()
+    return history
+  }
+  
+  // Execute batch transactions
+  async executeBatch(
+    transactions: Array<{
+      to: string
+      value?: string
+      data?: string
+    }>
+  ) {
+    const batch = transactions.map(tx => ({
+      to: tx.to,
+      value: tx.value ? parseEther(tx.value) : 0n,
+      data: tx.data || '0x',
+    }))
+    
+    const result = await this.wallet.executeBatch(batch)
+    return result
+  }
+}
+
+// React hook for wallet operations
+export function useCrossmintWallet() {
+  const [wallet, setWallet] = useState<CrossmintWalletService | null>(null)
+  const [balance, setBalance] = useState('0')
+  const [loading, setLoading] = useState(false)
+  
+  const { user } = useCrossmintAuth()
+  
+  useEffect(() => {
+    if (user?.wallet) {
+      initializeWallet()
+    }
+  }, [user])
+  
+  const initializeWallet = async () => {
+    try {
+      const crossmintWallet = await createCrossmintWallet({
+        email: user!.email,
+      })
+      
+      const walletService = new CrossmintWalletService(crossmintWallet)
+      setWallet(walletService)
+      
+      // Fetch initial balance
+      const balance = await walletService.getBalance()
+      setBalance(balance)
+    } catch (error) {
+      console.error('Wallet initialization failed:', error)
+    }
+  }
+  
+  const sendTransaction = async (to: string, value: string) => {
+    if (!wallet) throw new Error('Wallet not initialized')
+    
+    setLoading(true)
+    try {
+      const tx = await wallet.sendTransaction(to, value)
+      
+      // Update balance
+      const newBalance = await wallet.getBalance()
+      setBalance(newBalance)
+      
+      return tx
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  return {
+    wallet,
+    balance,
+    loading,
+    sendTransaction,
+    signMessage: wallet?.signMessage.bind(wallet),
+    deployAccount: wallet?.deploySmartAccount.bind(wallet),
+  }
+}
+```
+
+### 6. API Routes
+```typescript
+// app/api/crossmint/mint/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { CrossmintNFTAPI } from '@crossmint/nft-api'
+
+const nftAPI = new CrossmintNFTAPI({
+  projectId: process.env.CROSSMINT_PROJECT_ID!,
+  clientSecret: process.env.CROSSMINT_CLIENT_SECRET!,
+})
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { recipient, metadata, quantity } = body
+    
+    // Validate request
+    if (!recipient || !metadata) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
+    }
+    
+    // Mint NFT
+    const mintResponse = await nftAPI.mint({
+      recipient,
+      metadata,
+      quantity: quantity || 1,
+    })
+    
+    return NextResponse.json({
+      success: true,
+      mintId: mintResponse.id,
+      status: mintResponse.status,
+    })
+  } catch (error) {
+    console.error('Minting error:', error)
+    return NextResponse.json(
+      { error: 'Minting failed', details: error.message },
+      { status: 500 }
+    )
+  }
+}
+
+// app/api/crossmint/upload/route.ts
+export async function POST(request: NextRequest) {
+  try {
+    const formData = await request.formData()
+    const file = formData.get('file') as File
+    
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      )
+    }
+    
+    // Upload to IPFS via Crossmint
+    const buffer = await file.arrayBuffer()
+    const uploadResponse = await nftAPI.uploadAsset({
+      file: Buffer.from(buffer),
+      fileName: file.name,
+    })
+    
+    return NextResponse.json({
+      url: uploadResponse.url,
+      hash: uploadResponse.hash,
+    })
+  } catch (error) {
+    console.error('Upload error:', error)
+    return NextResponse.json(
+      { error: 'Upload failed' },
+      { status: 500 }
+    )
+  }
+}
+
+// app/api/crossmint/webhook/route.ts
+export async function POST(request: NextRequest) {
+  try {
+    const signature = request.headers.get('x-crossmint-signature')
+    const body = await request.text()
+    
+    // Verify webhook signature
+    const isValid = verifyWebhookSignature(
+      body,
+      signature!,
+      process.env.CROSSMINT_WEBHOOK_SECRET!
+    )
+    
+    if (!isValid) {
+      return NextResponse.json(
+        { error: 'Invalid signature' },
+        { status: 401 }
+      )
+    }
+    
+    const event = JSON.parse(body)
+    
+    // Handle different event types
+    switch (event.type) {
+      case 'mint.succeeded':
+        await handleMintSuccess(event.data)
+        break
+      case 'mint.failed':
+        await handleMintFailure(event.data)
+        break
+      case 'transfer.completed':
+        await handleTransferComplete(event.data)
+        break
+    }
+    
+    return NextResponse.json({ received: true })
+  } catch (error) {
+    console.error('Webhook error:', error)
+    return NextResponse.json(
+      { error: 'Webhook processing failed' },
+      { status: 500 }
+    )
+  }
+}
+```
+
+### 7. React Components
+```typescript
+// components/crossmint/WalletConnect.tsx
+import { useCrossmintAuth } from '@/lib/crossmint/auth'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useState } from 'react'
+
+export function CrossmintWalletConnect() {
+  const { user, login, logout, loading } = useCrossmintAuth()
+  const [email, setEmail] = useState('')
+  const [method, setMethod] = useState<'email' | 'social'>('email')
+  
+  if (user) {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 border rounded-lg">
+          <p className="text-sm text-gray-600">Connected as</p>
+          <p className="font-medium">{user.email || user.wallet.address}</p>
+          <p className="text-xs text-gray-500">{user.wallet.address}</p>
+        </div>
+        <Button onClick={logout} variant="outline" className="w-full">
+          Disconnect
+        </Button>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <Button
+          variant={method === 'email' ? 'default' : 'outline'}
+          onClick={() => setMethod('email')}
+          size="sm"
+        >
+          Email
+        </Button>
+        <Button
+          variant={method === 'social' ? 'default' : 'outline'}
+          onClick={() => setMethod('social')}
+          size="sm"
+        >
+          Social
+        </Button>
+      </div>
+      
+      {method === 'email' ? (
+        <form
+          onSubmit={async (e) => {
+            e.preventDefault()
+            await login('email', email)
+          }}
+          className="space-y-2"
+        >
+          <Input
+            type="email"
+            placeholder="Enter your email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <Button type="submit" disabled={loading} className="w-full">
+            {loading ? 'Connecting...' : 'Connect with Email'}
+          </Button>
+        </form>
+      ) : (
+        <div className="space-y-2">
+          <Button
+            onClick={() => login('social', 'google')}
+            disabled={loading}
+            className="w-full"
+            variant="outline"
+          >
+            <GoogleIcon className="mr-2 h-4 w-4" />
+            Continue with Google
+          </Button>
+          <Button
+            onClick={() => login('social', 'twitter')}
+            disabled={loading}
+            className="w-full"
+            variant="outline"
+          >
+            <TwitterIcon className="mr-2 h-4 w-4" />
+            Continue with Twitter
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}
+```
+
+### 8. NFT Gallery Component
+```typescript
+// components/crossmint/NFTGallery.tsx
+import { useEffect, useState } from 'react'
+import { getUserNFTs } from '@/lib/crossmint/nft'
+import { Card } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+
+export function NFTGallery({ email }: { email: string }) {
+  const [nfts, setNFTs] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    fetchNFTs()
+  }, [email])
+  
+  const fetchNFTs = async () => {
+    try {
+      const userNFTs = await getUserNFTs(email)
+      setNFTs(userNFTs)
+    } catch (error) {
+      console.error('Failed to fetch NFTs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...Array(6)].map((_, i) => (
+          <Card key={i} className="p-4">
+            <Skeleton className="w-full h-64 mb-4" />
+            <Skeleton className="h-6 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-full" />
+          </Card>
+        ))}
+      </div>
+    )
+  }
+  
+  if (nfts.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-gray-500">No NFTs found</p>
+      </div>
+    )
+  }
+  
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {nfts.map((nft) => (
+        <Card key={nft.id} className="overflow-hidden">
+          <img
+            src={nft.metadata.image}
+            alt={nft.metadata.name}
+            className="w-full h-64 object-cover"
+          />
+          <div className="p-4">
+            <h3 className="font-semibold mb-2">{nft.metadata.name}</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              {nft.metadata.description}
+            </p>
+            {nft.metadata.attributes && (
+              <div className="space-y-1">
+                {nft.metadata.attributes.map((attr: any, i: number) => (
+                  <div key={i} className="flex justify-between text-sm">
+                    <span className="text-gray-500">{attr.trait_type}:</span>
+                    <span className="font-medium">{attr.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
+      ))}
+    </div>
+  )
+}
+```
+
+### 9. Error Handling
+```typescript
+// lib/crossmint/errors.ts
+export enum CrossmintErrorCode {
+  AUTH_FAILED = 'AUTH_FAILED',
+  MINT_FAILED = 'MINT_FAILED',
+  WALLET_ERROR = 'WALLET_ERROR',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  INVALID_CONFIG = 'INVALID_CONFIG',
+}
+
+export class CrossmintError extends Error {
+  constructor(
+    public code: CrossmintErrorCode,
+    message: string,
+    public details?: any
+  ) {
+    super(message)
+    this.name = 'CrossmintError'
+  }
+}
+
+export function handleCrossmintError(error: any): CrossmintError {
+  // Auth errors
+  if (error.message?.includes('authentication')) {
+    return new CrossmintError(
+      CrossmintErrorCode.AUTH_FAILED,
+      'Authentication failed'
+    )
+  }
+  
+  // Minting errors
+  if (error.message?.includes('mint')) {
+    return new CrossmintError(
+      CrossmintErrorCode.MINT_FAILED,
+      'NFT minting failed',
+      error
+    )
+  }
+  
+  // Wallet errors
+  if (error.message?.includes('wallet')) {
+    return new CrossmintError(
+      CrossmintErrorCode.WALLET_ERROR,
+      'Wallet operation failed',
+      error
+    )
+  }
+  
+  // Network errors
+  if (error.message?.includes('network')) {
+    return new CrossmintError(
+      CrossmintErrorCode.NETWORK_ERROR,
+      'Network error occurred',
+      error
+    )
+  }
+  
+  // Generic error
+  return new CrossmintError(
+    CrossmintErrorCode.INVALID_CONFIG,
+    error.message || 'An error occurred',
+    error
+  )
+}
+```
+
+### 10. Testing
+```typescript
+// __tests__/crossmint/auth.test.tsx
+import { renderHook, act } from '@testing-library/react'
+import { useCrossmintAuth } from '@/lib/crossmint/auth'
+
+jest.mock('@crossmint/connect', () => ({
+  CrossmintAuth: jest.fn().mockImplementation(() => ({
+    getSession: jest.fn(),
+    loginWithEmail: jest.fn(),
+    logout: jest.fn(),
+  })),
+}))
+
+describe('useCrossmintAuth', () => {
+  it('should initialize with no user', () => {
+    const { result } = renderHook(() => useCrossmintAuth())
+    
+    expect(result.current.user).toBeNull()
+    expect(result.current.loading).toBe(true)
+  })
+  
+  it('should login with email', async () => {
+    const { result } = renderHook(() => useCrossmintAuth())
+    
+    await act(async () => {
+      await result.current.login('email', 'test@example.com')
+    })
+    
+    expect(result.current.user).toBeDefined()
+  })
+  
+  it('should handle login errors', async () => {
+    const { result } = renderHook(() => useCrossmintAuth())
+    
+    await act(async () => {
+      try {
+        await result.current.login('email', 'invalid')
+      } catch (error) {
+        expect(error).toBeDefined()
+      }
+    })
+    
+    expect(result.current.error).toBeDefined()
+  })
+})
+```
+
+Remember: Always handle wallet operations securely, validate all inputs, and provide clear user feedback for blockchain transactions.

@@ -1,0 +1,612 @@
+---
+description: "Security Standards and Best Practices"
+globs: 
+  - "**/auth/**/*.{ts,tsx}"
+  - "**/api/**/*.{ts,tsx}"
+  - "**/*security*.{ts,tsx}"
+  - "**/*crypto*.{ts,tsx}"
+alwaysApply: true
+---
+
+# Security Development Rules
+
+## Security First Mindset
+
+All code must be written with security as the primary concern. Follow the principle of "Defense in Depth" - multiple layers of security controls.
+
+## Authentication & Authorization
+
+### 1. Multi-Factor Authentication
+```typescript
+// Implement wallet + email verification
+interface AuthenticationFlow {
+  // Step 1: Wallet signature
+  verifyWallet(signature: string, message: string): Promise<WalletAuth>
+  
+  // Step 2: Email verification (optional)
+  verifyEmail(token: string): Promise<EmailAuth>
+  
+  // Step 3: Create secure session
+  createSession(auth: WalletAuth & EmailAuth): Promise<Session>
+}
+
+// Session management
+interface Session {
+  id: string
+  userId: string
+  walletAddress: string
+  expiresAt: Date
+  refreshToken: string
+}
+```
+
+### 2. JWT Best Practices
+```typescript
+// Never store sensitive data in JWT
+interface JWTPayload {
+  sub: string // user ID
+  iat: number
+  exp: number
+  jti: string // unique token ID for revocation
+  // Never include: passwords, PII, secrets
+}
+
+// Short-lived access tokens (15 min)
+const ACCESS_TOKEN_TTL = 15 * 60 * 1000
+
+// Long-lived refresh tokens (7 days)
+const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 * 1000
+
+// Rotate refresh tokens on use
+async function refreshTokens(refreshToken: string): Promise<TokenPair> {
+  // Validate refresh token
+  // Revoke old refresh token
+  // Issue new token pair
+}
+```
+
+### 3. Authorization Patterns
+```typescript
+// Role-Based Access Control (RBAC)
+enum Role {
+  USER = 'user',
+  ADMIN = 'admin',
+  MODERATOR = 'moderator'
+}
+
+// Permission-Based Access Control
+interface Permission {
+  resource: string
+  action: 'read' | 'write' | 'delete' | 'admin'
+}
+
+// Middleware for API routes
+export function authorize(requiredPermissions: Permission[]) {
+  return async (req: Request) => {
+    const user = await validateSession(req)
+    
+    if (!hasPermissions(user, requiredPermissions)) {
+      throw new ForbiddenError('Insufficient permissions')
+    }
+  }
+}
+```
+
+## Input Validation & Sanitization
+
+### 1. Always Validate Inputs
+```typescript
+import { z } from 'zod'
+
+// Define strict schemas
+const UserInputSchema = z.object({
+  email: z.string().email().max(255),
+  username: z.string()
+    .min(3)
+    .max(30)
+    .regex(/^[a-zA-Z0-9_-]+$/),
+  bio: z.string().max(500).optional(),
+  walletAddress: z.string()
+    .regex(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/) // Solana address
+})
+
+// Validate at entry points
+export async function updateProfile(input: unknown) {
+  // This throws if validation fails
+  const validated = UserInputSchema.parse(input)
+  
+  // Sanitize HTML content
+  if (validated.bio) {
+    validated.bio = sanitizeHtml(validated.bio, {
+      allowedTags: [], // No HTML allowed
+    })
+  }
+  
+  return await userService.update(validated)
+}
+```
+
+### 2. SQL Injection Prevention
+```typescript
+// Always use parameterized queries
+// ❌ NEVER do this
+const query = `SELECT * FROM users WHERE id = ${userId}`
+
+// ✅ Use parameterized queries (Convex handles this)
+const user = await ctx.db
+  .query('users')
+  .withIndex('by_id', (q) => q.eq('id', userId))
+  .first()
+
+// For raw SQL (if needed)
+const result = await db.prepare(
+  'SELECT * FROM users WHERE id = ?'
+).bind(userId).first()
+```
+
+### 3. XSS Prevention
+```typescript
+// React automatically escapes values
+// But be careful with dangerouslySetInnerHTML
+
+// ❌ Dangerous
+<div dangerouslySetInnerHTML={{ __html: userContent }} />
+
+// ✅ Safe alternatives
+import DOMPurify from 'isomorphic-dompurify'
+
+// Sanitize user content
+const sanitized = DOMPurify.sanitize(userContent, {
+  ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'a'],
+  ALLOWED_ATTR: ['href']
+})
+
+// Or use a markdown renderer with built-in sanitization
+import { marked } from 'marked'
+import DOMPurify from 'isomorphic-dompurify'
+
+const renderMarkdown = (content: string) => {
+  const html = marked(content)
+  return DOMPurify.sanitize(html)
+}
+```
+
+## Cryptography & Secrets Management
+
+### 1. Environment Variables
+```typescript
+// Never commit secrets
+// .env.local (git ignored)
+CONVEX_DEPLOYMENT=your-deployment-url
+NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+CROSSMINT_CLIENT_SECRET=secret-key
+JWT_SECRET=random-256-bit-secret
+
+// Validate environment variables
+const env = z.object({
+  CONVEX_DEPLOYMENT: z.string(),
+  CROSSMINT_CLIENT_SECRET: z.string(),
+  JWT_SECRET: z.string().min(32),
+}).parse(process.env)
+
+// Type-safe access
+export const config = {
+  convex: {
+    deployment: env.CONVEX_DEPLOYMENT,
+  },
+  crossmint: {
+    clientSecret: env.CROSSMINT_CLIENT_SECRET,
+  },
+  jwt: {
+    secret: env.JWT_SECRET,
+  }
+} as const
+```
+
+### 2. Secure Random Values
+```typescript
+// Use crypto for security-critical randomness
+import { randomBytes, randomUUID } from 'crypto'
+
+// Generate secure tokens
+export function generateSecureToken(bytes = 32): string {
+  return randomBytes(bytes).toString('base64url')
+}
+
+// Generate session IDs
+export function generateSessionId(): string {
+  return randomUUID()
+}
+
+// ❌ Never use Math.random() for security
+// const token = Math.random().toString(36)
+```
+
+### 3. Password Hashing
+```typescript
+import { hash, verify } from '@node-rs/argon2'
+
+// Hash passwords with Argon2id
+export async function hashPassword(password: string): Promise<string> {
+  return await hash(password, {
+    memoryCost: 19456, // 19 MB
+    timeCost: 2,
+    outputLen: 32,
+    parallelism: 1,
+  })
+}
+
+// Verify passwords
+export async function verifyPassword(
+  password: string,
+  hash: string
+): Promise<boolean> {
+  return await verify(hash, password)
+}
+
+// Rate limit password attempts
+const loginAttempts = new Map<string, number>()
+
+export async function checkLoginAttempts(identifier: string) {
+  const attempts = loginAttempts.get(identifier) || 0
+  
+  if (attempts >= 5) {
+    throw new Error('Too many login attempts. Please try again later.')
+  }
+  
+  loginAttempts.set(identifier, attempts + 1)
+  
+  // Clear after 15 minutes
+  setTimeout(() => {
+    loginAttempts.delete(identifier)
+  }, 15 * 60 * 1000)
+}
+```
+
+## Web3 Security
+
+### 1. Wallet Signature Verification
+```typescript
+import { PublicKey } from '@solana/web3.js'
+import nacl from 'tweetnacl'
+
+export async function verifyWalletSignature(
+  message: string,
+  signature: string,
+  publicKey: string
+): Promise<boolean> {
+  try {
+    const messageBytes = new TextEncoder().encode(message)
+    const signatureBytes = Buffer.from(signature, 'base64')
+    const publicKeyBytes = new PublicKey(publicKey).toBytes()
+    
+    return nacl.sign.detached.verify(
+      messageBytes,
+      signatureBytes,
+      publicKeyBytes
+    )
+  } catch (error) {
+    console.error('Signature verification failed:', error)
+    return false
+  }
+}
+
+// Prevent replay attacks
+interface SignatureChallenge {
+  nonce: string
+  timestamp: number
+  expiresAt: number
+}
+
+export function createSignatureChallenge(): SignatureChallenge {
+  const now = Date.now()
+  return {
+    nonce: generateSecureToken(16),
+    timestamp: now,
+    expiresAt: now + 5 * 60 * 1000 // 5 minutes
+  }
+}
+```
+
+### 2. Transaction Security
+```typescript
+// Always verify transaction details
+interface TransactionVerification {
+  // Verify recipient address
+  verifyRecipient(address: string): boolean
+  
+  // Verify amount and fees
+  verifyAmount(amount: bigint, maxFee: bigint): boolean
+  
+  // Check for suspicious patterns
+  detectAnomalies(tx: Transaction): AnomalyResult
+}
+
+// Implement transaction limits
+const DAILY_LIMIT = BigInt(1000) * BigInt(10 ** 9) // 1000 SOL
+const TRANSACTION_LIMIT = BigInt(100) * BigInt(10 ** 9) // 100 SOL
+
+export async function validateTransaction(
+  userId: string,
+  amount: bigint
+): Promise<void> {
+  if (amount > TRANSACTION_LIMIT) {
+    throw new Error('Transaction exceeds limit')
+  }
+  
+  const dailyTotal = await getDailyTransactionTotal(userId)
+  if (dailyTotal + amount > DAILY_LIMIT) {
+    throw new Error('Daily transaction limit exceeded')
+  }
+}
+```
+
+## API Security
+
+### 1. Rate Limiting
+```typescript
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+
+// Configure rate limits by endpoint
+const rateLimits = {
+  auth: new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(5, '1 m'), // 5 requests per minute
+  }),
+  api: new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
+  }),
+  wallet: new Ratelimit({
+    redis: Redis.fromEnv(),
+    limiter: Ratelimit.slidingWindow(10, '1 h'), // 10 wallet ops per hour
+  }),
+}
+
+// Middleware
+export async function rateLimit(
+  req: Request,
+  type: keyof typeof rateLimits
+) {
+  const identifier = getClientIdentifier(req)
+  const { success, limit, reset, remaining } = await rateLimits[type].limit(
+    identifier
+  )
+  
+  if (!success) {
+    throw new RateLimitError({ limit, reset, remaining })
+  }
+}
+```
+
+### 2. CORS Configuration
+```typescript
+// Strict CORS for production
+export const corsOptions = {
+  origin: process.env.NODE_ENV === 'production'
+    ? ['https://symlog.ai', 'https://www.symlog.ai']
+    : ['http://localhost:3000', 'http://localhost:3001'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['X-RateLimit-Limit', 'X-RateLimit-Remaining'],
+  maxAge: 86400, // 24 hours
+}
+```
+
+### 3. Content Security Policy
+```typescript
+// Next.js security headers
+export const securityHeaders = [
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' blob: data: https:",
+      "font-src 'self'",
+      "connect-src 'self' wss://*.convex.cloud https://*.convex.cloud",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join('; ')
+  },
+  {
+    key: 'X-Frame-Options',
+    value: 'DENY'
+  },
+  {
+    key: 'X-Content-Type-Options',
+    value: 'nosniff'
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'strict-origin-when-cross-origin'
+  },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=()'
+  }
+]
+```
+
+## Data Protection
+
+### 1. Encryption at Rest
+```typescript
+// Encrypt sensitive data before storage
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto'
+
+const algorithm = 'aes-256-gcm'
+const key = Buffer.from(process.env.ENCRYPTION_KEY!, 'hex')
+
+export function encrypt(text: string): EncryptedData {
+  const iv = randomBytes(16)
+  const cipher = createCipheriv(algorithm, key, iv)
+  
+  let encrypted = cipher.update(text, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  
+  const authTag = cipher.getAuthTag()
+  
+  return {
+    encrypted,
+    iv: iv.toString('hex'),
+    authTag: authTag.toString('hex')
+  }
+}
+
+export function decrypt(data: EncryptedData): string {
+  const decipher = createDecipheriv(
+    algorithm,
+    key,
+    Buffer.from(data.iv, 'hex')
+  )
+  
+  decipher.setAuthTag(Buffer.from(data.authTag, 'hex'))
+  
+  let decrypted = decipher.update(data.encrypted, 'hex', 'utf8')
+  decrypted += decipher.final('utf8')
+  
+  return decrypted
+}
+```
+
+### 2. PII Handling
+```typescript
+// Mask sensitive data in logs
+export function maskPII(data: any): any {
+  const masked = { ...data }
+  
+  // Mask email
+  if (masked.email) {
+    const [local, domain] = masked.email.split('@')
+    masked.email = `${local.slice(0, 2)}***@${domain}`
+  }
+  
+  // Mask wallet address
+  if (masked.walletAddress) {
+    masked.walletAddress = `${masked.walletAddress.slice(0, 6)}...${masked.walletAddress.slice(-4)}`
+  }
+  
+  // Remove sensitive fields
+  delete masked.password
+  delete masked.privateKey
+  delete masked.seedPhrase
+  
+  return masked
+}
+
+// Audit logging
+export async function auditLog(event: AuditEvent) {
+  await convex.mutation(api.audit.create, {
+    timestamp: Date.now(),
+    userId: event.userId,
+    action: event.action,
+    resource: event.resource,
+    details: maskPII(event.details),
+    ip: hashIP(event.ip), // Hash IP for privacy
+  })
+}
+```
+
+## Security Monitoring
+
+### 1. Anomaly Detection
+```typescript
+interface SecurityEvent {
+  type: 'failed_login' | 'suspicious_transaction' | 'rate_limit_exceeded'
+  userId?: string
+  ip: string
+  timestamp: number
+  details: Record<string, any>
+}
+
+export async function detectAnomalies(event: SecurityEvent) {
+  // Check for patterns
+  const recentEvents = await getRecentSecurityEvents(event.ip)
+  
+  // Multiple failed logins
+  if (event.type === 'failed_login') {
+    const failedCount = recentEvents.filter(
+      e => e.type === 'failed_login'
+    ).length
+    
+    if (failedCount >= 5) {
+      await blockIP(event.ip, '1h')
+      await notifySecurityTeam('Multiple failed login attempts', event)
+    }
+  }
+  
+  // Geographic anomaly
+  const location = await getIPLocation(event.ip)
+  if (event.userId) {
+    const userLocations = await getUserLocations(event.userId)
+    if (!isNearbyLocation(location, userLocations)) {
+      await requireAdditionalVerification(event.userId)
+      await notifyUser('New login location detected', event)
+    }
+  }
+}
+```
+
+### 2. Security Headers Monitoring
+```typescript
+// Monitor security headers in production
+export async function monitorSecurityHeaders(url: string) {
+  const response = await fetch(url, { method: 'HEAD' })
+  const headers = response.headers
+  
+  const required = [
+    'content-security-policy',
+    'x-frame-options',
+    'x-content-type-options',
+    'strict-transport-security',
+  ]
+  
+  const missing = required.filter(h => !headers.get(h))
+  
+  if (missing.length > 0) {
+    await notifySecurityTeam('Missing security headers', {
+      url,
+      missing,
+    })
+  }
+}
+```
+
+## Incident Response
+
+### 1. Security Breach Protocol
+1. **Detect** - Automated monitoring and alerts
+2. **Contain** - Isolate affected systems
+3. **Investigate** - Determine scope and impact
+4. **Remediate** - Fix vulnerabilities
+5. **Recover** - Restore normal operations
+6. **Learn** - Post-mortem and improvements
+
+### 2. Emergency Procedures
+```typescript
+// Kill switch for critical vulnerabilities
+export async function emergencyShutdown(reason: string) {
+  // 1. Block all new requests
+  await setMaintenanceMode(true)
+  
+  // 2. Revoke all active sessions
+  await revokeAllSessions()
+  
+  // 3. Notify team
+  await notifyEmergency(reason)
+  
+  // 4. Log incident
+  await createIncident({
+    severity: 'critical',
+    reason,
+    timestamp: Date.now(),
+  })
+}
+```
+
+Remember: Security is not a feature, it's a requirement. Always err on the side of caution.

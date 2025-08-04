@@ -1,0 +1,728 @@
+---
+description: "Code Quality Metrics and Monitoring"
+globs: 
+  - "**/*.{ts,tsx,js,jsx}"
+  - "**/metrics/**/*"
+  - "**/monitoring/**/*"
+alwaysApply: true
+---
+
+# Quality Metrics Rules
+
+## Metrics Philosophy
+
+### 1. Code Quality Metrics
+
+```typescript
+// Core Quality Metrics
+export interface QualityMetrics {
+  // Complexity Metrics
+  complexity: {
+    cyclomatic: number // McCabe complexity
+    cognitive: number // Cognitive complexity
+    halstead: {
+      difficulty: number
+      volume: number
+      effort: number
+    }
+    maxNesting: number // Maximum nesting depth
+  }
+  
+  // Maintainability
+  maintainability: {
+    index: number // 0-100 score
+    loc: number // Lines of code
+    comments: number // Comment lines
+    ratio: number // Comment to code ratio
+  }
+  
+  // Test Coverage
+  coverage: {
+    statements: number
+    branches: number
+    functions: number
+    lines: number
+  }
+  
+  // Technical Debt
+  debt: {
+    ratio: number // Debt ratio percentage
+    time: string // Estimated fix time
+    issues: {
+      critical: number
+      major: number
+      minor: number
+    }
+  }
+}
+
+// Calculate metrics for a module
+export function calculateMetrics(filePath: string): QualityMetrics {
+  const ast = parseFile(filePath)
+  
+  return {
+    complexity: calculateComplexity(ast),
+    maintainability: calculateMaintainability(ast),
+    coverage: getCoverageData(filePath),
+    debt: calculateTechnicalDebt(ast),
+  }
+}
+```
+
+### 2. Performance Metrics
+
+```typescript
+// Performance Monitoring
+export class PerformanceMonitor {
+  // Web Vitals
+  static webVitals = {
+    LCP: { // Largest Contentful Paint
+      target: 2500, // ms
+      threshold: 4000,
+    },
+    FID: { // First Input Delay
+      target: 100, // ms
+      threshold: 300,
+    },
+    CLS: { // Cumulative Layout Shift
+      target: 0.1,
+      threshold: 0.25,
+    },
+    FCP: { // First Contentful Paint
+      target: 1800, // ms
+      threshold: 3000,
+    },
+    TTFB: { // Time to First Byte
+      target: 800, // ms
+      threshold: 1800,
+    },
+  }
+  
+  // API Performance
+  static apiMetrics = {
+    responseTime: {
+      p50: 100, // ms
+      p95: 500,
+      p99: 1000,
+    },
+    throughput: {
+      target: 1000, // requests per second
+      minimum: 100,
+    },
+    errorRate: {
+      target: 0.001, // 0.1%
+      threshold: 0.01, // 1%
+    },
+  }
+  
+  // Database Performance
+  static dbMetrics = {
+    queryTime: {
+      simple: 10, // ms
+      complex: 100,
+      aggregate: 500,
+    },
+    connectionPool: {
+      size: 20,
+      timeout: 5000, // ms
+      idleTimeout: 10000,
+    },
+  }
+}
+
+// Real User Monitoring (RUM)
+export function collectWebVitals() {
+  if (typeof window === 'undefined') return
+  
+  // Core Web Vitals
+  new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      const metric = {
+        name: entry.name,
+        value: entry.startTime,
+        rating: getRating(entry.name, entry.startTime),
+      }
+      
+      // Send to analytics
+      sendToAnalytics('web-vitals', metric)
+    }
+  }).observe({ entryTypes: ['largest-contentful-paint', 'first-input', 'layout-shift'] })
+}
+```
+
+### 3. Business Metrics
+
+```typescript
+// Business KPIs
+export interface BusinessMetrics {
+  // User Engagement
+  engagement: {
+    dau: number // Daily Active Users
+    mau: number // Monthly Active Users
+    sessionDuration: number // Average in seconds
+    bounceRate: number // Percentage
+    retention: {
+      day1: number
+      day7: number
+      day30: number
+    }
+  }
+  
+  // Conversion Metrics
+  conversion: {
+    signupRate: number // Visitor to signup
+    activationRate: number // Signup to active
+    purchaseRate: number // Active to paying
+    churnRate: number // Monthly churn
+  }
+  
+  // Revenue Metrics
+  revenue: {
+    mrr: number // Monthly Recurring Revenue
+    arr: number // Annual Recurring Revenue
+    arpu: number // Average Revenue Per User
+    ltv: number // Lifetime Value
+    cac: number // Customer Acquisition Cost
+  }
+  
+  // Platform Health
+  health: {
+    uptime: number // Percentage
+    errorRate: number // Percentage
+    supportTickets: number // Count
+    nps: number // Net Promoter Score
+  }
+}
+
+// Track custom events
+export class Analytics {
+  static track(event: string, properties?: Record<string, any>) {
+    const enrichedEvent = {
+      event,
+      properties: {
+        ...properties,
+        timestamp: new Date().toISOString(),
+        sessionId: getSessionId(),
+        userId: getUserId(),
+        platform: getPlatform(),
+      },
+    }
+    
+    // Send to multiple analytics providers
+    if (window.gtag) {
+      window.gtag('event', event, properties)
+    }
+    
+    if (window.mixpanel) {
+      window.mixpanel.track(event, properties)
+    }
+    
+    if (window.amplitude) {
+      window.amplitude.track(event, properties)
+    }
+  }
+}
+```
+
+### 4. Build Metrics
+
+```typescript
+// Build Performance Metrics
+export interface BuildMetrics {
+  // Build Times
+  duration: {
+    total: number // seconds
+    typescript: number
+    bundling: number
+    optimization: number
+  }
+  
+  // Bundle Size
+  bundleSize: {
+    total: number // bytes
+    js: number
+    css: number
+    images: number
+    fonts: number
+    byRoute: Record<string, number>
+  }
+  
+  // Code Splitting
+  chunks: {
+    count: number
+    sizes: number[]
+    lazy: number // Lazy loaded chunks
+    shared: number // Shared chunks
+  }
+  
+  // Dependencies
+  dependencies: {
+    total: number
+    production: number
+    development: number
+    outdated: number
+    vulnerable: number
+  }
+}
+
+// Webpack Bundle Analyzer Config
+export const bundleAnalyzer = {
+  analyzerMode: 'static',
+  reportFilename: 'bundle-report.html',
+  openAnalyzer: false,
+  generateStatsFile: true,
+  statsOptions: {
+    source: false,
+    chunks: true,
+    modules: true,
+  },
+}
+
+// Track build metrics
+export async function trackBuildMetrics() {
+  const startTime = Date.now()
+  
+  const metrics: BuildMetrics = {
+    duration: {
+      total: 0,
+      typescript: 0,
+      bundling: 0,
+      optimization: 0,
+    },
+    bundleSize: await calculateBundleSize(),
+    chunks: await analyzeChunks(),
+    dependencies: await analyzeDependencies(),
+  }
+  
+  metrics.duration.total = (Date.now() - startTime) / 1000
+  
+  // Store metrics
+  await storeMetrics('build', metrics)
+  
+  // Alert on regressions
+  checkBuildRegressions(metrics)
+}
+```
+
+### 5. Security Metrics
+
+```typescript
+// Security Monitoring
+export interface SecurityMetrics {
+  // Vulnerability Scanning
+  vulnerabilities: {
+    critical: number
+    high: number
+    medium: number
+    low: number
+    lastScan: Date
+  }
+  
+  // Authentication
+  authentication: {
+    failedLogins: number
+    bruteForceAttempts: number
+    suspiciousIPs: string[]
+    mfaAdoption: number // percentage
+  }
+  
+  // API Security
+  api: {
+    unauthorizedAttempts: number
+    rateLimitViolations: number
+    suspiciousPatterns: string[]
+    ddosAttempts: number
+  }
+  
+  // Data Protection
+  dataProtection: {
+    encryptedFields: number
+    piiAccess: number
+    dataExports: number
+    gdprRequests: number
+  }
+}
+
+// Security Event Monitoring
+export class SecurityMonitor {
+  static events = {
+    AUTH_FAILURE: 'auth.failure',
+    RATE_LIMIT: 'security.rate_limit',
+    SUSPICIOUS_ACTIVITY: 'security.suspicious',
+    DATA_ACCESS: 'security.data_access',
+  }
+  
+  static async logSecurityEvent(
+    event: string,
+    details: Record<string, any>
+  ) {
+    const securityLog = {
+      event,
+      timestamp: new Date().toISOString(),
+      ip: getClientIP(),
+      userAgent: getUserAgent(),
+      userId: getUserId(),
+      ...details,
+    }
+    
+    // Log to security monitoring service
+    await logToSIEM(securityLog)
+    
+    // Alert on critical events
+    if (isCriticalEvent(event)) {
+      await alertSecurityTeam(securityLog)
+    }
+  }
+}
+```
+
+### 6. Infrastructure Metrics
+
+```typescript
+// Infrastructure Monitoring
+export interface InfrastructureMetrics {
+  // Server Metrics
+  servers: {
+    cpu: number // percentage
+    memory: number // percentage
+    disk: number // percentage
+    network: {
+      inbound: number // bytes/sec
+      outbound: number // bytes/sec
+    }
+  }
+  
+  // Container Metrics
+  containers: {
+    running: number
+    stopped: number
+    cpu: number
+    memory: number
+    restarts: number
+  }
+  
+  // Database Metrics
+  database: {
+    connections: number
+    activeQueries: number
+    slowQueries: number
+    replicationLag: number // seconds
+    diskUsage: number // percentage
+  }
+  
+  // Cache Metrics
+  cache: {
+    hitRate: number // percentage
+    missRate: number
+    evictions: number
+    memory: number // bytes
+  }
+}
+
+// Prometheus metrics
+export const metricsRegistry = new Registry()
+
+// Custom metrics
+export const httpRequestDuration = new Histogram({
+  name: 'http_request_duration_seconds',
+  help: 'Duration of HTTP requests in seconds',
+  labelNames: ['method', 'route', 'status'],
+  buckets: [0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10],
+})
+
+export const activeConnections = new Gauge({
+  name: 'active_connections',
+  help: 'Number of active connections',
+  labelNames: ['type'],
+})
+
+metricsRegistry.register(httpRequestDuration)
+metricsRegistry.register(activeConnections)
+```
+
+### 7. Error Tracking
+
+```typescript
+// Error Monitoring
+export interface ErrorMetrics {
+  // Error Rates
+  rates: {
+    total: number
+    byType: Record<string, number>
+    byEndpoint: Record<string, number>
+    byUser: Record<string, number>
+  }
+  
+  // Error Details
+  errors: Array<{
+    id: string
+    type: string
+    message: string
+    stack: string
+    count: number
+    lastSeen: Date
+    firstSeen: Date
+    affected: number // affected users
+  }>
+  
+  // Error Trends
+  trends: {
+    hourly: number[]
+    daily: number[]
+    weekly: number[]
+  }
+}
+
+// Sentry Integration
+export function initErrorTracking() {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+    tracesSampleRate: 0.1,
+    integrations: [
+      new Sentry.BrowserTracing(),
+      new Sentry.Replay({
+        maskAllText: true,
+        blockAllMedia: true,
+      }),
+    ],
+    beforeSend(event, hint) {
+      // Filter out known issues
+      if (event.exception?.values?.[0]?.type === 'NetworkError') {
+        return null
+      }
+      
+      // Enhance error context
+      event.extra = {
+        ...event.extra,
+        sessionId: getSessionId(),
+        feature: getCurrentFeature(),
+      }
+      
+      return event
+    },
+  })
+}
+```
+
+### 8. Monitoring Dashboards
+
+```typescript
+// Grafana Dashboard Configuration
+export const dashboardConfig = {
+  application: {
+    panels: [
+      {
+        title: 'Request Rate',
+        query: 'rate(http_requests_total[5m])',
+        type: 'graph',
+      },
+      {
+        title: 'Error Rate',
+        query: 'rate(http_errors_total[5m])',
+        type: 'graph',
+        alert: {
+          condition: 'avg() > 0.01',
+          message: 'Error rate above 1%',
+        },
+      },
+      {
+        title: 'Response Time',
+        query: 'histogram_quantile(0.95, http_request_duration_seconds)',
+        type: 'graph',
+      },
+      {
+        title: 'Active Users',
+        query: 'active_users',
+        type: 'stat',
+      },
+    ],
+  },
+  
+  infrastructure: {
+    panels: [
+      {
+        title: 'CPU Usage',
+        query: 'avg(cpu_usage_percent) by (instance)',
+        type: 'graph',
+        alert: {
+          condition: 'avg() > 80',
+          message: 'High CPU usage',
+        },
+      },
+      {
+        title: 'Memory Usage',
+        query: 'avg(memory_usage_percent) by (instance)',
+        type: 'graph',
+      },
+      {
+        title: 'Disk I/O',
+        query: 'rate(disk_io_bytes[5m])',
+        type: 'graph',
+      },
+    ],
+  },
+}
+```
+
+### 9. Quality Gates
+
+```typescript
+// Quality Gate Definitions
+export const qualityGates = {
+  // Code Quality Gates
+  code: {
+    coverage: {
+      minimum: 80,
+      target: 90,
+    },
+    complexity: {
+      maximum: 10,
+      target: 5,
+    },
+    duplication: {
+      maximum: 3, // percentage
+      target: 1,
+    },
+    smells: {
+      maximum: 10,
+      critical: 0,
+    },
+  },
+  
+  // Performance Gates
+  performance: {
+    buildTime: {
+      maximum: 300, // seconds
+      target: 180,
+    },
+    bundleSize: {
+      maximum: 1000000, // 1MB
+      target: 500000, // 500KB
+    },
+    lighthouse: {
+      minimum: 90,
+      target: 95,
+    },
+  },
+  
+  // Security Gates
+  security: {
+    vulnerabilities: {
+      critical: 0,
+      high: 0,
+      medium: 5,
+    },
+    dependencies: {
+      outdated: 10,
+      deprecated: 0,
+    },
+  },
+}
+
+// Check quality gates
+export async function checkQualityGates(): Promise<QualityReport> {
+  const metrics = await collectAllMetrics()
+  const failures: string[] = []
+  
+  // Check each gate
+  for (const [category, gates] of Object.entries(qualityGates)) {
+    for (const [metric, thresholds] of Object.entries(gates)) {
+      const value = metrics[category]?.[metric]
+      
+      if (value > thresholds.maximum || value < thresholds.minimum) {
+        failures.push(`${category}.${metric}: ${value} (limit: ${thresholds.maximum || thresholds.minimum})`)
+      }
+    }
+  }
+  
+  return {
+    passed: failures.length === 0,
+    failures,
+    metrics,
+    timestamp: new Date(),
+  }
+}
+```
+
+### 10. Metric Collection
+
+```typescript
+// Centralized Metric Collection
+export class MetricsCollector {
+  private static instance: MetricsCollector
+  private metrics: Map<string, any[]> = new Map()
+  
+  static getInstance() {
+    if (!this.instance) {
+      this.instance = new MetricsCollector()
+    }
+    return this.instance
+  }
+  
+  collect(category: string, metric: any) {
+    if (!this.metrics.has(category)) {
+      this.metrics.set(category, [])
+    }
+    
+    this.metrics.get(category)!.push({
+      ...metric,
+      timestamp: Date.now(),
+    })
+    
+    // Batch send metrics
+    this.scheduleSend()
+  }
+  
+  private scheduleSend = debounce(async () => {
+    const batch = Array.from(this.metrics.entries()).map(([category, metrics]) => ({
+      category,
+      metrics,
+    }))
+    
+    this.metrics.clear()
+    
+    // Send to multiple destinations
+    await Promise.all([
+      this.sendToDatadog(batch),
+      this.sendToElasticsearch(batch),
+      this.sendToS3(batch),
+    ])
+  }, 5000)
+  
+  private async sendToDatadog(batch: any[]) {
+    // Send to Datadog API
+  }
+  
+  private async sendToElasticsearch(batch: any[]) {
+    // Send to Elasticsearch
+  }
+  
+  private async sendToS3(batch: any[]) {
+    // Archive to S3
+  }
+}
+
+// Usage
+const collector = MetricsCollector.getInstance()
+
+// Collect various metrics
+collector.collect('performance', {
+  endpoint: '/api/users',
+  duration: 125,
+  status: 200,
+})
+
+collector.collect('business', {
+  event: 'user.signup',
+  properties: { plan: 'pro' },
+})
+
+collector.collect('error', {
+  type: 'ValidationError',
+  message: 'Invalid email format',
+  endpoint: '/api/auth/signup',
+})
+```
+
+Remember: You can't improve what you don't measure. Track metrics that align with business goals and user experience.

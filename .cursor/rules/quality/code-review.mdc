@@ -1,0 +1,410 @@
+---
+description: "Code Review Standards and Practices"
+globs: 
+  - "**/*.{ts,tsx,js,jsx}"
+  - "**/*.{py,go,rs}"
+alwaysApply: true
+---
+
+# Code Review Rules
+
+## Code Review Philosophy
+
+### 1. Review Checklist
+
+```typescript
+// Pre-Review Checklist
+interface CodeReviewChecklist {
+  // Functionality
+  functionality: {
+    correctness: boolean // Does the code do what it's supposed to?
+    edgeCases: boolean // Are edge cases handled?
+    errorHandling: boolean // Are errors properly handled?
+    performance: boolean // Are there performance concerns?
+  }
+  
+  // Code Quality
+  quality: {
+    readability: boolean // Is the code easy to understand?
+    maintainability: boolean // Can others maintain this code?
+    testability: boolean // Is the code testable?
+    documentation: boolean // Is it properly documented?
+  }
+  
+  // Architecture
+  architecture: {
+    patterns: boolean // Does it follow established patterns?
+    dependencies: boolean // Are dependencies appropriate?
+    coupling: boolean // Is coupling minimized?
+    cohesion: boolean // Is cohesion maximized?
+  }
+  
+  // Security
+  security: {
+    authentication: boolean // Auth properly implemented?
+    authorization: boolean // Permissions checked?
+    validation: boolean // Inputs validated?
+    secrets: boolean // No hardcoded secrets?
+  }
+}
+```
+
+### 2. Code Review Process
+
+```typescript
+// Pull Request Template
+const PR_TEMPLATE = `
+## Description
+Brief description of changes
+
+## Type of Change
+- [ ] Bug fix (non-breaking change)
+- [ ] New feature (non-breaking change)
+- [ ] Breaking change
+- [ ] Documentation update
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] E2E tests pass
+- [ ] Manual testing completed
+
+## Checklist
+- [ ] Code follows style guidelines
+- [ ] Self-review completed
+- [ ] Comments added for complex code
+- [ ] Documentation updated
+- [ ] No new warnings generated
+- [ ] Tests added for new features
+- [ ] All tests passing
+- [ ] Performance impact considered
+`
+
+// Review Comment Examples
+const REVIEW_COMMENTS = {
+  // Constructive feedback
+  improvement: "Consider extracting this logic into a separate function for better reusability",
+  
+  // Security concern
+  security: "This SQL query appears to be vulnerable to injection. Please use parameterized queries",
+  
+  // Performance issue
+  performance: "This O(n²) algorithm could be optimized using a Map for O(n) complexity",
+  
+  // Code clarity
+  clarity: "This function name doesn't clearly describe what it does. Consider renaming to `calculateUserDiscount`",
+  
+  // Missing tests
+  testing: "Please add unit tests for this new functionality",
+}
+```
+
+### 3. Automated Review Tools
+
+```yaml
+# .github/workflows/code-review.yml
+name: Automated Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run ESLint
+        run: npm run lint
+      
+      - name: Run TypeScript Check
+        run: npm run type-check
+      
+      - name: Run Tests
+        run: npm test -- --coverage
+      
+      - name: Check Bundle Size
+        run: npm run analyze
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run Security Audit
+        run: npm audit
+      
+      - name: Run SAST Scan
+        uses: github/super-linter@v4
+        env:
+          DEFAULT_BRANCH: main
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+```
+
+### 4. Review Guidelines
+
+```typescript
+// Code Review Best Practices
+export const ReviewGuidelines = {
+  // Focus Areas
+  priority: {
+    1: "Security vulnerabilities",
+    2: "Data loss risks",
+    3: "Performance regressions",
+    4: "Breaking changes",
+    5: "Code maintainability",
+  },
+  
+  // Review Depth
+  depth: {
+    critical: {
+      // Deep review for critical paths
+      authentication: true,
+      payments: true,
+      dataModification: true,
+      security: true,
+    },
+    standard: {
+      // Standard review for most code
+      features: true,
+      bugFixes: true,
+      refactoring: true,
+    },
+    light: {
+      // Light review for low-risk changes
+      documentation: true,
+      styling: true,
+      tests: true,
+    },
+  },
+  
+  // Time Limits
+  sla: {
+    critical: "2 hours",
+    standard: "24 hours",
+    light: "48 hours",
+  },
+}
+
+// Review Antipatterns to Avoid
+export const ReviewAntipatterns = {
+  // Don't do these
+  nitpicking: "Focusing on minor style issues over substance",
+  perfectionism: "Blocking PRs for non-critical improvements",
+  bikeshedding: "Excessive debate over trivial matters",
+  ghosting: "Not responding to PR in timely manner",
+  rubberstamping: "Approving without proper review",
+  
+  // Do these instead
+  constructive: "Provide actionable feedback",
+  balanced: "Weigh importance of changes",
+  timely: "Respond within SLA",
+  thorough: "Review based on risk level",
+  educational: "Share knowledge and context",
+}
+```
+
+### 5. Security Review
+
+```typescript
+// Security Review Checklist
+export const SecurityReview = {
+  authentication: {
+    // Check authentication implementation
+    tokenValidation: "Verify JWT tokens properly",
+    sessionManagement: "Check session handling",
+    passwordPolicy: "Enforce strong passwords",
+    mfaImplementation: "Verify 2FA if required",
+  },
+  
+  authorization: {
+    // Check authorization logic
+    accessControl: "Verify permission checks",
+    roleValidation: "Check role-based access",
+    resourceOwnership: "Verify ownership checks",
+    privilegeEscalation: "Prevent privilege escalation",
+  },
+  
+  dataProtection: {
+    // Check data handling
+    encryption: "Verify encryption at rest/transit",
+    piiHandling: "Check PII data handling",
+    logging: "No sensitive data in logs",
+    dataRetention: "Follow retention policies",
+  },
+  
+  inputValidation: {
+    // Check all inputs
+    sqlInjection: "Parameterized queries",
+    xss: "Output encoding",
+    csrf: "CSRF tokens",
+    fileUpload: "File type validation",
+  },
+}
+```
+
+### 6. Performance Review
+
+```typescript
+// Performance Review Checklist
+export const PerformanceReview = {
+  // Algorithm Complexity
+  complexity: {
+    timeComplexity: "Analyze Big O notation",
+    spaceComplexity: "Check memory usage",
+    optimization: "Look for optimization opportunities",
+  },
+  
+  // Database Queries
+  database: {
+    queryOptimization: "Check for N+1 queries",
+    indexUsage: "Verify index usage",
+    connectionPooling: "Check connection management",
+    caching: "Implement appropriate caching",
+  },
+  
+  // Frontend Performance
+  frontend: {
+    bundleSize: "Check bundle size impact",
+    lazyLoading: "Implement code splitting",
+    renderPerformance: "Avoid unnecessary re-renders",
+    assetOptimization: "Optimize images/fonts",
+  },
+  
+  // API Performance
+  api: {
+    responseTime: "Check response times",
+    pagination: "Implement for large datasets",
+    rateLimit: "Add rate limiting",
+    compression: "Enable response compression",
+  },
+}
+```
+
+### 7. Architecture Review
+
+```typescript
+// Architecture Review Points
+export const ArchitectureReview = {
+  // Design Patterns
+  patterns: {
+    consistency: "Follow existing patterns",
+    appropriateness: "Right pattern for problem",
+    simplicity: "Avoid over-engineering",
+    flexibility: "Allow for future changes",
+  },
+  
+  // Dependencies
+  dependencies: {
+    necessity: "Is dependency needed?",
+    maintenance: "Is it actively maintained?",
+    security: "Any known vulnerabilities?",
+    size: "What's the bundle impact?",
+  },
+  
+  // Code Organization
+  organization: {
+    separation: "Separate concerns properly",
+    modularity: "Create reusable modules",
+    layering: "Respect layer boundaries",
+    naming: "Use clear, consistent naming",
+  },
+}
+```
+
+### 8. Testing Review
+
+```typescript
+// Testing Review Standards
+export const TestingReview = {
+  coverage: {
+    unit: "Minimum 80% coverage",
+    integration: "Critical paths tested",
+    e2e: "User journeys covered",
+    edge: "Edge cases handled",
+  },
+  
+  quality: {
+    isolated: "Tests run independently",
+    deterministic: "No flaky tests",
+    fast: "Tests run quickly",
+    meaningful: "Test actual behavior",
+  },
+  
+  structure: {
+    arrangement: "Arrange-Act-Assert pattern",
+    naming: "Descriptive test names",
+    grouping: "Logical test organization",
+    fixtures: "Reusable test data",
+  },
+}
+```
+
+### 9. Documentation Review
+
+```typescript
+// Documentation Standards
+export const DocumentationReview = {
+  code: {
+    comments: "Complex logic explained",
+    jsdoc: "Public APIs documented",
+    examples: "Usage examples provided",
+    warnings: "Edge cases noted",
+  },
+  
+  readme: {
+    setup: "Clear setup instructions",
+    usage: "Usage examples",
+    api: "API documentation",
+    troubleshooting: "Common issues",
+  },
+  
+  architecture: {
+    decisions: "ADRs for major choices",
+    diagrams: "Visual representations",
+    flow: "Data/process flows",
+    dependencies: "Dependency graph",
+  },
+}
+```
+
+### 10. Review Metrics
+
+```typescript
+// Track Review Effectiveness
+export const ReviewMetrics = {
+  // Process Metrics
+  process: {
+    reviewTime: "Time to first review",
+    cycleTime: "Time to merge",
+    iterations: "Review rounds needed",
+    participation: "Reviewer engagement",
+  },
+  
+  // Quality Metrics
+  quality: {
+    defectRate: "Bugs found post-merge",
+    coverageIncrease: "Test coverage delta",
+    techDebt: "Technical debt introduced",
+    performance: "Performance impact",
+  },
+  
+  // Team Metrics
+  team: {
+    knowledge: "Knowledge sharing",
+    mentoring: "Junior developer growth",
+    consistency: "Code consistency",
+    satisfaction: "Developer happiness",
+  },
+}
+```
+
+Remember: Code reviews are about improving code quality and sharing knowledge, not about showing superiority or nitpicking. Be constructive, be kind, and focus on what matters.

@@ -1,0 +1,688 @@
+---
+description: "React Development Best Practices"
+globs: 
+  - "**/*.{tsx,jsx}"
+  - "**/components/**/*"
+  - "**/hooks/**/*"
+alwaysApply: true
+---
+
+# React Development Rules
+
+## React 19 & Modern Patterns
+
+### 1. Component Patterns
+```typescript
+// Prefer functional components with TypeScript
+import { memo, useCallback, useMemo, useState } from 'react'
+
+// ✅ Good: Typed functional component
+export const UserCard = memo<UserCardProps>(function UserCard({ 
+  user, 
+  onEdit,
+  className 
+}) {
+  // Hooks at the top
+  const [isExpanded, setIsExpanded] = useState(false)
+  
+  // Memoized values
+  const fullName = useMemo(
+    () => `${user.firstName} ${user.lastName}`,
+    [user.firstName, user.lastName]
+  )
+  
+  // Stable callbacks
+  const handleToggle = useCallback(() => {
+    setIsExpanded(prev => !prev)
+  }, [])
+  
+  // Conditional rendering
+  if (!user) return null
+  
+  return (
+    <div className={cn('user-card', className)}>
+      <h3>{fullName}</h3>
+      <button onClick={handleToggle}>
+        {isExpanded ? 'Collapse' : 'Expand'}
+      </button>
+      {isExpanded && <UserDetails user={user} />}
+    </div>
+  )
+})
+
+// Component display name for debugging
+UserCard.displayName = 'UserCard'
+
+// Export types alongside component
+export interface UserCardProps {
+  user: User
+  onEdit?: (user: User) => void
+  className?: string
+}
+```
+
+### 2. Server Components (React 19)
+```typescript
+// Mark client components explicitly
+'use client'
+
+// Server Component (default in Next.js 15)
+// app/users/page.tsx
+export default async function UsersPage() {
+  // Direct data fetching in server components
+  const users = await fetchUsers()
+  
+  return (
+    <div>
+      <h1>Users</h1>
+      <Suspense fallback={<UserListSkeleton />}>
+        <UserList users={users} />
+      </Suspense>
+    </div>
+  )
+}
+
+// Client Component for interactivity
+// components/UserList.tsx
+'use client'
+
+export function UserList({ users }: { users: User[] }) {
+  const [filter, setFilter] = useState('')
+  
+  const filteredUsers = useMemo(
+    () => users.filter(u => u.name.includes(filter)),
+    [users, filter]
+  )
+  
+  return (
+    <>
+      <SearchInput value={filter} onChange={setFilter} />
+      <div className="grid gap-4">
+        {filteredUsers.map(user => (
+          <UserCard key={user.id} user={user} />
+        ))}
+      </div>
+    </>
+  )
+}
+```
+
+### 3. Hooks Best Practices
+```typescript
+// Custom hooks with clear return types
+export function useUser(userId: string): UseUserReturn {
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
+  
+  useEffect(() => {
+    let cancelled = false
+    
+    const loadUser = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const data = await fetchUser(userId)
+        
+        if (!cancelled) {
+          setUser(data)
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err as Error)
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false)
+        }
+      }
+    }
+    
+    loadUser()
+    
+    return () => {
+      cancelled = true
+    }
+  }, [userId])
+  
+  const refetch = useCallback(() => {
+    // Trigger re-fetch by updating a dependency
+  }, [userId])
+  
+  return { user, loading, error, refetch }
+}
+
+interface UseUserReturn {
+  user: User | null
+  loading: boolean
+  error: Error | null
+  refetch: () => void
+}
+
+// Compose hooks for complex logic
+export function useAuth() {
+  const { user, loading: userLoading } = useUser()
+  const { permissions, loading: permLoading } = usePermissions(user?.id)
+  
+  return {
+    user,
+    permissions,
+    loading: userLoading || permLoading,
+    isAuthenticated: !!user,
+    can: (action: string) => permissions.includes(action),
+  }
+}
+```
+
+### 4. State Management
+```typescript
+// Local state for UI
+const [isOpen, setIsOpen] = useState(false)
+
+// Derived state instead of separate state
+const isValid = useMemo(
+  () => email.includes('@') && password.length >= 8,
+  [email, password]
+)
+
+// useReducer for complex state
+interface FormState {
+  values: FormValues
+  errors: FormErrors
+  touched: Set<string>
+  isSubmitting: boolean
+}
+
+type FormAction = 
+  | { type: 'SET_FIELD'; field: string; value: any }
+  | { type: 'SET_ERROR'; field: string; error: string }
+  | { type: 'TOUCH_FIELD'; field: string }
+  | { type: 'SUBMIT_START' }
+  | { type: 'SUBMIT_END' }
+
+const formReducer = (state: FormState, action: FormAction): FormState => {
+  switch (action.type) {
+    case 'SET_FIELD':
+      return {
+        ...state,
+        values: { ...state.values, [action.field]: action.value },
+        errors: { ...state.errors, [action.field]: '' },
+      }
+    case 'TOUCH_FIELD':
+      return {
+        ...state,
+        touched: new Set([...state.touched, action.field]),
+      }
+    // ... other cases
+  }
+}
+
+// Context for global state
+const ThemeContext = createContext<ThemeContextValue | null>(null)
+
+export function useTheme() {
+  const context = useContext(ThemeContext)
+  if (!context) {
+    throw new Error('useTheme must be used within ThemeProvider')
+  }
+  return context
+}
+```
+
+### 5. Performance Optimization
+```typescript
+// Memo for expensive components
+export const ExpensiveList = memo(function ExpensiveList({ 
+  items, 
+  renderItem 
+}: Props) {
+  return (
+    <div>
+      {items.map(item => (
+        <MemoizedItem key={item.id} item={item} />
+      ))}
+    </div>
+  )
+}, (prevProps, nextProps) => {
+  // Custom comparison
+  return (
+    prevProps.items.length === nextProps.items.length &&
+    prevProps.items.every((item, i) => item.id === nextProps.items[i].id)
+  )
+})
+
+// useMemo for expensive calculations
+const sortedItems = useMemo(
+  () => items.sort((a, b) => b.score - a.score),
+  [items]
+)
+
+// useCallback for stable references
+const handleSearch = useCallback((query: string) => {
+  setSearchParams({ q: query })
+}, [setSearchParams])
+
+// React.lazy for code splitting
+const AdminPanel = lazy(() => 
+  import('./AdminPanel').then(module => ({
+    default: module.AdminPanel
+  }))
+)
+
+// Virtualization for long lists
+import { VirtualList } from '@tanstack/react-virtual'
+
+export function LongList({ items }: { items: Item[] }) {
+  const parentRef = useRef<HTMLDivElement>(null)
+  
+  const rowVirtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50,
+    overscan: 5,
+  })
+  
+  return (
+    <div ref={parentRef} className="h-[400px] overflow-auto">
+      <div style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+        {rowVirtualizer.getVirtualItems().map((virtualItem) => (
+          <div
+            key={virtualItem.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualItem.size}px`,
+              transform: `translateY(${virtualItem.start}px)`,
+            }}
+          >
+            <Item item={items[virtualItem.index]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+### 6. Event Handling
+```typescript
+// Proper event typing
+const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  setValue(e.target.value)
+}
+
+const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault()
+  onSubmit(formData)
+}
+
+// Synthetic event pooling (React 17+)
+const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+  // No need to call e.persist() in React 17+
+  setTimeout(() => {
+    console.log(e.target) // Safe to access
+  }, 1000)
+}
+
+// Keyboard events
+const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault()
+    handleSubmit()
+  }
+}
+
+// Custom event handlers
+interface CustomEventHandlers {
+  onUserSelect?: (user: User) => void
+  onFilterChange?: (filter: FilterOptions) => void
+  onSortChange?: (sort: SortOptions) => void
+}
+```
+
+### 7. Error Boundaries
+```typescript
+import { Component, ErrorInfo, ReactNode } from 'react'
+
+interface Props {
+  children: ReactNode
+  fallback?: ReactNode
+  onError?: (error: Error, errorInfo: ErrorInfo) => void
+}
+
+interface State {
+  hasError: boolean
+  error: Error | null
+}
+
+export class ErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  
+  static getDerivedStateFromError(error: Error): State {
+    return { hasError: true, error }
+  }
+  
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('ErrorBoundary caught:', error, errorInfo)
+    this.props.onError?.(error, errorInfo)
+  }
+  
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback || (
+        <div className="error-fallback">
+          <h2>Something went wrong</h2>
+          <details>
+            <summary>Error details</summary>
+            <pre>{this.state.error?.stack}</pre>
+          </details>
+        </div>
+      )
+    }
+    
+    return this.props.children
+  }
+}
+
+// Use with React Query
+export function QueryErrorBoundary({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
+  
+  return (
+    <ErrorBoundary
+      fallback={<ErrorFallback />}
+      onError={() => {
+        // Reset queries on error
+        queryClient.invalidateQueries()
+      }}
+    >
+      {children}
+    </ErrorBoundary>
+  )
+}
+```
+
+### 8. Forms and Validation
+```typescript
+// Controlled components with validation
+export function LoginForm({ onSubmit }: Props) {
+  const [values, setValues] = useState({ email: '', password: '' })
+  const [errors, setErrors] = useState<Partial<typeof values>>({})
+  const [touched, setTouched] = useState<Set<string>>(new Set())
+  
+  const validate = (name: string, value: string) => {
+    switch (name) {
+      case 'email':
+        if (!value) return 'Email is required'
+        if (!value.includes('@')) return 'Invalid email'
+        return ''
+      case 'password':
+        if (!value) return 'Password is required'
+        if (value.length < 8) return 'Password must be at least 8 characters'
+        return ''
+      default:
+        return ''
+    }
+  }
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setValues(prev => ({ ...prev, [name]: value }))
+    
+    if (touched.has(name)) {
+      setErrors(prev => ({ ...prev, [name]: validate(name, value) }))
+    }
+  }
+  
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+    const { name, value } = e.target
+    setTouched(prev => new Set([...prev, name]))
+    setErrors(prev => ({ ...prev, [name]: validate(name, value) }))
+  }
+  
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    // Validate all fields
+    const newErrors = {
+      email: validate('email', values.email),
+      password: validate('password', values.password),
+    }
+    
+    setErrors(newErrors)
+    setTouched(new Set(['email', 'password']))
+    
+    if (!Object.values(newErrors).some(Boolean)) {
+      onSubmit(values)
+    }
+  }
+  
+  return (
+    <form onSubmit={handleSubmit}>
+      <Input
+        name="email"
+        type="email"
+        value={values.email}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        error={touched.has('email') ? errors.email : undefined}
+      />
+      <Input
+        name="password"
+        type="password"
+        value={values.password}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        error={touched.has('password') ? errors.password : undefined}
+      />
+      <Button type="submit">Login</Button>
+    </form>
+  )
+}
+```
+
+### 9. Accessibility
+```typescript
+// ARIA attributes and semantic HTML
+export function Modal({ isOpen, onClose, title, children }: ModalProps) {
+  const headingId = useId()
+  
+  // Trap focus
+  useEffect(() => {
+    if (isOpen) {
+      const previousFocus = document.activeElement as HTMLElement
+      
+      // Focus first focusable element
+      const firstFocusable = document.querySelector<HTMLElement>(
+        '[role="dialog"] button, [role="dialog"] [href], [role="dialog"] input'
+      )
+      firstFocusable?.focus()
+      
+      return () => {
+        previousFocus?.focus()
+      }
+    }
+  }, [isOpen])
+  
+  // Close on Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose()
+      }
+    }
+    
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, onClose])
+  
+  if (!isOpen) return null
+  
+  return createPortal(
+    <>
+      <div
+        className="modal-backdrop"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={headingId}
+        className="modal"
+      >
+        <h2 id={headingId}>{title}</h2>
+        <button
+          onClick={onClose}
+          aria-label="Close modal"
+          className="modal-close"
+        >
+          ×
+        </button>
+        {children}
+      </div>
+    </>,
+    document.body
+  )
+}
+
+// Skip navigation
+export function SkipNavigation() {
+  return (
+    <a
+      href="#main-content"
+      className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4"
+    >
+      Skip to main content
+    </a>
+  )
+}
+```
+
+### 10. Testing Patterns
+```typescript
+// Component testing with React Testing Library
+import { render, screen, userEvent, waitFor } from '@testing-library/react'
+
+describe('UserCard', () => {
+  const mockUser = {
+    id: '1',
+    name: 'John Doe',
+    email: 'john@example.com',
+  }
+  
+  it('should render user information', () => {
+    render(<UserCard user={mockUser} />)
+    
+    expect(screen.getByText(mockUser.name)).toBeInTheDocument()
+    expect(screen.getByText(mockUser.email)).toBeInTheDocument()
+  })
+  
+  it('should handle edit action', async () => {
+    const handleEdit = jest.fn()
+    const user = userEvent.setup()
+    
+    render(<UserCard user={mockUser} onEdit={handleEdit} />)
+    
+    await user.click(screen.getByRole('button', { name: /edit/i }))
+    
+    expect(handleEdit).toHaveBeenCalledWith(mockUser)
+  })
+  
+  it('should expand details on click', async () => {
+    const user = userEvent.setup()
+    
+    render(<UserCard user={mockUser} />)
+    
+    expect(screen.queryByTestId('user-details')).not.toBeInTheDocument()
+    
+    await user.click(screen.getByRole('button', { name: /expand/i }))
+    
+    await waitFor(() => {
+      expect(screen.getByTestId('user-details')).toBeInTheDocument()
+    })
+  })
+})
+
+// Hook testing
+import { renderHook, act } from '@testing-library/react'
+
+describe('useCounter', () => {
+  it('should increment counter', () => {
+    const { result } = renderHook(() => useCounter())
+    
+    expect(result.current.count).toBe(0)
+    
+    act(() => {
+      result.current.increment()
+    })
+    
+    expect(result.current.count).toBe(1)
+  })
+})
+```
+
+## Common Patterns
+
+### Compound Components
+```typescript
+const Card = Object.assign(CardRoot, {
+  Header: CardHeader,
+  Body: CardBody,
+  Footer: CardFooter,
+})
+
+// Usage
+<Card>
+  <Card.Header>Title</Card.Header>
+  <Card.Body>Content</Card.Body>
+  <Card.Footer>Actions</Card.Footer>
+</Card>
+```
+
+### Render Props
+```typescript
+interface DataFetcherProps<T> {
+  url: string
+  children: (data: T | null, loading: boolean, error: Error | null) => ReactNode
+}
+
+function DataFetcher<T>({ url, children }: DataFetcherProps<T>) {
+  const { data, loading, error } = useFetch<T>(url)
+  return <>{children(data, loading, error)}</>
+}
+
+// Usage
+<DataFetcher url="/api/user">
+  {(user, loading, error) => {
+    if (loading) return <Spinner />
+    if (error) return <Error error={error} />
+    return <UserProfile user={user} />
+  }}
+</DataFetcher>
+```
+
+### Provider Pattern
+```typescript
+const FeatureProvider = ({ children, config }: Props) => {
+  const [state, dispatch] = useReducer(reducer, initialState)
+  
+  const value = useMemo(
+    () => ({ state, dispatch, config }),
+    [state, config]
+  )
+  
+  return (
+    <FeatureContext.Provider value={value}>
+      {children}
+    </FeatureContext.Provider>
+  )
+}
+```
+
+Remember: Write React code that is predictable, testable, and maintainable.
