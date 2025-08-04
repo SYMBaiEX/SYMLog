@@ -4,6 +4,7 @@ import type { FileAttachment } from "@/types/attachments"
 import { getAttachmentType } from "@/types/attachments"
 import { Badge } from "@/components/ui/badge"
 import { GlassCard } from "@/components/ui/glass-card"
+import { LazyImage } from "@/components/ui/lazy-image"
 import { 
   Image, 
   FileText, 
@@ -60,7 +61,7 @@ export function MessageAttachments({ attachments, className }: MessageAttachment
               <div className="flex-shrink-0">
                 {isImage && attachment.preview ? (
                   <div className="relative">
-                    <img
+                    <LazyImage
                       src={attachment.preview}
                       alt={attachment.name}
                       className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
@@ -128,7 +129,7 @@ export function MessageAttachments({ attachments, className }: MessageAttachment
             {/* Image Gallery Preview */}
             {isImage && attachment.preview && (
               <div className="mt-3">
-                <img
+                <LazyImage
                   src={attachment.preview}
                   alt={attachment.name}
                   className="w-full max-w-xs rounded border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"

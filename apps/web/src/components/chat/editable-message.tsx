@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, memo } from "react"
 import type { UIMessage } from "@ai-sdk/react"
 import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
@@ -39,7 +39,7 @@ interface EditableMessageProps {
   className?: string
 }
 
-export function EditableMessage({
+function EditableMessageComponent({
   nodeId,
   message,
   isEditing: initialEditing = false,
@@ -370,3 +370,15 @@ export function EditableMessage({
     </div>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const EditableMessage = memo(EditableMessageComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.nodeId === nextProps.nodeId &&
+    prevProps.message.id === nextProps.message.id &&
+    prevProps.message.content === nextProps.message.content &&
+    prevProps.isEditing === nextProps.isEditing &&
+    prevProps.canEdit === nextProps.canEdit &&
+    prevProps.canRegenerate === nextProps.canRegenerate
+  )
+})

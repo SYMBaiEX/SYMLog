@@ -13,7 +13,7 @@ export const registry = createProviderRegistry({
 export const getAIModel = (preferredModel?: string) => {
   const models = {
     // Latest models as of August 2025
-    primary: 'gpt-4o',  // OpenAI's stable general-purpose model
+    primary: 'gpt-4.1-nano',  // OpenAI's efficient nano model
     secondary: 'claude-sonnet-4-20250514',  // Claude 4 Sonnet - latest model (May 2025)
     fallback: 'gpt-4o-mini',  // Cost-effective OpenAI fallback
     coding: 'gpt-4.1-2025-04-14',  // OpenAI's specialized coding model

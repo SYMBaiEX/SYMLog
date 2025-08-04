@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES, TIME_CONSTANTS } from "./constants";
+import { EXPIRY_TIMES, TIME_CONSTANTS, DB_OPERATIONS } from "./constants";
 
 // Auth sessions have a short expiry (5 minutes) for security,
 // but cleanup runs daily to avoid excessive database operations.
@@ -37,7 +37,13 @@ export const storeAuthCode = mutation({
       .first();
 
     if (existing) {
-      // Update existing record
+      // Update existing record - log this for security monitoring
+      console.log("Auth code update detected", {
+        previousUserId: existing.userId,
+        newUserId: args.userId,
+        timestamp: now,
+      });
+      
       await ctx.db.patch(existing._id, {
         userId: args.userId,
         userEmail: args.userEmail,
@@ -140,39 +146,63 @@ export const cleanupExpiredAuthSessions = mutation({
   handler: async (ctx) => {
     const now = Date.now();
     const cutoffTime = now - EXPIRY_TIMES.EXPIRED_SESSION_CLEANUP; // 24 hours old
-
-    // Find expired sessions older than 24 hours
-    const expired = await ctx.db
-      .query("authSessions")
-      .filter((q) => 
-        q.and(
-          q.lt(q.field("expiresAt"), cutoffTime),
-          q.neq(q.field("status"), "completed")
-        )
-      )
-      .collect();
-
     let deletedCount = 0;
-    for (const session of expired) {
-      await ctx.db.delete(session._id);
-      deletedCount++;
+
+    // Process expired sessions in batches
+    let hasMoreExpired = true;
+    while (hasMoreExpired) {
+      const expired = await ctx.db
+        .query("authSessions")
+        .filter((q) => 
+          q.and(
+            q.lt(q.field("expiresAt"), cutoffTime),
+            q.neq(q.field("status"), "completed")
+          )
+        )
+        .take(DB_OPERATIONS.BATCH_SIZE);
+
+      if (expired.length === 0) {
+        hasMoreExpired = false;
+        break;
+      }
+
+      for (const session of expired) {
+        await ctx.db.delete(session._id);
+        deletedCount++;
+      }
+
+      if (expired.length < DB_OPERATIONS.BATCH_SIZE) {
+        hasMoreExpired = false;
+      }
     }
 
     // Also clean up completed sessions older than 1 day for security
     const oneDayAgo = now - EXPIRY_TIMES.COMPLETED_SESSION_RETENTION;
-    const oldCompleted = await ctx.db
-      .query("authSessions")
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("status"), "completed"),
-          q.lt(q.field("createdAt"), oneDayAgo)
+    let hasMoreCompleted = true;
+    while (hasMoreCompleted) {
+      const oldCompleted = await ctx.db
+        .query("authSessions")
+        .filter((q) => 
+          q.and(
+            q.eq(q.field("status"), "completed"),
+            q.lt(q.field("createdAt"), oneDayAgo)
+          )
         )
-      )
-      .collect();
+        .take(DB_OPERATIONS.BATCH_SIZE);
 
-    for (const session of oldCompleted) {
-      await ctx.db.delete(session._id);
-      deletedCount++;
+      if (oldCompleted.length === 0) {
+        hasMoreCompleted = false;
+        break;
+      }
+
+      for (const session of oldCompleted) {
+        await ctx.db.delete(session._id);
+        deletedCount++;
+      }
+
+      if (oldCompleted.length < DB_OPERATIONS.BATCH_SIZE) {
+        hasMoreCompleted = false;
+      }
     }
 
     return { deletedCount };

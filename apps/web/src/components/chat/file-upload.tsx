@@ -6,6 +6,7 @@ import { MAX_FILE_SIZE, MAX_FILES_PER_MESSAGE, isFileTypeSupported, getAttachmen
 import { GlassButton } from "@/components/ui/glass-button"
 import { GlassCard } from "@/components/ui/glass-card"
 import { Badge } from "@/components/ui/badge"
+import { LazyImage } from "@/components/ui/lazy-image"
 import { 
   Paperclip, 
   X, 
@@ -225,7 +226,7 @@ export function FileUpload({ attachments, onAttachmentsChange, disabled }: FileU
                   {/* File Preview/Icon */}
                   <div className="flex-shrink-0">
                     {isImage && attachment.preview ? (
-                      <img
+                      <LazyImage
                         src={attachment.preview}
                         alt={attachment.name}
                         className="w-10 h-10 object-cover rounded"

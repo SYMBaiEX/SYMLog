@@ -1,12 +1,20 @@
 import { api } from "@/convex/_generated/api";
 import { getConvexClient } from "./convex-client";
 
+/**
+ * Result from rate limit check
+ */
 export interface RateLimitResult {
+  /** Whether the request is allowed */
   allowed: boolean;
+  /** Maximum number of requests allowed in the window */
   limit: number;
+  /** Number of requests remaining in the current window */
   remaining: number;
-  reset: number; // Timestamp (ms) when the rate limit window resets
-  requestCountInWindow: number; // Number of requests made in the current time window
+  /** Timestamp (ms) when the rate limit window resets */
+  resetAt: number;
+  /** Number of requests made in the current time window */
+  requestCountInWindow: number;
 }
 
 /**
@@ -32,7 +40,7 @@ export async function checkRateLimit(
       allowed: false,
       limit,
       remaining: 0,
-      reset: Date.now() + 3600000, // 1 hour from now
+      resetAt: Date.now() + 3600000, // 1 hour from now
       requestCountInWindow: limit,
     };
   }
@@ -59,7 +67,7 @@ export async function getRateLimitStatus(
     return {
       limit,
       remaining: 0,
-      reset: Date.now() + 3600000,
+      resetAt: Date.now() + 3600000,
       requestCountInWindow: limit,
     };
   }

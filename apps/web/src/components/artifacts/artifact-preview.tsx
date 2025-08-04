@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, memo } from "react"
 import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Badge } from "@/components/ui/badge"
+import { LazyImage } from "@/components/ui/lazy-image"
 import { ArtifactViewer } from "./artifact-viewer"
 import type { Artifact } from "@/types/artifacts"
 import {
@@ -22,7 +23,7 @@ interface ArtifactPreviewProps {
   className?: string
 }
 
-export function ArtifactPreview({ artifact, className }: ArtifactPreviewProps) {
+function ArtifactPreviewComponent({ artifact, className }: ArtifactPreviewProps) {
   const [isExpanded, setIsExpanded] = useState(false)
 
   const getIcon = () => {
@@ -81,13 +82,13 @@ export function ArtifactPreview({ artifact, className }: ArtifactPreviewProps) {
         return (
           <div className="relative h-32 bg-black/20 rounded-lg overflow-hidden">
             {artifact.url ? (
-              <img
+              <LazyImage
                 src={artifact.url}
                 alt={artifact.title}
                 className="w-full h-full object-contain"
               />
             ) : artifact.base64 ? (
-              <img
+              <LazyImage
                 src={`data:image/${artifact.format};base64,${artifact.base64}`}
                 alt={artifact.title}
                 className="w-full h-full object-contain"
@@ -167,3 +168,12 @@ export function ArtifactPreview({ artifact, className }: ArtifactPreviewProps) {
     </GlassCard>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const ArtifactPreview = memo(ArtifactPreviewComponent, (prevProps, nextProps) => {
+  return (
+    prevProps.artifact.id === nextProps.artifact.id &&
+    prevProps.artifact.content === nextProps.artifact.content &&
+    prevProps.className === nextProps.className
+  )
+})

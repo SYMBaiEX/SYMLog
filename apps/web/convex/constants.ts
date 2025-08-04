@@ -27,3 +27,8 @@ export const CLEANUP_SCHEDULES = {
   AUTH_SESSIONS: { hourUTC: 3, minuteUTC: 0 }, // 3 AM UTC daily
   RATE_LIMITS: { hours: 6 }, // Every 6 hours
 } as const;
+
+// Database operations
+export const DB_OPERATIONS = {
+  BATCH_SIZE: 100, // Number of records to process in batch operations
+} as const;

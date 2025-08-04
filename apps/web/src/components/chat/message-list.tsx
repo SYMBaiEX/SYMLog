@@ -1,7 +1,7 @@
 "use client"
 
 import type { UIMessage } from "@ai-sdk/react"
-import { useRef, useEffect } from "react"
+import { useRef, useEffect, memo } from "react"
 import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -32,7 +32,7 @@ interface MessageListProps {
   enableBranching?: boolean
 }
 
-export function MessageList({ 
+function MessageListComponent({ 
   messages, 
   isLoading, 
   onRegenerate, 
@@ -242,3 +242,13 @@ export function MessageList({
     </>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const MessageList = memo(MessageListComponent, (prevProps, nextProps) => {
+  // Custom comparison function for better performance
+  return (
+    prevProps.messages.length === nextProps.messages.length &&
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.messages.every((msg, idx) => msg.id === nextProps.messages[idx]?.id)
+  )
+})

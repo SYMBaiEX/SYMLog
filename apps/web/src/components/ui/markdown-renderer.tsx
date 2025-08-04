@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from 'react'
+import { memo, useEffect } from 'react'
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'

@@ -33,7 +33,7 @@ import { SpreadsheetViewer } from "./spreadsheet-viewer"
 import { ImageViewer } from "./image-viewer"
 import { ChartViewer } from "./chart-viewer"
 import { DataViewer } from "./data-viewer"
-import { CodeSandbox } from "./code-sandbox"
+import { CodeSandbox } from "@/components/dynamic"
 import { toast } from "sonner"
 
 interface ArtifactViewerProps {

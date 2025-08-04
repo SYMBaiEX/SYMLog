@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES, RATE_LIMIT_DEFAULTS } from "./constants";
+import { EXPIRY_TIMES, RATE_LIMIT_DEFAULTS, DB_OPERATIONS } from "./constants";
 
 export const checkRateLimit = mutation({
   args: {
@@ -25,6 +25,8 @@ export const checkRateLimit = mutation({
     const isAllowed = requestCount < limit;
 
     // If allowed, record this request
+    // Note: We intentionally record after checking to ensure accurate counting
+    // This prevents the current request from being counted in its own limit check
     if (isAllowed) {
       await ctx.db.insert("rateLimits", {
         userId: args.userId,
@@ -37,7 +39,7 @@ export const checkRateLimit = mutation({
       allowed: isAllowed,
       limit,
       remaining,
-      reset: windowStart + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
+      resetAt: windowStart + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
       requestCountInWindow: requestCount,
     };
   },
@@ -85,7 +87,7 @@ export const getRateLimitStatus = query({
     return {
       limit,
       remaining,
-      reset: windowStart + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
+      resetAt: windowStart + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
       requestCountInWindow: requestCount,
     };
   },
@@ -96,17 +98,31 @@ export const cleanupExpiredRateLimits = mutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    
-    // Find all expired entries
-    const expired = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_expiry", (q) => q.lte("expiresAt", now))
-      .collect();
-
     let deletedCount = 0;
-    for (const entry of expired) {
-      await ctx.db.delete(entry._id);
-      deletedCount++;
+    let hasMore = true;
+    
+    // Process deletions in batches to handle large datasets efficiently
+    while (hasMore) {
+      // Find a batch of expired entries
+      const expired = await ctx.db
+        .query("rateLimits")
+        .withIndex("by_expiry", (q) => q.lte("expiresAt", now))
+        .take(DB_OPERATIONS.BATCH_SIZE);
+
+      if (expired.length === 0) {
+        hasMore = false;
+      }
+
+      // Delete the batch
+      for (const entry of expired) {
+        await ctx.db.delete(entry._id);
+        deletedCount++;
+      }
+
+      // If we got less than full batch size, we're done
+      if (expired.length < DB_OPERATIONS.BATCH_SIZE) {
+        hasMore = false;
+      }
     }
 
     return { deletedCount };

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo, useState, useRef, useEffect } from "react"
+import React, { useMemo, useState, useRef, useEffect, memo } from "react"
 import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Badge } from "@/components/ui/badge"
@@ -55,7 +55,7 @@ interface Connection {
   toNodeId: string
 }
 
-export function TreeVisualization({ className, compact = false, onNodeSelect }: TreeVisualizationProps) {
+function TreeVisualizationComponent({ className, compact = false, onNodeSelect }: TreeVisualizationProps) {
   const { tree, nodes, branches, currentNodeId } = useCurrentTree()
   const { switchToBranch, navigateToNode } = useTreeNavigation()
   const [selectedNode, setSelectedNode] = useState<string | null>(null)
@@ -616,3 +616,6 @@ export function TreeVisualization({ className, compact = false, onNodeSelect }: 
     </GlassCard>
   )
 }
+
+// Memoize the component to prevent unnecessary re-renders
+export const TreeVisualization = memo(TreeVisualizationComponent)

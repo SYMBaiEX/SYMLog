@@ -9,7 +9,8 @@ import {
   Search, 
   Calendar,
   Trash2,
-  MoreVertical
+  MoreVertical,
+  Loader2
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
@@ -18,13 +19,14 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useConversationListCache } from "@/hooks/use-api-cache"
+import { CacheService } from "@/services/cache.service"
 
 interface Conversation {
   id: string
   title: string
-  lastMessage: string
-  timestamp: Date
-  messageCount: number
+  lastMessage?: string
+  updatedAt: string
 }
 
 interface ConversationSidebarProps {
@@ -38,43 +40,48 @@ export function ConversationSidebar({
   onSelectConversation,
   onNewConversation,
 }: ConversationSidebarProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  // Mock data - replace with Convex queries
+  // Use SWR to cache conversation list
+  const { data: conversations = [], error, isLoading, mutate } = useConversationListCache(currentUserId)
+
+  // Mock data fallback - in real app this would come from the API
   useEffect(() => {
-    setConversations([
-      {
-        id: "1",
-        title: "Web3 Integration Help",
-        lastMessage: "How can I integrate Phantom wallet...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 min ago
-        messageCount: 12,
-      },
-      {
-        id: "2",
-        title: "Smart Contract Review",
-        lastMessage: "Can you review this Solana program...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-        messageCount: 8,
-      },
-      {
-        id: "3",
-        title: "UI Design Suggestions",
-        lastMessage: "I need help with glassmorphism...",
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-        messageCount: 15,
-      },
-    ])
-  }, [])
+    if (!conversations.length && !isLoading && !error) {
+      // Simulate API call with cached data
+      const mockData = [
+        {
+          id: "1",
+          title: "Web3 Integration Help",
+          lastMessage: "How can I integrate Phantom wallet...",
+          updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 min ago
+        },
+        {
+          id: "2",
+          title: "Smart Contract Review",
+          lastMessage: "Can you review this Solana program...",
+          updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
+        },
+        {
+          id: "3",
+          title: "UI Design Suggestions",
+          lastMessage: "I need help with glassmorphism...",
+          updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
+        },
+      ]
+      // Update cache with mock data
+      CacheService.updateUserCache(`${currentUserId}/conversations`, mockData)
+    }
+  }, [conversations.length, isLoading, error, currentUserId])
 
   const filteredConversations = conversations.filter(conv =>
     conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
+    (conv.lastMessage && conv.lastMessage.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  const formatTimestamp = (date: Date) => {
+  const formatTimestamp = (dateString: string) => {
+    const date = new Date(dateString)
     const now = new Date()
     const diff = now.getTime() - date.getTime()
     const minutes = Math.floor(diff / (1000 * 60))
@@ -85,6 +92,13 @@ export function ConversationSidebar({
     if (hours < 24) return `${hours}h ago`
     if (days < 7) return `${days}d ago`
     return date.toLocaleDateString()
+  }
+
+  const handleDeleteConversation = (id: string) => {
+    // Update cache to remove conversation
+    const updatedConversations = conversations.filter(conv => conv.id !== id)
+    CacheService.updateUserCache(`${currentUserId}/conversations`, updatedConversations)
+    mutate()
   }
 
   return (
@@ -118,7 +132,25 @@ export function ConversationSidebar({
 
       {/* Conversations list */}
       <div className="flex-1 overflow-y-auto space-y-2 scrollbar-thin scrollbar-thumb-white/10">
-        {filteredConversations.length === 0 ? (
+        {isLoading ? (
+          <div className="text-center py-8">
+            <Loader2 className="h-8 w-8 text-periwinkle mx-auto mb-3 animate-spin" />
+            <p className="text-sm text-muted-foreground">Loading conversations...</p>
+          </div>
+        ) : error ? (
+          <div className="text-center py-8">
+            <MessageSquare className="h-12 w-12 text-red-400/30 mx-auto mb-3" />
+            <p className="text-sm text-red-400">Failed to load conversations</p>
+            <GlassButton
+              variant="ghost"
+              size="sm"
+              onClick={() => mutate()}
+              className="mt-2"
+            >
+              Retry
+            </GlassButton>
+          </div>
+        ) : filteredConversations.length === 0 ? (
           <div className="text-center py-8">
             <MessageSquare className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
             <p className="text-sm text-muted-foreground">
@@ -175,8 +207,7 @@ export function ConversationSidebar({
                       className="text-red-400"
                       onClick={(e) => {
                         e.stopPropagation()
-                        // Implement delete
-                        setConversations(conversations.filter(c => c.id !== conv.id))
+                        handleDeleteConversation(conv.id)
                       }}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -186,18 +217,16 @@ export function ConversationSidebar({
                 </DropdownMenu>
               </div>
               
-              <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
-                {conv.lastMessage}
-              </p>
+              {conv.lastMessage && (
+                <p className="text-xs text-muted-foreground line-clamp-1 mb-2">
+                  {conv.lastMessage}
+                </p>
+              )}
               
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <MessageSquare className="h-3 w-3" />
-                  {conv.messageCount} messages
-                </span>
+              <div className="flex items-center justify-end text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
-                  {formatTimestamp(conv.timestamp)}
+                  {formatTimestamp(conv.updatedAt)}
                 </span>
               </div>
             </div>

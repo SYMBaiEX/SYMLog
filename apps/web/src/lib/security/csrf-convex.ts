@@ -3,18 +3,9 @@
  * This module provides async versions of CSRF functions using Convex
  */
 
-import { ConvexHttpClient } from "convex/browser"
 import { api } from "@/convex/_generated/api"
 import { NextRequest } from 'next/server'
-
-// Initialize Convex client
-const getConvexClient = () => {
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
-  if (!convexUrl) {
-    throw new Error("NEXT_PUBLIC_CONVEX_URL is not set")
-  }
-  return new ConvexHttpClient(convexUrl)
-}
+import { getConvexClient } from '../convex-client'
 
 /**
  * Generate a CSRF token for a user (async version)

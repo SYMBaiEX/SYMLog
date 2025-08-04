@@ -5,6 +5,7 @@ import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 import { PhantomWalletProvider } from "./phantom-wallet-provider";
 import { CrossmintProviderWrapper } from "./crossmint-provider";
+import { SWRProvider } from "@/providers/swr-provider";
 
 const convex = new ConvexReactClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -20,13 +21,15 @@ export default function Providers({
       enableSystem
       disableTransitionOnChange
     >
-      <ConvexProvider client={convex}>
-        <CrossmintProviderWrapper>
-          <PhantomWalletProvider>
-            {children}
-          </PhantomWalletProvider>
-        </CrossmintProviderWrapper>
-      </ConvexProvider>
+      <SWRProvider>
+        <ConvexProvider client={convex}>
+          <CrossmintProviderWrapper>
+            <PhantomWalletProvider>
+              {children}
+            </PhantomWalletProvider>
+          </CrossmintProviderWrapper>
+        </ConvexProvider>
+      </SWRProvider>
       <Toaster richColors />
     </ThemeProvider>
   );

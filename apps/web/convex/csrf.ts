@@ -1,6 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES, TIME_CONSTANTS } from "./constants";
+import { EXPIRY_TIMES, TIME_CONSTANTS, DB_OPERATIONS } from "./constants";
 
 // Generate cryptographically secure random token
 function generateSecureToken(): string {
@@ -60,23 +60,23 @@ export const validateCSRFToken = mutation({
       .first();
 
     if (!tokenRecord) {
-      return { valid: false, reason: "token_not_found" };
+      return { valid: false, reason: "invalid_token" };
     }
 
     // Check if expired
     if (tokenRecord.expiresAt < now) {
       await ctx.db.delete(tokenRecord._id);
-      return { valid: false, reason: "token_expired" };
+      return { valid: false, reason: "invalid_token" };
     }
 
     // Check if already used
     if (tokenRecord.used) {
-      return { valid: false, reason: "token_already_used" };
+      return { valid: false, reason: "invalid_token" };
     }
 
     // Check if token belongs to the user
     if (tokenRecord.userId !== args.userId) {
-      return { valid: false, reason: "token_user_mismatch" };
+      return { valid: false, reason: "invalid_token" };
     }
 
     // Mark token as used (one-time use)
@@ -90,34 +90,58 @@ export const cleanupExpiredCSRFTokens = mutation({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    
-    // Find all expired tokens
-    const expired = await ctx.db
-      .query("csrfTokens")
-      .withIndex("by_expiry", (q) => q.lte("expiresAt", now))
-      .collect();
-
     let deletedCount = 0;
-    for (const token of expired) {
-      await ctx.db.delete(token._id);
-      deletedCount++;
+    
+    // Process expired tokens in batches
+    let hasMoreExpired = true;
+    while (hasMoreExpired) {
+      const expired = await ctx.db
+        .query("csrfTokens")
+        .withIndex("by_expiry", (q) => q.lte("expiresAt", now))
+        .take(DB_OPERATIONS.BATCH_SIZE);
+
+      if (expired.length === 0) {
+        hasMoreExpired = false;
+        break;
+      }
+
+      for (const token of expired) {
+        await ctx.db.delete(token._id);
+        deletedCount++;
+      }
+
+      if (expired.length < DB_OPERATIONS.BATCH_SIZE) {
+        hasMoreExpired = false;
+      }
     }
 
-    // Also clean up used tokens older than 1 hour
+    // Also clean up used tokens older than 1 hour in batches
     const oneHourAgo = now - TIME_CONSTANTS.HOUR;
-    const usedTokens = await ctx.db
-      .query("csrfTokens")
-      .filter((q) => 
-        q.and(
-          q.eq(q.field("used"), true),
-          q.lt(q.field("expiresAt"), oneHourAgo)
+    let hasMoreUsed = true;
+    while (hasMoreUsed) {
+      const usedTokens = await ctx.db
+        .query("csrfTokens")
+        .filter((q) => 
+          q.and(
+            q.eq(q.field("used"), true),
+            q.lt(q.field("expiresAt"), oneHourAgo)
+          )
         )
-      )
-      .collect();
+        .take(DB_OPERATIONS.BATCH_SIZE);
 
-    for (const token of usedTokens) {
-      await ctx.db.delete(token._id);
-      deletedCount++;
+      if (usedTokens.length === 0) {
+        hasMoreUsed = false;
+        break;
+      }
+
+      for (const token of usedTokens) {
+        await ctx.db.delete(token._id);
+        deletedCount++;
+      }
+
+      if (usedTokens.length < DB_OPERATIONS.BATCH_SIZE) {
+        hasMoreUsed = false;
+      }
     }
 
     return { deletedCount };
