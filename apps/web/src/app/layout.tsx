@@ -11,6 +11,7 @@ import { TauriDetector } from "@/components/tauri-detector";
 import { TauriKeyboardShortcuts } from "@/components/tauri-keyboard-shortcuts";
 import { TauriWindowControls } from "@/components/tauri-window-controls";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { RoutePreloader } from "@/components/route-preloader";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -39,6 +40,7 @@ export default function RootLayout({
       >
         <ErrorBoundary level="page">
           <Providers>
+            <RoutePreloader />
             <AnimatedBackground />
             <TauriMenuHandler />
             <TauriDetector />

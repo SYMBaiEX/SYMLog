@@ -5,7 +5,7 @@ import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Badge } from "@/components/ui/badge"
 import { LazyImage } from "@/components/ui/lazy-image"
-import { ArtifactViewer } from "./artifact-viewer"
+import { ArtifactViewer } from "@/components/dynamic"
 import type { Artifact } from "@/types/artifacts"
 import {
   Code,

@@ -34,6 +34,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { FileUpload } from "./file-upload"
 import { MarkdownRenderer } from "@/components/ui/markdown-renderer"
+import { SmartModelSelector } from "./smart-model-selector"
 
 interface EnhancedMessageInputProps {
   isLoading: boolean
@@ -140,9 +141,55 @@ export function EnhancedMessageInput({
   ] as const
 
   const models = [
-    { value: 'gpt-4-turbo-preview', label: 'GPT-4 Turbo', provider: 'OpenAI' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', provider: 'OpenAI' },
-    { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet', provider: 'Anthropic' },
+    { 
+      value: 'gpt-4.1-nano', 
+      label: 'GPT-4.1 Nano', 
+      provider: 'OpenAI',
+      tier: 'nano',
+      description: 'Fast, cost-effective for general tasks'
+    },
+    { 
+      value: 'o3-mini', 
+      label: 'o3-mini', 
+      provider: 'OpenAI',
+      tier: 'reasoning',
+      description: 'Advanced reasoning and problem solving'
+    },
+    { 
+      value: 'o4-mini', 
+      label: 'o4-mini', 
+      provider: 'OpenAI',
+      tier: 'reasoning',
+      description: 'Latest reasoning with vision capabilities'
+    },
+    { 
+      value: 'gpt-4.1-nano-2025-04-14', 
+      label: 'GPT-4.1 Nano (Apr 2025)', 
+      provider: 'OpenAI',
+      tier: 'coding',
+      description: 'Optimized for code generation'
+    },
+    { 
+      value: 'gpt-4.1-mini-2025-04-14', 
+      label: 'GPT-4.1 Mini (Apr 2025)', 
+      provider: 'OpenAI',
+      tier: 'balanced',
+      description: 'Balanced performance and cost'
+    },
+    { 
+      value: 'gpt-4o-mini', 
+      label: 'GPT-4o Mini', 
+      provider: 'OpenAI',
+      tier: 'vision',
+      description: 'Multimodal with vision support'
+    },
+    { 
+      value: 'text-embedding-3-large', 
+      label: 'Text Embedding 3 Large', 
+      provider: 'OpenAI',
+      tier: 'embedding',
+      description: 'High-dimensional semantic search'
+    },
   ]
 
   const markdownTools = [
@@ -217,25 +264,41 @@ export function EnhancedMessageInput({
               </GlassButton>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="glass min-w-[200px]">
-              <DropdownMenuLabel>AI Model</DropdownMenuLabel>
+              <DropdownMenuLabel>AI Model Selection</DropdownMenuLabel>
               <DropdownMenuSeparator />
               {models.map((model) => (
                 <DropdownMenuItem
                   key={model.value}
                   onClick={() => onModelChange(model.value)}
                   className={cn(
-                    "gap-3",
+                    "gap-3 min-h-[60px] items-start",
                     currentModel === model.value && "bg-accent"
                   )}
                 >
                   <div className="flex-1">
-                    <div className="font-medium">{model.label}</div>
+                    <div className="flex items-center gap-2">
+                      <div className="font-medium">{model.label}</div>
+                      <Badge 
+                        variant="outline" 
+                        className={cn(
+                          "text-xs",
+                          model.tier === 'nano' && "border-green-500/50 text-green-400",
+                          model.tier === 'reasoning' && "border-purple-500/50 text-purple-400",
+                          model.tier === 'coding' && "border-blue-500/50 text-blue-400",
+                          model.tier === 'vision' && "border-orange-500/50 text-orange-400",
+                          model.tier === 'embedding' && "border-cyan-500/50 text-cyan-400",
+                          model.tier === 'balanced' && "border-yellow-500/50 text-yellow-400"
+                        )}
+                      >
+                        {model.tier}
+                      </Badge>
+                    </div>
                     <div className="text-xs text-muted-foreground">
-                      {model.provider}
+                      {model.provider} • {model.description}
                     </div>
                   </div>
                   {currentModel === model.value && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs mt-1">
                       Active
                     </Badge>
                   )}
@@ -350,6 +413,19 @@ export function EnhancedMessageInput({
           </GlassButton>
         </div>
       </div>
+
+      {/* Smart model suggestions */}
+      {input.trim() && (
+        <div className="px-4 pb-2">
+          <SmartModelSelector
+            message={input}
+            attachments={attachments}
+            currentModel={currentModel}
+            onModelSelect={onModelChange}
+            systemPromptType={currentPromptType}
+          />
+        </div>
+      )}
       
       {/* Character/token count and help */}
       <div className="flex justify-between items-center mt-2 px-2">

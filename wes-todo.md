@@ -828,6 +828,720 @@ Sentry.init({
 - Error Rate: < 0.1%
 - Uptime: > 99.9%
 
+## 🤖 AI SDK 5.0 IMPLEMENTATION (P1) - MODERNIZE AI CAPABILITIES
+
+### 36. Implement Structured Data Generation
+**Priority**: P1 - Week 1
+**Missing**: `streamObject` and `generateObject` for type-safe data generation
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/structured-output.ts
+import { streamObject, generateObject } from 'ai'
+import { getAIModel } from './providers'
+import { z } from 'zod'
+
+export async function generateStructuredData<T>(
+  schema: z.ZodSchema<T>,
+  prompt: string,
+  model?: string
+) {
+  return await generateObject({
+    model: getAIModel(model),
+    schema,
+    prompt,
+  })
+}
+
+export function streamStructuredData<T>(
+  schema: z.ZodSchema<T>,
+  prompt: string,
+  model?: string
+) {
+  return streamObject({
+    model: getAIModel(model),
+    schema,
+    prompt,
+  })
+}
+```
+**New API Endpoints**:
+- `/api/ai/generate-object` - Generate structured JSON data
+- `/api/ai/stream-object` - Stream structured data generation
+**React Hooks**:
+```typescript
+// Create apps/web/src/hooks/use-structured-output.ts
+export function useStructuredOutput<T>(schema: z.ZodSchema<T>) {
+  // Implementation for React integration
+}
+```
+**Use Cases**: Form generation, data extraction, API responses, structured artifacts
+
+### 37. Implement Agent Class for Complex Workflows
+**Priority**: P1 - Week 2
+**Missing**: AI SDK 5's Agent class for agentic workflows
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/agents.ts
+import { Experimental_Agent as Agent, stepCountIs, tool } from 'ai'
+import { getAIModel } from './providers'
+import { z } from 'zod'
+
+export class SYMLogAgent {
+  private agent: Agent<any>
+  
+  constructor(config: {
+    model?: string
+    system: string
+    tools?: Record<string, any>
+    maxSteps?: number
+  }) {
+    this.agent = new Agent({
+      model: getAIModel(config.model),
+      system: config.system,
+      tools: config.tools || {},
+      stopWhen: stepCountIs(config.maxSteps || 10),
+    })
+  }
+  
+  async generate(prompt: string) {
+    return await this.agent.generate({ prompt })
+  }
+  
+  stream(prompt: string) {
+    return this.agent.stream({ prompt })
+  }
+}
+```
+**Agent Types**:
+- Research Agent - Multi-step information gathering
+- Code Agent - Complex code generation with validation
+- Analysis Agent - Deep data analysis with reasoning steps
+- Planning Agent - Project breakdown and task management
+**Integration**: New chat mode for agentic conversations
+
+### 38. Add Speech Generation Capabilities  
+**Priority**: P1 - Week 3
+**Missing**: `generateSpeech` integration for text-to-speech
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/speech.ts
+import { experimental_generateSpeech as generateSpeech } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+export async function generateSpeechFromText(
+  text: string,
+  options: {
+    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
+    speed?: number
+    model?: 'tts-1' | 'tts-1-hd'
+  } = {}
+) {
+  return await generateSpeech({
+    model: openai.speech(options.model || 'tts-1'),
+    text,
+    voice: options.voice || 'nova',
+    speed: options.speed || 1.0,
+  })
+}
+```
+**Features**:
+- Voice selection (6 OpenAI voices)
+- Speed control (0.25x to 4.0x)
+- Audio format options (MP3, WAV)
+- Streaming audio generation
+**UI Integration**: Audio playback controls in chat messages
+
+### 39. Enhanced Tool System with AI SDK 5 Features
+**Priority**: P1 - Week 3  
+**Missing**: Advanced tool features from AI SDK 5
+**Enhancements**:
+```typescript
+// Update apps/web/src/lib/ai/tools/artifact-tools.ts
+import { tool } from 'ai'
+
+export const enhancedArtifactTools = {
+  createCodeArtifact: tool({
+    description: 'Create executable code artifacts with validation',
+    inputSchema: createCodeArtifactSchema,
+    execute: async (input) => {
+      // Enhanced validation and error handling
+      const artifact = await createCodeArtifact(input)
+      
+      // Validate code syntax if applicable
+      if (input.language === 'javascript' || input.language === 'typescript') {
+        await validateCodeSyntax(input.content)
+      }
+      
+      return artifact
+    },
+  }),
+  
+  // Required tool choice for specific scenarios
+  generateWithRequiredTool: tool({
+    description: 'Force tool usage for structured outputs',
+    inputSchema: z.object({
+      outputType: z.enum(['code', 'document', 'data']),
+      requirements: z.string(),
+    }),
+    // Tool choice: 'required' will be set in the streamText call
+  }),
+}
+```
+**Features**:
+- Required tool choice enforcement
+- Tool result validation and error recovery
+- Streaming tool execution with progress updates
+- Tool composition and chaining
+
+### 40. V2 Specification Layer Compliance
+**Priority**: P2 - Week 4
+**Missing**: Latest AI SDK architecture patterns
+**Implementation**:
+```typescript
+// Update apps/web/src/lib/ai/providers.ts
+import { 
+  experimental_createProviderRegistry as createProviderRegistry,
+  type LanguageModelRequestMetadata,
+  type LanguageModelResponseMetadata,
+  type ProviderMetadata 
+} from 'ai'
+
+export const registry = createProviderRegistry({
+  openai,
+  anthropic,
+})
+
+// Enhanced model configuration with metadata
+export const getAIModel = (
+  preferredModel?: string,
+  metadata?: LanguageModelRequestMetadata
+) => {
+  const model = registry.languageModel(preferredModel || 'gpt-4.1-nano')
+  
+  // Add provider metadata and options
+  return model.withMetadata({
+    ...metadata,
+    application: 'SYMLog',
+    version: '1.0.0',
+  })
+}
+```
+**Features**:
+- Provider metadata tracking
+- Enhanced error types and handling
+- Response metadata collection
+- Request/response middleware support
+
+### 41. AI Gateway Integration for Multi-Provider Support
+**Priority**: P3 - Month 2
+**Missing**: AI Gateway integration with 100+ models
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/gateway.ts
+import { registry } from './providers'
+
+interface GatewayConfig {
+  providers: string[]
+  fallbackChain: string[]
+  loadBalancing: 'round-robin' | 'least-latency' | 'cost-optimized'
+}
+
+export class AIGateway {
+  constructor(private config: GatewayConfig) {}
+  
+  async getOptimalModel(requirements: {
+    task: 'chat' | 'code' | 'analysis'
+    priority: 'speed' | 'quality' | 'cost'
+  }) {
+    // Intelligent model selection based on requirements
+    // Automatic failover and load balancing
+  }
+}
+```
+**Features**:
+- 100+ model support via Gateway
+- Automatic failover between providers
+- Cost optimization and load balancing
+- Real-time model performance monitoring
+
+### 42. React Integration Enhancements
+**Priority**: P2 - Week 4
+**Missing**: Modern React patterns for AI SDK 5
+**New Hooks**:
+```typescript
+// Create apps/web/src/hooks/use-agent.ts
+export function useAgent(config: AgentConfig) {
+  // React hook for Agent class integration
+}
+
+// Create apps/web/src/hooks/use-structured-output.ts  
+export function useStructuredOutput<T>(schema: z.ZodSchema<T>) {
+  // React hook for streamObject integration
+}
+
+// Create apps/web/src/hooks/use-speech.ts
+export function useSpeech() {
+  // React hook for speech generation
+}
+```
+**Enhanced useChat**:
+- Tool streaming integration
+- Agent workflow support  
+- Structured output handling
+- Speech synthesis integration
+
+### 43. Advanced Error Handling and Recovery
+**Priority**: P2 - Week 4
+**Missing**: AI SDK 5 error handling patterns
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/error-handling.ts
+import { 
+  APICallError,
+  InvalidArgumentError,
+  NoObjectGeneratedError,
+  UnsupportedFunctionalityError 
+} from 'ai'
+
+export function handleAIError(error: unknown): {
+  message: string
+  retry: boolean
+  fallback?: string
+} {
+  if (error instanceof APICallError) {
+    return {
+      message: 'AI service temporarily unavailable',
+      retry: true,
+      fallback: 'Switch to backup model'
+    }
+  }
+  
+  if (error instanceof NoObjectGeneratedError) {
+    return {
+      message: 'Failed to generate structured output',
+      retry: true,
+      fallback: 'Try with simpler schema'
+    }
+  }
+  
+  // Handle other AI SDK 5 specific errors
+}
+```
+
+### 44. Performance Optimizations for AI SDK 5
+**Priority**: P2 - Week 4
+**Missing**: Modern caching and optimization patterns
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/caching.ts
+export class AIResponseCache {
+  private cache = new Map<string, any>()
+  
+  async getCachedResponse(
+    key: string,
+    generator: () => Promise<any>,
+    ttl: number = 300000 // 5 minutes
+  ) {
+    // Intelligent caching for AI responses
+    // Different strategies for different content types
+  }
+}
+```
+**Features**:
+- Streaming response caching
+- Structured output memoization
+- Agent workflow result caching
+- Smart cache invalidation
+
+### 45. Native MCP (Model Context Protocol) Integration
+**Priority**: P1 - Week 2
+**Missing**: Built-in MCP client/server capabilities for tool orchestration
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/mcp-integration.ts
+import { experimental_createMCPClient } from 'ai'
+
+export class SYMLogMCPClient {
+  private client: any
+  
+  async initialize() {
+    this.client = await experimental_createMCPClient({
+      transport: {
+        type: 'sse',
+        url: process.env.MCP_SERVER_URL,
+        headers: {
+          'Authorization': `Bearer ${process.env.MCP_API_KEY}`
+        }
+      }
+    })
+  }
+  
+  async getTools() {
+    return await this.client.tools()
+  }
+  
+  async callTool(name: string, args: any) {
+    return await this.client.callTool(name, args)
+  }
+}
+```
+**Benefits**:
+- Tool federation across multiple services
+- Dynamic tool discovery and registration  
+- External API integrations (Zapier, GitHub, etc.)
+- Scalable tool ecosystem
+
+### 46. Embedding and Vector Search Capabilities
+**Priority**: P1 - Week 3
+**Missing**: Text embeddings, semantic search, and similarity scoring
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/embeddings.ts
+import { embed, embedMany, cosineSimilarity } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+export class SemanticSearch {
+  async embedText(text: string) {
+    return await embed({
+      model: openai.embedding('text-embedding-3-small'),
+      value: text,
+    })
+  }
+  
+  async embedMultiple(texts: string[]) {
+    return await embedMany({
+      model: openai.embedding('text-embedding-3-small'), 
+      values: texts,
+    })
+  }
+  
+  findSimilar(queryEmbedding: number[], documentEmbeddings: number[][]) {
+    return documentEmbeddings
+      .map((embedding, index) => ({
+        index,
+        similarity: cosineSimilarity(queryEmbedding, embedding)
+      }))
+      .sort((a, b) => b.similarity - a.similarity)
+  }
+}
+```
+**Use Cases**:
+- Semantic conversation search
+- Related message suggestions
+- Intelligent artifact recommendations
+- Context-aware responses
+
+### 47. Image Generation Integration
+**Priority**: P2 - Week 4
+**Missing**: AI-powered image generation capabilities
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/image-generation.ts
+import { experimental_generateImage as generateImage } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+export async function createImageArtifact(
+  prompt: string,
+  options: {
+    size?: '1024x1024' | '1792x1024' | '1024x1792'
+    quality?: 'standard' | 'hd'
+    style?: 'vivid' | 'natural'
+    n?: number
+  } = {}
+) {
+  return await generateImage({
+    model: openai.image('dall-e-3'),
+    prompt,
+    size: options.size || '1024x1024',
+    quality: options.quality || 'standard',
+    style: options.style || 'vivid',
+    n: options.n || 1,
+  })
+}
+```
+**Integration**: Enhanced artifact tools for image creation
+
+### 48. Audio Transcription Capabilities  
+**Priority**: P2 - Week 4
+**Missing**: Audio-to-text transcription for voice messages
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/transcription.ts
+import { experimental_transcribe as transcribe } from 'ai'
+import { openai } from '@ai-sdk/openai'
+
+export async function transcribeAudio(
+  audioData: Uint8Array | string,
+  options: {
+    language?: string
+    prompt?: string
+    temperature?: number
+  } = {}
+) {
+  return await transcribe({
+    model: openai.transcription('whisper-1'),
+    audio: audioData,
+    language: options.language,
+    prompt: options.prompt,
+    temperature: options.temperature || 0,
+  })
+}
+```
+**Use Cases**:
+- Voice message transcription
+- Audio file processing
+- Accessibility improvements
+- Multi-language support
+
+### 49. React Server Components (RSC) Integration
+**Priority**: P2 - Month 2  
+**Missing**: Advanced RSC patterns with streamUI and createStreamableValue
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/rsc-streaming.ts
+import { streamUI, createStreamableValue, createStreamableUI } from '@ai-sdk/rsc'
+import { openai } from '@ai-sdk/openai'
+
+export async function streamingArtifactGeneration(prompt: string) {
+  const streamableUI = createStreamableUI()
+  
+  const result = streamUI({
+    model: openai('gpt-4.1-nano'),
+    prompt,
+    text: ({ content }) => {
+      streamableUI.update(<ArtifactPreview content={content} />)
+    },
+    tools: {
+      createArtifact: {
+        description: 'Create an interactive artifact',
+        parameters: z.object({
+          type: z.enum(['code', 'document', 'chart']),
+          content: z.string(),
+        }),
+        generate: async ({ type, content }) => {
+          streamableUI.done(<ArtifactViewer type={type} content={content} />)
+        }
+      }
+    }
+  })
+  
+  return streamableUI.value
+}
+```
+**Benefits**:
+- Real-time UI streaming
+- Progressive artifact rendering
+- Server-side React component streaming
+
+### 50. Advanced Provider Registry and Gateway
+**Priority**: P3 - Month 2
+**Missing**: Multi-provider load balancing and intelligent routing
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/intelligent-routing.ts
+export class IntelligentAIRouter {
+  private providers = new Map()
+  
+  constructor() {
+    // Register multiple providers
+    this.providers.set('openai', openai)
+    this.providers.set('anthropic', anthropic)
+    this.providers.set('google', google)
+  }
+  
+  async routeRequest(
+    request: {
+      type: 'chat' | 'code' | 'analysis' | 'creative'
+      priority: 'speed' | 'quality' | 'cost'
+      complexity: 'simple' | 'moderate' | 'complex'
+    }
+  ) {
+    // Intelligent routing logic based on:
+    // - Provider capabilities
+    // - Current load/latency
+    // - Cost optimization
+    // - Quality requirements
+  }
+}
+```
+
+### 51. Semantic Router Implementation
+**Priority**: P2 - Week 4
+**Missing**: Intent classification and routing based on embeddings
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/semantic-router.ts  
+import { SemanticRouter } from 'ai'
+
+export const chatRouter = new SemanticRouter({
+  routes: [
+    { name: 'code-help', values: ['debug code', 'fix bug', 'write function'] },
+    { name: 'creative', values: ['write story', 'create content', 'brainstorm'] },
+    { name: 'analysis', values: ['analyze data', 'create chart', 'summarize'] },
+    { name: 'blockchain', values: ['solana', 'smart contract', 'wallet'] },
+  ],
+  embeddingModel: openai.embedding('text-embedding-3-small'),
+  similarityThreshold: 0.8,
+})
+
+export async function routeUserIntent(message: string) {
+  const route = await chatRouter.route(message)
+  
+  switch (route?.name) {
+    case 'code-help':
+      return { systemPrompt: systemPrompts.technical, tools: codeTools }
+    case 'creative':
+      return { systemPrompt: systemPrompts.creative, tools: creativeTools }
+    // ... other routes
+  }
+}
+```
+
+### 52. Advanced Error Recovery and Fallbacks
+**Priority**: P2 - Week 4
+**Missing**: Sophisticated error handling with automatic recovery
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/resilient-ai.ts
+import { 
+  APICallError, 
+  InvalidArgumentError, 
+  NoObjectGeneratedError,
+  TooManyEmbeddingValuesForCallError 
+} from 'ai'
+
+export class ResilientAIService {
+  async executeWithFallback<T>(
+    primaryAction: () => Promise<T>,
+    fallbackChain: Array<() => Promise<T>>,
+    maxRetries: number = 3
+  ): Promise<T> {
+    let lastError: Error
+    
+    // Try primary action with retries
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await primaryAction()
+      } catch (error) {
+        lastError = error as Error
+        
+        if (error instanceof APICallError) {
+          // Wait with exponential backoff
+          await this.delay(Math.pow(2, i) * 1000)
+          continue
+        }
+        
+        break // Non-retryable error
+      }
+    }
+    
+    // Try fallback chain
+    for (const fallback of fallbackChain) {
+      try {
+        return await fallback()
+      } catch (error) {
+        lastError = error as Error
+        continue
+      }
+    }
+    
+    throw lastError
+  }
+}
+```
+
+### 53. Advanced Telemetry and Observability
+**Priority**: P3 - Month 2
+**Missing**: Comprehensive AI operation monitoring
+**Implementation**:
+```typescript
+// Create apps/web/src/lib/ai/telemetry.ts
+export class AITelemetry {
+  async trackAICall(
+    operation: string,
+    model: string,
+    startTime: number,
+    endTime: number,
+    tokenUsage: any,
+    success: boolean,
+    error?: Error
+  ) {
+    const metrics = {
+      operation,
+      model,
+      duration: endTime - startTime,
+      tokenUsage,
+      success,
+      error: error?.message,
+      timestamp: new Date().toISOString(),
+    }
+    
+    // Send to monitoring service
+    await this.sendMetrics(metrics)
+  }
+  
+  async trackUserInteraction(
+    userId: string,
+    sessionId: string,
+    action: string,
+    metadata: any
+  ) {
+    // Track user behavior patterns
+  }
+}
+```
+
+### 54. Multi-Modal Attachment Processing Enhancement
+**Priority**: P1 - Week 3
+**Missing**: Advanced multi-modal processing (images, audio, documents)
+**Implementation**:
+```typescript
+// Enhance apps/web/src/lib/ai/multimodal.ts
+export class AdvancedMultiModal {
+  async processImageAttachment(imageData: string) {
+    // OCR text extraction
+    const extractedText = await this.extractTextFromImage(imageData)
+    
+    // Image analysis
+    const analysis = await generateObject({
+      model: openai('gpt-4o'),
+      prompt: `Analyze this image: ${imageData}`,
+      schema: z.object({
+        description: z.string(),
+        objects: z.array(z.string()),
+        text: z.string(),
+        colors: z.array(z.string()),
+        mood: z.string(),
+      })
+    })
+    
+    return { extractedText, analysis }
+  }
+  
+  async processAudioAttachment(audioData: Uint8Array) {
+    // Transcribe audio
+    const transcription = await transcribe({
+      model: openai.transcription('whisper-1'),
+      audio: audioData,
+    })
+    
+    // Analyze sentiment and content
+    const analysis = await generateObject({
+      model: openai('gpt-4.1-nano'),
+      prompt: `Analyze this transcribed audio: ${transcription.text}`,
+      schema: z.object({
+        sentiment: z.enum(['positive', 'negative', 'neutral']),
+        topics: z.array(z.string()),
+        summary: z.string(),
+        actionItems: z.array(z.string()),
+      })
+    })
+    
+    return { transcription, analysis }
+  }
+}
+```
+
 ---
 
 **Priority Legend**:
