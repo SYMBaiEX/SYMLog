@@ -1,8 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useAuth } from "@crossmint/client-sdk-react-ui"
-import { CrossmintWalletAuth } from "./crossmint-wallet-auth"
+import { WebAuthFlow } from "./web-auth-flow"
 import { DesktopAuthFallback } from "./desktop-auth-fallback"
 
 export function SmartAuthWrapper() {
@@ -86,7 +85,7 @@ function CrossmintAuthWithFallback() {
   }
 
   try {
-    return <CrossmintWalletAuth />
+    return <WebAuthFlow />
   } catch (error) {
     console.warn("Crossmint component error, using fallback:", error)
     return <DesktopAuthFallback />

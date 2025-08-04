@@ -3,6 +3,15 @@
 import * as React from "react"
 import { X, Minus, Square, Maximize2, Brain } from "lucide-react"
 import { cn } from "@/lib/utils"
+import type { TauriWindow } from "@/types/tauri"
+
+// Helper function to safely access Tauri window API
+const getTauriWindow = (): TauriWindow | null => {
+  if (typeof window !== 'undefined' && window.__TAURI__?.window) {
+    return window.__TAURI__.window.getCurrent()
+  }
+  return null
+}
 
 export function TauriWindowControls() {
   const [isMaximized, setIsMaximized] = React.useState(false)
@@ -15,9 +24,12 @@ export function TauriWindowControls() {
         setIsTauri(true)
         
         // Check if window is maximized on load
-        window.__TAURI__.window.getCurrent().isMaximized().then(setIsMaximized).catch(() => {
-          // Ignore errors
-        })
+        const tauriWindow = getTauriWindow()
+        if (tauriWindow) {
+          tauriWindow.isMaximized().then(setIsMaximized).catch(() => {
+            // Ignore errors
+          })
+        }
         return true
       }
       return false
@@ -34,27 +46,29 @@ export function TauriWindowControls() {
   }, [])
 
   const handleMinimize = async () => {
-    if (window.__TAURI__) {
-      await window.__TAURI__.window.getCurrent().minimize()
+    const tauriWindow = getTauriWindow()
+    if (tauriWindow) {
+      await tauriWindow.minimize()
     }
   }
 
   const handleMaximize = async () => {
-    if (window.__TAURI__) {
-      const currentWindow = window.__TAURI__.window.getCurrent()
+    const tauriWindow = getTauriWindow()
+    if (tauriWindow) {
       if (isMaximized) {
-        await currentWindow.unmaximize()
+        await tauriWindow.unmaximize()
         setIsMaximized(false)
       } else {
-        await currentWindow.maximize()
+        await tauriWindow.maximize()
         setIsMaximized(true)
       }
     }
   }
 
   const handleClose = async () => {
-    if (window.__TAURI__) {
-      await window.__TAURI__.window.getCurrent().close()
+    const tauriWindow = getTauriWindow()
+    if (tauriWindow) {
+      await tauriWindow.close()
     }
   }
 
@@ -146,21 +160,4 @@ export function TauriWindowControls() {
       </div>
     </div>
   )
-}
-
-// Type declaration for Tauri window API
-declare global {
-  interface Window {
-    __TAURI__?: {
-      window: {
-        getCurrent(): {
-          minimize(): Promise<void>
-          maximize(): Promise<void>
-          unmaximize(): Promise<void>
-          close(): Promise<void>
-          isMaximized(): Promise<boolean>
-        }
-      }
-    }
-  }
 }

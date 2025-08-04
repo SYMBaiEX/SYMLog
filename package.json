@@ -15,7 +15,9 @@
     "dev:server": "turbo -F @SYMLog/backend dev",
     "dev:setup": "turbo -F @SYMLog/backend dev:setup"
   },
-  "dependencies": {},
+  "dependencies": {
+    "pino-pretty": "^13.1.1"
+  },
   "devDependencies": {
     "turbo": "^2.5.4",
     "@biomejs/biome": "2.1.2",
