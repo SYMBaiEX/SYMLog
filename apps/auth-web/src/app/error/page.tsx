@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Brain, AlertTriangle, RefreshCw, Home, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 interface ErrorInfo {
   type: string
@@ -82,7 +82,7 @@ function ErrorPageContent() {
   const errorDetails = getErrorDetails()
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-br from-black via-gray-900 to-black"></div>
@@ -90,93 +90,95 @@ function ErrorPageContent() {
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-orange-500/10 rounded-full filter blur-[100px] animate-pulse-slow"></div>
       </div>
 
-      <div className="relative w-full max-w-md">
+      <div className="relative w-full max-w-sm sm:max-w-md lg:max-w-lg">
         {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center mb-6">
-            <Brain className="h-12 w-12 text-gray-400 mr-3" />
-            <h1 className="text-3xl font-bold text-white">
+        <div className="text-center mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row items-center justify-center mb-4 sm:mb-6">
+            <Brain className="h-10 w-10 sm:h-12 sm:w-12 text-gray-400 mb-2 sm:mb-0 sm:mr-3" />
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">
               SYMLog Auth
             </h1>
           </div>
         </div>
 
         {/* Error Card */}
-        <div className="glass rounded-2xl p-8 space-y-6 border border-red-500/20">
-          <div className="text-center">
-            <AlertTriangle className="h-16 w-16 text-red-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-white mb-2">
+        <Card className="p-6 sm:p-8 space-y-4 sm:space-y-6 border border-red-500/20">
+          <CardHeader className="text-center p-0">
+            <AlertTriangle className="h-12 w-12 sm:h-16 sm:w-16 text-red-400 mx-auto mb-3 sm:mb-4" />
+            <CardTitle className="text-lg sm:text-xl font-semibold text-white mb-2">
               {errorDetails.title}
-            </h2>
-            <p className="text-gray-400 text-sm mb-4">
+            </CardTitle>
+            <CardDescription className="text-sm sm:text-base text-gray-400 mb-3 sm:mb-4">
               {errorInfo?.message || errorDetails.message}
-            </p>
+            </CardDescription>
             {errorInfo?.code && (
-              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 mb-4">
-                <code className="text-red-300 text-sm">
+              <div className="bg-red-900/20 border border-red-500/30 rounded-lg p-3 mb-3 sm:mb-4">
+                <code className="text-red-300 text-xs sm:text-sm break-all">
                   Error Code: {errorInfo.code}
                 </code>
               </div>
             )}
-            <p className="text-gray-300 text-sm">
+            <p className="text-gray-300 text-sm sm:text-base">
               {errorDetails.suggestion}
             </p>
-          </div>
+          </CardHeader>
 
-          {/* Action Buttons */}
-          <div className="space-y-3">
-            <Button
-              onClick={handleRetry}
-              variant="periwinkle"
-              size="lg"
-              className="w-full"
-            >
-              <RefreshCw className="h-5 w-5" />
-              Try Again
-            </Button>
-            
-            <Button asChild variant="glass" size="lg" className="w-full">
-              <Link href="/">
-                <Home className="h-5 w-5" />
-                Back to Login
-              </Link>
-            </Button>
+          <CardContent className="p-0">
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <Button
+                onClick={handleRetry}
+                variant="periwinkle"
+                size="lg"
+                className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold touch-manipulation"
+              >
+                <RefreshCw className="h-5 w-5" />
+                Try Again
+              </Button>
+              
+              <Button asChild variant="glass" size="lg" className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold touch-manipulation">
+                <Link href="/">
+                  <Home className="h-5 w-5" />
+                  Back to Login
+                </Link>
+              </Button>
 
-            <Button
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.history.back()
-                }
-              }}
-              variant="ghost"
-              size="sm"
-              className="w-full text-gray-500 hover:text-gray-300"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Go Back
-            </Button>
-          </div>
-        </div>
+              <Button
+                onClick={() => {
+                  if (typeof window !== 'undefined') {
+                    window.history.back()
+                  }
+                }}
+                variant="ghost"
+                size="sm"
+                className="w-full text-gray-500 hover:text-gray-300 h-10 touch-manipulation"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Go Back
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Help Section */}
-        <div className="glass rounded-xl p-4 mt-6">
+        <Card className="p-4 sm:p-6 mt-4 sm:mt-6">
           <div className="text-center">
-            <h3 className="text-sm font-medium text-white mb-2">Need Help?</h3>
-            <p className="text-xs text-gray-400 mb-3">
+            <h3 className="text-sm sm:text-base font-medium text-white mb-2">Need Help?</h3>
+            <p className="text-xs sm:text-sm text-gray-400 mb-3">
               If you continue to experience issues, try these steps:
             </p>
-            <ul className="text-xs text-gray-500 space-y-1 text-left">
+            <ul className="text-xs sm:text-sm text-gray-500 space-y-1 text-left">
               <li>• Clear your browser cache and cookies</li>
               <li>• Disable browser extensions temporarily</li>
               <li>• Try using an incognito/private window</li>
               <li>• Ensure SYMLog desktop app is running</li>
             </ul>
           </div>
-        </div>
+        </Card>
 
         {/* Footer */}
-        <div className="text-center mt-8">
-          <p className="text-xs text-gray-500">
+        <div className="text-center mt-6 sm:mt-8">
+          <p className="text-xs sm:text-sm text-gray-500">
             SYMLog Authentication Portal
           </p>
         </div>
