@@ -5,6 +5,7 @@ import { ConvexProvider } from './convex-provider'
 import { CrossmintProvider } from './crossmint-provider'
 import { Analytics } from '../components/analytics'
 import { Toaster } from 'sonner'
+import { ThemeProvider } from '../components/theme-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -39,21 +40,31 @@ export const metadata: Metadata = {
   },
 }
 
+// Force dynamic rendering for all pages
+export const dynamic = 'force-dynamic'
+
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
-        <ConvexProvider>
-          <CrossmintProvider>
-            {children}
-            <Analytics />
-            <Toaster richColors />
-          </CrossmintProvider>
-        </ConvexProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ConvexProvider>
+            <CrossmintProvider>
+              {children}
+              <Analytics />
+              <Toaster richColors />
+            </CrossmintProvider>
+          </ConvexProvider>
+        </ThemeProvider>
       </body>
     </html>
   )

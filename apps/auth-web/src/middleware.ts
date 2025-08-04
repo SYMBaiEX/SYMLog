@@ -9,15 +9,20 @@ export function middleware(request: NextRequest) {
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   
-  // Content Security Policy for Crossmint and Convex
+  // Content Security Policy for Crossmint, Convex, and Dynamic
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://staging.crossmint.com https://www.crossmint.com",
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://staging.crossmint.com https://www.crossmint.com https://*.vercel-scripts.com",
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' https://fonts.gstatic.com",
-    "img-src 'self' data: https:",
-    "connect-src 'self' https://staging.crossmint.com https://www.crossmint.com https://*.convex.cloud wss://*.convex.cloud",
-    "frame-src 'none'",
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https:",
+    "connect-src 'self' https://staging.crossmint.com https://www.crossmint.com https://*.convex.cloud wss://*.convex.cloud https://dynamic-static-assets.com https://*.dynamic-static-assets.com https://api.dynamic.xyz https://*.walletconnect.com wss://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.org",
+    "frame-src 'self' https://staging.crossmint.com https://www.crossmint.com",
+    "media-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
   ].join('; ')
   
   response.headers.set('Content-Security-Policy', csp)

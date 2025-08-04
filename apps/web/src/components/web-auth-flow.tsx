@@ -134,8 +134,8 @@ export function WebAuthFlow() {
 
   const openAuthPopup = () => {
     const authUrl = process.env.NODE_ENV === 'development' 
-      ? 'http://localhost:3002' 
-      : 'https://your-auth-app.vercel.app' // Replace with your actual Vercel URL
+      ? 'http://localhost:3003' 
+      : 'https://auth-web-two.vercel.app' // SYMLog Auth Portal
     
     setIsLoading(true)
     

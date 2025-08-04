@@ -128,7 +128,7 @@ function ErrorPageContent() {
             <div className="space-y-3">
               <Button
                 onClick={handleRetry}
-                variant="periwinkle"
+                variant="default"
                 size="lg"
                 className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold touch-manipulation"
               >

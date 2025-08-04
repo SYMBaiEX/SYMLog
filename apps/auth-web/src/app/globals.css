@@ -286,21 +286,27 @@ html.dark {
 }
 
 /* Gradient text effect */
-.gradient-text,
-.from-periwinkle.to-light-green {
-  background: linear-gradient(135deg, var(--periwinkle) 0%, var(--light-green) 100%);
+.gradient-text {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.from-primary.to-secondary {
+  background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--secondary)) 100%);
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 /* Glow effects */
-.glow-periwinkle {
-  box-shadow: 0 0 20px color-mix(in srgb, var(--periwinkle) 50%, transparent);
+.glow-primary {
+  box-shadow: 0 0 20px hsla(var(--primary) / 0.5);
 }
 
-.glow-green {
-  box-shadow: 0 0 20px color-mix(in srgb, var(--light-green) 50%, transparent);
+.glow-secondary {
+  box-shadow: 0 0 20px hsla(var(--secondary) / 0.5);
 }
 
 /* Hover lift effect */
