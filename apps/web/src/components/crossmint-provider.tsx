@@ -13,7 +13,7 @@ export function CrossmintProviderWrapper({ children }: { children: React.ReactNo
   
   // Detect if running in Tauri
   useEffect(() => {
-    const checkTauri = async () => {
+    const checkTauri = () => {
       try {
         // Check if we're in a Tauri environment
         if (typeof window !== 'undefined' && window.__TAURI__) {

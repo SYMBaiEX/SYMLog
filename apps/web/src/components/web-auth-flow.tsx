@@ -32,14 +32,7 @@ import {
   Monitor
 } from "lucide-react"
 
-// Extend window type for Tauri
-declare global {
-  interface Window {
-    __TAURI__?: {
-      invoke(cmd: string, args?: Record<string, any>): Promise<any>
-    }
-  }
-}
+
 
 interface AuthUser {
   id: string

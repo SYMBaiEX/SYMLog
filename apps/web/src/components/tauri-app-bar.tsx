@@ -47,6 +47,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
+import type { TauriWindow } from "@/types/tauri"
 
 type TauriMenuItem = {
   label: string
@@ -64,9 +65,9 @@ interface MenuBarItem {
 }
 
 // Helper function to safely access Tauri window API
-const getTauriWindow = () => {
-  if (typeof window !== 'undefined' && (window as any).__TAURI__?.window) {
-    return (window as any).__TAURI__.window.getCurrent()
+const getTauriWindow = (): TauriWindow | null => {
+  if (typeof window !== 'undefined' && window.__TAURI__?.window) {
+    return window.__TAURI__.window.getCurrent()
   }
   return null
 }
