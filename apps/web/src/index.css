@@ -310,6 +310,42 @@ html.dark {
   box-shadow: 0 8px 32px var(--glass-shadow);
 }
 
+/* Glass component styles with enhanced contrast */
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid var(--glass-border);
+  /* Force minimum opacity for readability */
+  background-color: color-mix(in srgb, var(--background) 85%, transparent);
+}
+
+.glass-dark {
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .glass,
+  .glass-dark,
+  .glass-effect {
+    /* Solid backgrounds in high contrast mode */
+    background: var(--card) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 2px solid var(--border) !important;
+  }
+  
+  .glass *,
+  .glass-dark *,
+  .glass-effect * {
+    font-weight: 600 !important;
+  }
+}
+
 /* Gradient text effect */
 .gradient-text,
 .from-periwinkle.to-light-green {

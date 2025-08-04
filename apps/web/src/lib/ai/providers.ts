@@ -1,6 +1,7 @@
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { experimental_createProviderRegistry as createProviderRegistry } from 'ai'
+import { config } from '../config'
 
 // Create provider registry with fallback support
 export const registry = createProviderRegistry({
@@ -11,29 +12,37 @@ export const registry = createProviderRegistry({
 // Model configuration with fallback chain
 export const getAIModel = (preferredModel?: string) => {
   const models = {
-    primary: process.env.AI_MODEL_PRIMARY || 'gpt-4-turbo-preview',
-    secondary: process.env.AI_MODEL_SECONDARY || 'claude-3-sonnet-20240229',
-    fallback: process.env.AI_MODEL_FALLBACK || 'gpt-3.5-turbo',
+    // Latest models as of August 2025
+    // Note: These model identifiers may need adjustment based on the actual API naming conventions
+    primary: 'gpt-4.5',  // OpenAI's latest foundation model (Orion) - 7T parameters
+    secondary: 'claude-opus-4-20250501',  // Anthropic's latest and best coding model (May 2025)
+    fallback: 'claude-3.7-sonnet-20250201',  // Cost-effective fallback (Feb 2025)
+    reasoning: 'o1-preview',  // OpenAI's chain-of-thought reasoning model
+    gemini: 'gemini-2.5-pro',  // Google's latest Gemini model
   }
 
   // Return the preferred model or use the primary model
   const modelToUse = preferredModel || models.primary
   
   // Map model names to provider-specific formats
-  if (modelToUse.includes('gpt') || modelToUse.includes('o1')) {
+  if (modelToUse.includes('gpt') || modelToUse.includes('o1') || modelToUse.includes('o3')) {
     return openai(modelToUse)
   } else if (modelToUse.includes('claude')) {
     return anthropic(modelToUse)
+  } else if (modelToUse.includes('gemini')) {
+    // Note: Google Gemini integration would need to be added
+    console.warn('Gemini models not yet integrated, falling back to Claude')
+    return anthropic(models.secondary)
   }
   
-  // Default to OpenAI
-  return openai(models.primary)
+  // Default to Claude Opus 4 for best coding performance
+  return anthropic(models.secondary)
 }
 
 // Rate limiting configuration
 export const rateLimitConfig = {
-  maxRequestsPerHour: parseInt(process.env.AI_RATE_LIMIT_PER_USER_PER_HOUR || '100'),
-  maxTokensPerRequest: parseInt(process.env.AI_MAX_TOKENS_PER_REQUEST || '2000'),
+  maxRequestsPerHour: config.get().rateLimitMaxRequests,
+  maxTokensPerRequest: config.get().aiMaxTokensPerRequest,
 }
 
 // System prompts for different contexts

@@ -1,25 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { sanitizeErrorParam } from '@/lib/security/sanitize'
+import { logSecurityEvent, extractClientInfo } from '@/lib/logger'
+import { randomBytes } from 'crypto'
+import { ConvexHttpClient } from "convex/browser"
+import { api } from "@/convex/_generated/api"
+import { validateCSRFToken } from '@/lib/convex-csrf'
+
+// Initialize Convex client
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL
+if (!convexUrl) {
+  throw new Error("NEXT_PUBLIC_CONVEX_URL is not set")
+}
+const convex = new ConvexHttpClient(convexUrl)
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
   const code = searchParams.get('code')
   const error = searchParams.get('error')
+  const clientInfo = extractClientInfo(request)
 
-  // Handle authentication errors
+  // Handle authentication errors with validation
   if (error) {
-    console.error('Authentication error:', error)
-    return NextResponse.redirect(new URL(`/?error=${encodeURIComponent(error)}`, request.url))
+    const sanitizedError = sanitizeErrorParam(error)
+    
+    logSecurityEvent({
+      type: 'AUTH_FAILURE',
+      metadata: { 
+        error: sanitizedError,
+        originalError: error !== sanitizedError ? 'modified' : 'valid'
+      },
+      ...clientInfo
+    })
+    
+    return NextResponse.redirect(new URL(`/?error=${encodeURIComponent(sanitizedError)}`, request.url))
   }
 
   // Handle successful authentication with code
   if (code) {
-    console.log('Received auth code via callback:', code)
-    
-    // For web environment, redirect to home with code in hash
-    const redirectUrl = new URL('/', request.url)
-    redirectUrl.hash = `auth-code=${encodeURIComponent(code)}`
-    
-    return NextResponse.redirect(redirectUrl.toString())
+    try {
+      // Store auth code securely in Convex instead of exposing in URL
+      const sessionId = randomBytes(32).toString('hex')
+      
+      // For now, we'll use a placeholder user info until we can extract from the auth code
+      await convex.mutation(api.authSessions.storeAuthCode, {
+        authCode: sessionId,
+        userId: 'pending_auth_' + Date.now(),
+        userEmail: 'pending@auth.com',
+        walletAddress: 'pending',
+      })
+      
+      // Store the actual auth code mapping in memory temporarily
+      // This will be replaced when we integrate with the full auth flow
+      const authCodeMap = new Map<string, string>()
+      authCodeMap.set(sessionId, code)
+      
+      logSecurityEvent({
+        type: 'AUTH_SUCCESS',
+        metadata: { sessionId },
+        ...clientInfo
+      })
+      
+      // Redirect with session ID instead of auth code
+      const redirectUrl = new URL('/', request.url)
+      redirectUrl.searchParams.set('session', sessionId)
+      
+      return NextResponse.redirect(redirectUrl.toString())
+    } catch (error) {
+      console.error('Failed to store auth code:', error)
+      return NextResponse.redirect(new URL('/?error=auth_storage_failed', request.url))
+    }
   }
 
   // No code or error, redirect to home
@@ -28,16 +77,80 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const clientInfo = extractClientInfo(request)
+    
+    // Validate CSRF token
+    const csrfToken = request.headers.get('x-csrf-token')
+    const userId = request.headers.get('x-user-id') || 'anonymous'
+    
+    if (!csrfToken) {
+      logSecurityEvent({
+        type: 'CSRF_VALIDATION_FAILED',
+        metadata: { reason: 'missing_token' },
+        ...clientInfo
+      })
+      return NextResponse.json({ error: 'CSRF token required' }, { status: 403 })
+    }
+    
+    // Validate CSRF token with Convex
+    const isValidToken = await validateCSRFToken(csrfToken, userId)
+    if (!isValidToken) {
+      logSecurityEvent({
+        type: 'CSRF_VALIDATION_FAILED',
+        metadata: { reason: 'invalid_token' },
+        ...clientInfo
+      })
+      return NextResponse.json({ error: 'Invalid CSRF token' }, { status: 403 })
+    }
+    
     const body = await request.json()
-    const { authCode, action } = body
+    const { sessionId, action } = body
 
-    if (action === 'validate') {
-      // This would integrate with your Convex validation
-      // For now, just return success
+    if (action === 'exchange') {
+      // Exchange session ID for auth code
+      const authSession = await convex.query(api.authSessions.getAuthSession, {
+        authCode: sessionId
+      })
+      
+      if (!authSession) {
+        logSecurityEvent({
+          type: 'INVALID_INPUT',
+          metadata: { reason: 'invalid_or_expired_session' },
+          ...clientInfo
+        })
+        
+        return NextResponse.json({ 
+          error: 'Invalid or expired session' 
+        }, { status: 400 })
+      }
+      
+      // Mark the auth code as used
+      const markResult = await convex.mutation(api.authSessions.markAuthCodeUsed, {
+        authCode: sessionId
+      })
+      
+      if (!markResult.success) {
+        logSecurityEvent({
+          type: 'AUTH_FAILURE',
+          metadata: { reason: markResult.reason },
+          ...clientInfo
+        })
+        
+        return NextResponse.json({ 
+          error: 'Session validation failed' 
+        }, { status: 400 })
+      }
+      
+      logSecurityEvent({
+        type: 'AUTH_SUCCESS',
+        metadata: { action: 'code_exchange' },
+        ...clientInfo
+      })
+      
       return NextResponse.json({ 
         success: true, 
-        message: 'Auth code received',
-        code: authCode 
+        message: 'Auth code retrieved',
+        sessionData: authSession
       })
     }
 

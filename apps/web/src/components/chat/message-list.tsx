@@ -65,9 +65,13 @@ export function MessageList({
   }
 
   return (
+    <>
     <div
       ref={scrollRef}
       className="flex-1 overflow-y-auto space-y-4 pb-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent"
+      role="log"
+      aria-live="polite"
+      aria-label="Chat messages"
     >
       {messages.length === 0 && !isLoading && (
         <div className="flex flex-col items-center justify-center h-full text-center">
@@ -225,5 +229,16 @@ export function MessageList({
         </GlassCard>
       )}
     </div>
+    
+    {/* Screen reader announcements for new messages */}
+    <div className="sr-only" aria-live="assertive" aria-atomic="true">
+      {messages.length > 0 && (
+        <div>
+          New message from {messages[messages.length - 1].role === 'user' ? 'you' : 'assistant'}: 
+          {messages[messages.length - 1].content || 'Message content'}
+        </div>
+      )}
+    </div>
+    </>
   )
 }

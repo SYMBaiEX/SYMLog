@@ -10,6 +10,7 @@ import { TauriMenuHandler } from "@/components/tauri-menu-handler";
 import { TauriDetector } from "@/components/tauri-detector";
 import { TauriKeyboardShortcuts } from "@/components/tauri-keyboard-shortcuts";
 import { TauriWindowControls } from "@/components/tauri-window-controls";
+import { ErrorBoundary } from "@/components/error-boundary";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,19 +37,27 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>
-          <AnimatedBackground />
-          <TauriMenuHandler />
-          <TauriDetector />
-          <TauriWindowControls />
-          <TauriKeyboardShortcuts />
-          <div className="relative flex min-h-screen flex-col tauri-app:pt-10">
-            <AppMenuBar />
-            <Navigation />
-            <main className="flex-1 relative z-10">{children}</main>
-            <Footer />
-          </div>
-        </Providers>
+        <ErrorBoundary level="page">
+          <Providers>
+            <AnimatedBackground />
+            <TauriMenuHandler />
+            <TauriDetector />
+            <TauriWindowControls />
+            <TauriKeyboardShortcuts />
+            <div className="relative flex min-h-screen flex-col tauri-app:pt-10">
+              <ErrorBoundary level="section" isolate>
+                <AppMenuBar />
+              </ErrorBoundary>
+              <ErrorBoundary level="section" isolate>
+                <Navigation />
+              </ErrorBoundary>
+              <main className="flex-1 relative z-10">{children}</main>
+              <ErrorBoundary level="component" isolate>
+                <Footer />
+              </ErrorBoundary>
+            </div>
+          </Providers>
+        </ErrorBoundary>
       </body>
     </html>
   );

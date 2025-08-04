@@ -15,11 +15,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { toast } from "sonner"
 import { Wallet, LogOut, Check, Loader2, Shield } from "lucide-react"
 
-declare global {
-  interface Window {
-    solana?: any
-  }
-}
+// Type definitions are now in @/types/phantom.d.ts
 
 export function SolanaWalletButton() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null)
@@ -99,14 +95,34 @@ export function SolanaWalletButton() {
       // Request signature
       const { signature } = await window.solana.signMessage(message, "utf8")
       
-      console.log("Signature:", signature)
+      // Send to backend for verification
+      const verifyResponse = await fetch('/api/wallet/verify', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          // Add auth token if available
+          ...(typeof window !== 'undefined' && window.localStorage.getItem('sessionToken') 
+            ? { 'Authorization': `Bearer ${window.localStorage.getItem('sessionToken')}` }
+            : {})
+        },
+        body: JSON.stringify({
+          walletAddress: walletAddr,
+          message: Buffer.from(message).toString('base64'),
+          signature: Buffer.from(signature).toString('base64')
+        })
+      })
+
+      if (!verifyResponse.ok) {
+        const error = await verifyResponse.json()
+        throw new Error(error.error || 'Server verification failed')
+      }
+
+      const result = await verifyResponse.json()
       setIsVerified(true)
       
       toast.success("Wallet verified successfully!", {
         description: "You can now access all features"
       })
-
-      // In production, send signature to backend for verification
     } catch (error) {
       console.error("Verification failed:", error)
       toast.error("Failed to verify wallet")
@@ -127,6 +143,9 @@ export function SolanaWalletButton() {
           size="sm"
           onClick={() => setShowAccountDialog(true)}
           className="flex items-center gap-2 w-full md:w-auto"
+          aria-label={`Wallet account menu for ${formatAddress(walletAddress)}`}
+          aria-expanded={showAccountDialog}
+          aria-haspopup="dialog"
         >
           <Avatar className="h-6 w-6">
             <AvatarFallback className="text-xs">
@@ -182,6 +201,8 @@ export function SolanaWalletButton() {
                     onClick={() => verifyWallet()} 
                     disabled={isVerifying}
                     className="w-full"
+                    aria-label="Verify wallet ownership"
+                    aria-busy={isVerifying}
                   >
                     {isVerifying ? (
                       <>
@@ -209,6 +230,7 @@ export function SolanaWalletButton() {
                 variant="destructive"
                 className="w-full"
                 onClick={disconnectWallet}
+                aria-label="Disconnect wallet"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Disconnect Wallet
@@ -227,6 +249,8 @@ export function SolanaWalletButton() {
       onClick={connectWallet}
       disabled={isConnecting}
       className="flex w-full md:w-auto"
+      aria-label="Connect Solana wallet"
+      aria-busy={isConnecting}
     >
       {isConnecting ? (
         <>

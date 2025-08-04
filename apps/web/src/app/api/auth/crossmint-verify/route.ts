@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { jwtVerify, SignJWT } from 'jose'
+import { jwtVerify, createRemoteJWKSet } from 'jose'
+import { logSecurityEvent, extractClientInfo } from '@/lib/logger'
+import { createSessionJWT } from '@/lib/jwt-utils'
+import { config } from '@/lib/config'
 
 interface CrossmintTokenVerifyRequest {
   token: string
@@ -17,13 +20,23 @@ interface CrossmintTokenPayload {
   scope?: string
 }
 
+// Crossmint JWKS endpoint for proper JWT verification
+const CROSSMINT_JWKS_URL = 'https://api.crossmint.com/.well-known/jwks.json'
+const jwks = createRemoteJWKSet(new URL(CROSSMINT_JWKS_URL))
+
 export async function POST(request: NextRequest) {
   try {
+    const clientInfo = extractClientInfo(request)
     const body: CrossmintTokenVerifyRequest = await request.json()
     const { token, walletAddress } = body
 
     // Validate input
     if (!token) {
+      logSecurityEvent({
+        type: 'INVALID_INPUT',
+        metadata: { reason: 'missing_token' },
+        ...clientInfo
+      })
       return NextResponse.json(
         { 
           isValid: false, 
@@ -33,81 +46,56 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate JWT format and extract payload
+    // Properly verify JWT with cryptographic signature validation
     let crossmintPayload: CrossmintTokenPayload
     try {
-      const parts = token.split('.')
-      if (parts.length !== 3) {
-        throw new Error('Invalid JWT format - must have 3 parts')
-      }
-      
-      const payload = JSON.parse(atob(parts[1]))
-      
-      // Validate required payload fields
-      if (!payload.sub || !payload.iat || !payload.exp) {
-        throw new Error('Missing required JWT claims')
-      }
-      
-      crossmintPayload = payload as CrossmintTokenPayload
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer: 'https://api.crossmint.com',
+        audience: config.get().crossmintClientKey,
+      })
+      crossmintPayload = payload as unknown as CrossmintTokenPayload
     } catch (error) {
+      console.error('JWT verification failed:', error)
+      logSecurityEvent({
+        type: 'TOKEN_VERIFICATION_FAILED',
+        metadata: { 
+          reason: 'invalid_crossmint_token',
+          error: error instanceof Error ? error.message : 'unknown'
+        },
+        ...clientInfo
+      })
       return NextResponse.json(
         { 
           isValid: false, 
-          message: 'Invalid Crossmint token format' 
+          message: 'Invalid Crossmint token' 
         },
         { status: 400 }
       )
     }
 
-    // Validate token expiration
-    const now = Math.floor(Date.now() / 1000)
-    if (crossmintPayload.exp && now > crossmintPayload.exp) {
-      return NextResponse.json(
-        { 
-          isValid: false, 
-          message: 'Crossmint token has expired' 
-        },
-        { status: 401 }
-      )
-    }
-
-    // Validate JWT_SECRET exists and is secure
-    const jwtSecretEnv = process.env.JWT_SECRET
-    if (!jwtSecretEnv || jwtSecretEnv.length < 32) {
-      console.error('JWT_SECRET is missing or too short. Must be at least 32 characters.')
-      return NextResponse.json(
-        { 
-          isValid: false, 
-          message: 'Server configuration error' 
-        },
-        { status: 500 }
-      )
-    }
-
-    // Create our own session token
-    const jwtSecret = new TextEncoder().encode(jwtSecretEnv)
-
-    const sessionToken = await new SignJWT({
+    // Create our own session token using common JWT utilities
+    const sessionToken = await createSessionJWT({
       userId: crossmintPayload.sub,
-      walletAddress: walletAddress || null,
-      crossmintToken: token,
-      verifiedAt: new Date().toISOString(),
-      type: 'crossmint_verified_session'
+      walletAddress: walletAddress,
+      type: 'crossmint_verified_session',
+      metadata: {
+        crossmintToken: token,
+        verifiedAt: new Date().toISOString()
+      }
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setExpirationTime('24h')
-      .setSubject(crossmintPayload.sub)
-      .setAudience('symlog-app')
-      .setIssuer('symlog-auth')
-      .sign(jwtSecret)
 
     const expiresAt = Date.now() + (24 * 60 * 60 * 1000) // 24 hours
 
-    // Log successful verification (development only)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Crossmint token verification successful for user: ${crossmintPayload.sub}`)
-    }
+    // Log successful verification
+    logSecurityEvent({
+      type: 'AUTH_SUCCESS',
+      userId: crossmintPayload.sub,
+      metadata: { 
+        action: 'crossmint_verification',
+        walletAddress: walletAddress || null
+      },
+      ...clientInfo
+    })
 
     return NextResponse.json({
       isValid: true,
@@ -132,22 +120,35 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle CORS with secure origin policy
+// Handle CORS with secure origin policy using regex patterns
 export async function OPTIONS(request: NextRequest) {
   const origin = request.headers.get('origin')
-  const allowedOrigins = [
-    'http://localhost:3001',
-    'http://localhost:3000', 
-    'https://symlog.app',
-    process.env.NEXT_PUBLIC_APP_DOMAIN ? `https://${process.env.NEXT_PUBLIC_APP_DOMAIN}` : null
-  ].filter(Boolean)
   
-  const isAllowedOrigin = allowedOrigins.includes(origin || '')
+  // Use regex patterns for more flexible matching
+  const allowedOriginPatterns = [
+    /^https?:\/\/localhost:(3000|3001)$/,
+    /^https:\/\/(.*\.)?symlog\.app$/,
+  ]
+  
+  // Add custom domain if configured
+  const appUrl = config.get().nextPublicAppUrl
+  if (appUrl) {
+    try {
+      const url = new URL(appUrl)
+      allowedOriginPatterns.push(
+        new RegExp(`^https?://${url.hostname.replace(/\./g, '\\.')}(:\\d+)?$`)
+      )
+    } catch (e) {
+      // Invalid URL, skip
+    }
+  }
+  
+  const isAllowedOrigin = origin ? allowedOriginPatterns.some(pattern => pattern.test(origin)) : false
   
   return new NextResponse(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': isAllowedOrigin ? (origin || '') : 'null',
+      'Access-Control-Allow-Origin': isAllowedOrigin ? origin : 'null',
       'Access-Control-Allow-Methods': 'POST, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Allow-Credentials': 'true',

@@ -8,6 +8,8 @@ import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Brain, Lock, Loader2 } from "lucide-react"
 import Link from "next/link"
+import { ChatErrorBoundary } from "@/components/chat-error-boundary"
+import { config } from "@/lib/config"
 
 export default function ChatPage() {
   const router = useRouter()
@@ -15,8 +17,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(true)
   
   // Check if Crossmint is available
-  const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
-  const isCrossmintEnabled = clientApiKey && clientApiKey !== 'your_client_api_key_here'
+  const isCrossmintEnabled = config.isCrossmintAuthEnabled()
 
   // Always call the hook, but only use the result if Crossmint is enabled
   const auth = useAuth()
@@ -107,8 +108,7 @@ export default function ChatPage() {
   }
 
   // Check if AI is configured
-  const isAIConfigured = process.env.OPENAI_API_KEY && 
-                        process.env.OPENAI_API_KEY !== 'your_openai_api_key_here'
+  const isAIConfigured = true // Config service will handle validation
 
   if (!isAIConfigured) {
     return (
