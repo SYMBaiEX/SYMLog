@@ -26,14 +26,8 @@ import {
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   
-  // Use optional chaining and error handling for Convex query
-  let healthCheck
-  try {
-    healthCheck = useQuery(api.healthCheck.get)
-  } catch (error) {
-    console.warn("Convex health check not available:", error)
-    healthCheck = null
-  }
+  // Always call useQuery hook to avoid conditional hook calls
+  const healthCheck = useQuery(api.healthCheck.get)
 
   useEffect(() => {
     setMounted(true)

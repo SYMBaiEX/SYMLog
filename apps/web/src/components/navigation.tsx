@@ -34,12 +34,14 @@ export function Navigation() {
   const router = useRouter()
   const navRefs = React.useRef<(HTMLAnchorElement | null)[]>([])
 
+  // Always call useAuth hook to avoid conditional hook calls
+  const auth = useAuth()
+  
   // Check if user is authenticated
   let isAuthenticated = false
   try {
     const clientApiKey = process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY as string
-    if (clientApiKey && clientApiKey !== 'your_client_api_key_here') {
-      const auth = useAuth()
+    if (clientApiKey && clientApiKey !== 'your_client_api_key_here' && auth) {
       isAuthenticated = !!auth.jwt && !!auth.user
     }
   } catch (error) {
