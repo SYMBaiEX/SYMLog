@@ -14,7 +14,7 @@ import {
 } from './gateway';
 import { IntelligentRoutingEngine } from './intelligent-routing';
 import { ProviderMetricsService } from './provider-metrics';
-import { v2ErrorHandler } from './v2-error-handling';
+import { v2ErrorHandler } from './error-handling';
 
 // Create a logger wrapper
 const loggingService = {

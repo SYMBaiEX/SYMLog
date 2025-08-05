@@ -607,5 +607,12 @@ export async function executeWithRecovery<T>(
   }
 }
 
+// Export a v2ErrorHandler instance for backward compatibility
+export const v2ErrorHandler = {
+  handleError: (error: unknown): AIErrorInfo => {
+    return AIErrorHandler.handle(error);
+  },
+};
+
 // Export additional types (enums are already exported above)
 export type { AIErrorInfo, RecoveryStrategy };

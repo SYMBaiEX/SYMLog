@@ -1,6 +1,6 @@
-import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
-import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { experimental_createMCPClient, type MCPClient } from 'ai';
 
 // MCP Transport types

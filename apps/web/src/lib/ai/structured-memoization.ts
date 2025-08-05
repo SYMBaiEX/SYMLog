@@ -891,11 +891,5 @@ export function clearMemoizationCaches(): void {
   structuredMemoizer.clearCaches();
 }
 
-// Export types and singleton
-export type {
-  MemoizationConfig,
-  MemoizationMetrics,
-  SchemaFingerprint,
-  MemoizationMetadata,
-};
+// Export singleton
 export { structuredMemoizer };

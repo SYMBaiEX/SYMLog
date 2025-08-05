@@ -1751,19 +1751,4 @@ export const transformPresets = {
 // Export experimental utilities and types
 export {
   customSpanProcessor,
-  globalMetricsCollector,
-  // Types
-  type TransformConfig,
-  type CompressionTransformConfig,
-  type MetricsTransformConfig,
-  type DebugTransformConfig,
-  type FilterTransformConfig,
-  type DebugEvent,
-  type ProviderMetricsData,
-  type ProviderMetricsCollectorConfig,
-  // New experimental types
-  type MessagePart,
-  type EnhancedMessage,
-  type PrepareStepOptions,
-  type PrepareStepCallback,
 };

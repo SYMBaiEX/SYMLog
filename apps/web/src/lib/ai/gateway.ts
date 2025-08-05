@@ -15,7 +15,7 @@ import {
 } from './provider-discovery';
 import { ProviderMetricsService } from './provider-metrics';
 import { registry } from './providers';
-import { v2ErrorHandler } from './v2-error-handling';
+import { v2ErrorHandler } from './error-handling';
 
 // Create a logger wrapper
 const loggingService = {

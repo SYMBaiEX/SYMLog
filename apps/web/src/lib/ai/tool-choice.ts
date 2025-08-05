@@ -86,6 +86,14 @@ export class ToolChoiceError extends Error {
   }
 }
 
+// Tool metric interface for proper typing
+export interface ToolMetric {
+  successRate: number;
+  avgExecutionTime: number;
+  lastUsed: number;
+  usageCount: number;
+}
+
 /**
  * Tool Choice Enforcement System
  * Manages required tool usage, smart tool selection, and fallback strategies
@@ -93,15 +101,7 @@ export class ToolChoiceError extends Error {
 export class ToolChoiceEnforcer {
   private static instance: ToolChoiceEnforcer;
   private toolRegistry = new Map<string, CoreTool>();
-  private toolMetrics = new Map<
-    string,
-    {
-      successRate: number;
-      avgExecutionTime: number;
-      lastUsed: number;
-      usageCount: number;
-    }
-  >();
+  private toolMetrics = new Map<string, ToolMetric>();
 
   private constructor() {
     this.initializeToolRegistry();
@@ -409,7 +409,7 @@ export class ToolChoiceEnforcer {
   /**
    * Get tool performance metrics
    */
-  getToolMetrics(toolName?: string): Map<string, unknown> | unknown {
+  getToolMetrics(toolName?: string): Map<string, ToolMetric> | ToolMetric | undefined {
     if (toolName) {
       return this.toolMetrics.get(toolName);
     }

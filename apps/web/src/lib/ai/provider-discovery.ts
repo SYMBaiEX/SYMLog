@@ -7,6 +7,15 @@ import { distributedTracing } from '../telemetry/distributed-tracing';
 import type { ModelInfo, ProviderHealth, ProviderInfo } from './gateway';
 import { aiTelemetry } from './telemetry';
 
+// Type-safe EventEmitter wrapper
+type TypedEventEmitter<T extends Record<string, any>> = {
+  on<K extends keyof T>(event: K, listener: T[K]): any;
+  off<K extends keyof T>(event: K, listener: T[K]): any;
+  emit<K extends keyof T>(event: K, ...args: Parameters<T[K]>): boolean;
+  once<K extends keyof T>(event: K, listener: T[K]): any;
+  removeAllListeners<K extends keyof T>(event?: K): any;
+} & EventEmitter;
+
 // Provider discovery configuration
 export interface ProviderDiscoveryConfig {
   // Health check settings
@@ -109,7 +118,7 @@ export interface ProviderHealthHistory {
  * Real-time Provider Discovery Service
  * Implements August 2025 best practices for dynamic AI provider discovery
  */
-export class ProviderDiscoveryService extends EventEmitter<ProviderDiscoveryEvents> {
+export class ProviderDiscoveryService extends EventEmitter {
   private static instance: ProviderDiscoveryService;
   private discoveredProviders: Map<string, DiscoveredProvider> = new Map();
   private healthCheckIntervals: Map<string, NodeJS.Timeout> = new Map();
@@ -120,6 +129,14 @@ export class ProviderDiscoveryService extends EventEmitter<ProviderDiscoveryEven
   constructor(private config: ProviderDiscoveryConfig) {
     super();
     this.setupEventHandlers();
+  }
+
+  // Type-safe emit wrapper
+  override emit<K extends keyof ProviderDiscoveryEvents>(
+    event: K,
+    ...args: Parameters<ProviderDiscoveryEvents[K]>
+  ): boolean {
+    return super.emit(event, ...args);
   }
 
   static getInstance(
@@ -850,11 +867,3 @@ export const getProviderDiscoveryService = (
   return ProviderDiscoveryService.getInstance({ ...defaultConfig, ...config });
 };
 
-// Export types for external use
-export type {
-  ProviderDiscoveryConfig,
-  ProviderDiscoveryEvents,
-  ProviderCapabilities,
-  DiscoveredProvider,
-  ProviderHealthHistory,
-};
