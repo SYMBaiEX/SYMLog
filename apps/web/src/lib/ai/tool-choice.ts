@@ -66,7 +66,7 @@ export interface ToolRecommendation {
   confidence: number; // 0-1
   reasoning: string;
   alternativeTools: string[];
-  choiceMode: ToolChoice;
+  choiceMode: ToolChoice<any>;
 }
 
 // Enhanced tool choice errors
@@ -120,7 +120,17 @@ export class ToolChoiceEnforcer {
   private initializeToolRegistry(): void {
     // Register enhanced artifact tools
     Object.entries(enhancedArtifactTools).forEach(([name, tool]) => {
-      this.toolRegistry.set(name, tool as CoreTool);
+      // Convert AI SDK tool to CoreTool format
+      const coreTool: CoreTool = {
+        type: 'function',
+        function: {
+          name: name,
+          description: tool.description || `Enhanced tool: ${name}`,
+          parameters: tool.inputSchema || {},
+        },
+      };
+      
+      this.toolRegistry.set(name, coreTool);
 
       // Initialize metrics with default values
       this.toolMetrics.set(name, {
@@ -143,7 +153,7 @@ export class ToolChoiceEnforcer {
   enforceToolUsage(
     criteria: ToolSelectionCriteria,
     config: ToolChoiceConfig = { mode: 'required' }
-  ): ToolChoice {
+  ): ToolChoice<any> {
     try {
       const recommendation = this.recommendTool(criteria);
 
@@ -164,7 +174,7 @@ export class ToolChoiceEnforcer {
           }
 
           // Fallback to any required tool if specific recommendation isn't confident enough
-          return { type: 'required' };
+          return { type: 'required' } as unknown as ToolChoice<any>;
 
         case 'tool':
           // Force specific tool
@@ -188,13 +198,13 @@ export class ToolChoiceEnforcer {
               toolName: recommendation.toolName,
             };
           }
-          return { type: 'auto' };
+          return { type: 'auto' } as unknown as ToolChoice<any>;
 
         case 'none':
-          return { type: 'none' };
+          return { type: 'none' } as unknown as ToolChoice<any>;
 
         default:
-          return { type: 'auto' };
+          return { type: 'auto' } as unknown as ToolChoice<any>;
       }
     } catch (error) {
       const toolError = standardErrorHandler.handleError(error, {
@@ -324,8 +334,8 @@ export class ToolChoiceEnforcer {
       alternativeTools: alternatives,
       choiceMode:
         bestTool.score > CONFIDENCE_THRESHOLDS.HIGH
-          ? { type: 'tool', toolName: bestTool.name }
-          : { type: 'auto' },
+          ? ({ type: 'tool', toolName: bestTool.name } as unknown as ToolChoice<any>)
+          : ({ type: 'auto' } as unknown as ToolChoice<any>),
     };
   }
 
@@ -520,17 +530,17 @@ export class ToolChoiceEnforcer {
   private handleToolChoiceError(
     error: ToolError,
     config: ToolChoiceConfig
-  ): ToolChoice {
+  ): ToolChoice<any> {
     const errorType =
       error.code === 'TOOL_CHOICE_ERROR' ? 'unavailable' : 'execution';
 
     switch (config.fallbackBehavior) {
       case 'retry':
         // Return a safe fallback tool choice
-        return { type: 'auto' };
+        return { type: 'auto' } as unknown as ToolChoice<any>;
 
       case 'bypass':
-        return { type: 'none' };
+        return { type: 'none' } as unknown as ToolChoice<any>;
 
       case 'error':
       default:
@@ -554,7 +564,7 @@ export const toolChoiceEnforcer = ToolChoiceEnforcer.getInstance();
 export function enforceStructuredOutput(
   outputType: 'code' | 'document' | 'chart' | 'data' | 'image',
   complexity: 'simple' | 'moderate' | 'complex' = 'moderate'
-): ToolChoice {
+): ToolChoice<any> {
   return toolChoiceEnforcer.enforceToolUsage(
     { outputType, complexity, userIntent: 'create' },
     { mode: 'required', fallbackBehavior: 'retry' }

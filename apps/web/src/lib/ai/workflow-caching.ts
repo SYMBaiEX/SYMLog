@@ -143,9 +143,7 @@ export class WorkflowCachingEngine {
     this.stepCache = new AIResponseCache({
       maxSize: 5000,
       maxAge: 1_800_000, // 30 minutes
-      enableCompression: true,
-      enableMetrics: true,
-      cleanupInterval: 300_000, // 5 minutes
+      updateAgeOnGet: true,
     });
   }
 
@@ -558,7 +556,6 @@ export class WorkflowCachingEngine {
       model,
       prompt: interpolatedPrompt,
       temperature: step.metadata?.temperature || 0.7,
-      maxTokens: step.metadata?.maxTokens || 1000,
     });
 
     return result.text;
@@ -582,7 +579,6 @@ export class WorkflowCachingEngine {
       step.schema,
       {
         temperature: step.metadata?.temperature || 0.7,
-        maxTokens: step.metadata?.maxTokens || 1000,
         dependencies: step.dependencies,
         customKey: `${context.workflowId}:${step.id}:${this.hashInput(interpolatedPrompt)}`,
       }
@@ -609,7 +605,6 @@ export class WorkflowCachingEngine {
             model,
             prompt: interpolatedPrompt,
             temperature: step.metadata?.temperature || 0.7,
-            maxTokens: step.metadata?.maxTokens || 1000,
           })
         );
         return result.textStream;

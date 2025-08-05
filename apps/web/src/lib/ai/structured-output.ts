@@ -271,7 +271,6 @@ export async function generateStructuredData<T>(params: {
   prompt: string;
   model?: string;
   temperature?: number;
-  maxTokens?: number;
   mode?: 'object' | 'json';
   output?: OutputStrategy;
 }): Promise<StructuredResult<T>> {
@@ -280,7 +279,6 @@ export async function generateStructuredData<T>(params: {
     prompt,
     model,
     temperature = DEFAULT_TEMPERATURE,
-    maxTokens = DEFAULT_MAX_TOKENS,
     mode = 'json',
     output = 'object',
   } = params;
@@ -298,7 +296,6 @@ export async function generateStructuredData<T>(params: {
       schema,
       prompt: sanitizedPrompt,
       temperature,
-      maxTokens,
       mode: validatedMode as any,
       output: validatedOutput as any,
     });
@@ -329,7 +326,6 @@ export async function streamStructuredData<T>(params: {
   prompt: string;
   model?: string;
   temperature?: number;
-  maxTokens?: number;
   mode?: 'object' | 'json';
   output?: OutputStrategy;
   onStreamValue?: (value: any) => void;
@@ -347,7 +343,6 @@ export async function streamStructuredData<T>(params: {
     prompt,
     model,
     temperature = DEFAULT_STREAM_TEMPERATURE,
-    maxTokens = DEFAULT_MAX_TOKENS,
     mode = 'json',
     output = 'object',
     onStreamValue,
@@ -368,7 +363,6 @@ export async function streamStructuredData<T>(params: {
       schema,
       prompt: sanitizedPrompt,
       temperature,
-      maxTokens,
       mode: validatedMode as any,
       output: validatedOutput as any,
       onFinish: (result) => {
@@ -413,7 +407,6 @@ export async function generateStructuredArray<T>(params: {
   count?: number;
   model?: string;
   temperature?: number;
-  maxTokens?: number;
 }): Promise<StructuredResult<T[]>> {
   const {
     schema,
@@ -421,7 +414,6 @@ export async function generateStructuredArray<T>(params: {
     count = DEFAULT_ARRAY_COUNT,
     model,
     temperature = DEFAULT_ARRAY_TEMPERATURE,
-    maxTokens = DEFAULT_ARRAY_MAX_TOKENS,
   } = params;
 
   // Validate count to prevent abuse
@@ -434,7 +426,6 @@ export async function generateStructuredArray<T>(params: {
     prompt: `${prompt}\n\nGenerate exactly ${validatedCount} items.`,
     model,
     temperature,
-    maxTokens,
     output: 'array',
   });
 }
@@ -450,7 +441,6 @@ export async function streamStructuredArray<T>(params: {
   count?: number;
   model?: string;
   temperature?: number;
-  maxTokens?: number;
   onElement?: (element: T) => void;
   onError?: (error: StructuredResult<T[]>) => void;
 }): Promise<{ success: boolean; stream?: any; error?: string }> {
@@ -460,7 +450,6 @@ export async function streamStructuredArray<T>(params: {
     count = DEFAULT_ARRAY_COUNT,
     model,
     temperature = DEFAULT_ARRAY_TEMPERATURE,
-    maxTokens = DEFAULT_ARRAY_MAX_TOKENS,
     onElement,
     onError,
   } = params;
@@ -479,14 +468,21 @@ export async function streamStructuredArray<T>(params: {
       schema: arraySchema,
       prompt: `${sanitizedPrompt}\n\nGenerate exactly ${validatedCount} items.`,
       temperature,
-      maxTokens,
       output: 'array',
     });
 
     // Handle element streaming
     if (onElement) {
-      for await (const element of result.elementStream) {
-        onElement(element);
+      for await (const elements of result.elementStream) {
+        // elementStream yields arrays when output is 'array', so we need to iterate through elements
+        if (Array.isArray(elements)) {
+          for (const element of elements) {
+            onElement(element);
+          }
+        } else {
+          // Type cast to handle the complex generic type resolution
+          onElement(elements as T);
+        }
       }
     }
 
@@ -604,7 +600,6 @@ export async function generateBySchemaName<T extends SchemaType>(
   options?: {
     model?: string;
     temperature?: number;
-    maxTokens?: number;
     output?: OutputStrategy;
   }
 ): Promise<StructuredResult<SchemaData<T>>> {

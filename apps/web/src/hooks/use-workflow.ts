@@ -101,7 +101,14 @@ export function useWorkflow(options: WorkflowOptions = {}) {
               throw new Error(`Tool ${step.toolName} not found`);
             }
 
-            result = await tool.execute(step.toolParams || {}, stepContext);
+            if (!tool.execute) {
+              throw new Error(`Tool ${step.toolName} does not have an execute method`);
+            }
+
+            result = await tool.execute(step.toolParams || {}, { 
+              toolCallId: `${step.id}-${Date.now()}`,
+              messages: [] 
+            });
             break;
           }
 

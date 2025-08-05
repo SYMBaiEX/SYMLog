@@ -118,7 +118,6 @@ export async function POST(req: NextRequest) {
           count: arrayCount,
           model,
           temperature,
-          maxTokens,
         });
       } else {
         // Stream object generation
@@ -127,7 +126,6 @@ export async function POST(req: NextRequest) {
           prompt,
           model,
           temperature,
-          maxTokens,
           mode,
           output,
         });

@@ -64,23 +64,53 @@ export interface RecoveryResult<T> {
   duration: number;
 }
 
-// Model fallback chain
-const MODEL_FALLBACK_CHAINS: Record<string, string[]> = {
+// Type for registry model IDs
+type RegistryModelId = 
+  | "openai:premium" 
+  | "openai:code" 
+  | "openai:fast" 
+  | "anthropic:fast" 
+  | "anthropic:balanced" 
+  | "anthropic:reasoning" 
+  | "anthropic:creative";
+
+// Helper function to ensure model ID is valid for registry
+function getRegistryModelId(modelId: string): RegistryModelId {
+  // Map model IDs to registry format
+  const modelMap: Record<string, RegistryModelId> = {
+    'openai:gpt-4.1-nano': 'openai:premium',
+    'openai:gpt-4o-mini': 'openai:fast',
+    'anthropic:claude-3-5-sonnet-20241022': 'anthropic:balanced',
+    'anthropic:claude-3-haiku-20240307': 'anthropic:fast',
+    'openai:premium': 'openai:premium',
+    'openai:fast': 'openai:fast',
+    'openai:code': 'openai:code',
+    'anthropic:fast': 'anthropic:fast',
+    'anthropic:balanced': 'anthropic:balanced',
+    'anthropic:reasoning': 'anthropic:reasoning',
+    'anthropic:creative': 'anthropic:creative',
+  };
+  
+  return modelMap[modelId] || 'openai:premium';
+}
+
+// Model fallback chain - updated to use registry model IDs
+const MODEL_FALLBACK_CHAINS: Record<string, RegistryModelId[]> = {
   'openai:gpt-4.1-nano': [
-    'openai:gpt-4o-mini',
-    'anthropic:claude-3-5-sonnet-20241022',
+    'openai:fast',
+    'anthropic:balanced',
   ],
   'anthropic:claude-3-5-sonnet-20241022': [
-    'anthropic:claude-3-haiku-20240307',
-    'openai:gpt-4.1-nano',
+    'anthropic:fast',
+    'openai:premium',
   ],
   'openai:gpt-4o-mini': [
-    'anthropic:claude-3-haiku-20240307',
-    'openai:gpt-4.1-nano',
+    'anthropic:fast',
+    'openai:premium',
   ],
   'anthropic:claude-3-haiku-20240307': [
-    'openai:gpt-4o-mini',
-    'anthropic:claude-3-5-sonnet-20241022',
+    'openai:fast',
+    'anthropic:balanced',
   ],
 };
 
@@ -410,7 +440,7 @@ export class ErrorRecoveryManager {
 
     if (fallbackType === 'fallback') {
       const fallbacks = MODEL_FALLBACK_CHAINS[modelId] || [
-        'openai:gpt-4o-mini',
+        'openai:fast' as RegistryModelId,
       ];
       const fallbackId = fallbacks[0];
 
@@ -424,13 +454,14 @@ export class ErrorRecoveryManager {
 
     if (fallbackType === 'upgrade') {
       // Upgrade to more capable model
-      const upgrades: Record<string, string> = {
-        'openai:gpt-4o-mini': 'openai:gpt-4.1-nano',
-        'anthropic:claude-3-haiku-20240307':
-          'anthropic:claude-3-5-sonnet-20241022',
+      const upgrades: Record<string, RegistryModelId> = {
+        'openai:gpt-4o-mini': 'openai:premium',
+        'anthropic:claude-3-haiku-20240307': 'anthropic:balanced',
+        'openai:fast': 'openai:premium',
+        'anthropic:fast': 'anthropic:balanced',
       };
 
-      const upgradeId = upgrades[modelId] || 'openai:gpt-4.1-nano';
+      const upgradeId = upgrades[modelId] || 'openai:premium';
 
       loggingService.info('Upgrading to more capable model', {
         from: modelId,
@@ -441,7 +472,7 @@ export class ErrorRecoveryManager {
     }
 
     return typeof currentModel === 'string'
-      ? registry.languageModel(currentModel)
+      ? registry.languageModel(getRegistryModelId(currentModel))
       : currentModel;
   }
 
@@ -531,7 +562,7 @@ export class ErrorRecoveryManager {
     const errorInfo = this.errorHandler.handleError(error);
 
     // Always retry API errors with 5xx status codes
-    if (APICallError.isInstance(error) && error.statusCode >= 500) {
+    if (APICallError.isInstance(error) && error.statusCode && error.statusCode >= 500) {
       return true;
     }
 

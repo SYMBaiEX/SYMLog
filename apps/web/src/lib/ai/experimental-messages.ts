@@ -542,5 +542,4 @@ export class MessageStreamer {
   }
 }
 
-// Export utilities
-export { MessageManager, MessageStreamer };
+// Classes are already exported above

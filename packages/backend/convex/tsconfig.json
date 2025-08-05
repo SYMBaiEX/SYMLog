@@ -12,6 +12,7 @@
     "skipLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
+    "downlevelIteration": true,
 
     /* These compiler options are required by Convex */
     "target": "ESNext",
@@ -22,5 +23,5 @@
     "noEmit": true
   },
   "include": ["./**/*"],
-  "exclude": ["./_generated"]
+  "exclude": ["./_generated", "./node_modules"]
 }

@@ -1,4 +1,4 @@
-import { loggingService } from '@/lib/logger';
+import logger from '@/lib/logger';
 
 /**
  * Standardized error handling for the enhanced tool system
@@ -337,16 +337,16 @@ export class StandardErrorHandler {
 
     switch (logLevel) {
       case 'error':
-        loggingService.error('Tool system error', logData);
+        logger.error(logData, 'Tool system error');
         break;
       case 'warn':
-        loggingService.warn('Tool system warning', logData);
+        logger.warn(logData, 'Tool system warning');
         break;
       case 'info':
-        loggingService.info('Tool system info', logData);
+        logger.info(logData, 'Tool system info');
         break;
       case 'debug':
-        loggingService.debug('Tool system debug', logData);
+        logger.debug(logData, 'Tool system debug');
         break;
     }
   }

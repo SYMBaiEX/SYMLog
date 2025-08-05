@@ -146,6 +146,7 @@ export class ToolStreamingManager extends EventEmitter {
       state: 'idle',
       startTime,
       lastUpdateTime: startTime,
+      executionId,
       metadata: {
         toolName: sanitizedToolName,
         executionId,

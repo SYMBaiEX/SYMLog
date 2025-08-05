@@ -62,7 +62,7 @@ export function useStructuredOutput<T extends SchemaType>(schemaName: T) {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Get the schema for validation
-  const schema = schemaRegistry[schemaName];
+  const schema = schemaRegistry[schemaName] as unknown as z.ZodSchema<SchemaData<T>>;
 
   const generate = useCallback(
     async (prompt: string, options: GenerateObjectOptions = {}) => {
@@ -134,11 +134,11 @@ export function useStructuredOutput<T extends SchemaType>(schemaName: T) {
                     const validationResult = schema.safeParse(data.object);
                     setState((prev) => ({
                       ...prev,
-                      partialData: data.object,
+                      partialData: data.object as Partial<SchemaData<T>>,
                     }));
                   } else if (data.type === 'complete') {
                     // Validate final data
-                    const validationResult = validateStructuredData(
+                    const validationResult = validateStructuredData<SchemaData<T>>(
                       data.object,
                       schema
                     );
@@ -196,7 +196,7 @@ export function useStructuredOutput<T extends SchemaType>(schemaName: T) {
           }
 
           // Validate the result
-          const validationResult = validateStructuredData(
+          const validationResult = validateStructuredData<SchemaData<T>>(
             result.object,
             schema
           );
@@ -350,7 +350,7 @@ export function useStructuredArray<T extends SchemaType>(schemaName: T) {
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const schema = z.array(schemaRegistry[schemaName]);
+  const schema = z.array(schemaRegistry[schemaName] as unknown as z.ZodSchema<SchemaData<T>>);
 
   const generateArray = useCallback(
     async (
@@ -422,7 +422,7 @@ export function useStructuredArray<T extends SchemaType>(schemaName: T) {
           }
 
           // Validate the array result
-          const validationResult = validateStructuredData(
+          const validationResult = validateStructuredData<SchemaData<T>[]>(
             result.object,
             schema
           );

@@ -744,7 +744,7 @@ export async function embedMany(
       values: sanitizedValues,
       embeddings: allEmbeddings,
       usage: totalUsage,
-      response: result.response,
+      response: undefined, // Batch results don't have individual response objects
       providerMetadata: batchResults[batchResults.length - 1].providerMetadata,
     };
   }

@@ -132,7 +132,6 @@ export async function POST(req: NextRequest) {
         {
           model,
           temperature,
-          maxTokens,
           output: outputType,
         }
       );

@@ -538,7 +538,7 @@ export class ErrorClassifier {
     }
 
     // 5xx errors are transient
-    if (APICallError.isInstance(error) && error.statusCode >= 500) {
+    if (APICallError.isInstance(error) && error.statusCode && error.statusCode >= 500) {
       return true;
     }
 
@@ -558,7 +558,9 @@ export class ErrorClassifier {
     // Check API error retryability
     if (APICallError.isInstance(error)) {
       return (
-        error.isRetryable || error.statusCode >= 500 || error.statusCode === 429
+        Boolean(error.isRetryable) || 
+        (error.statusCode !== undefined && error.statusCode >= 500) || 
+        (error.statusCode !== undefined && error.statusCode === 429)
       );
     }
 

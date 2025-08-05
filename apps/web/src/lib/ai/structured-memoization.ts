@@ -127,7 +127,6 @@ export class StructuredMemoizer {
     schema: z.ZodSchema<T>,
     options?: {
       temperature?: number;
-      maxTokens?: number;
       dependencies?: string[];
       computationCost?: number;
       customKey?: string;
@@ -145,7 +144,6 @@ export class StructuredMemoizer {
         prompt,
         schemaKey,
         temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
       });
 
     // Check schema cache
@@ -181,13 +179,17 @@ export class StructuredMemoizer {
     this.metrics.totalComputations++;
 
     try {
-      const result = await generateObject({
+      const generateParams: any = {
         model,
         prompt,
         schema: optimizedSchema,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
-      });
+      };
+      
+      if (options?.temperature !== undefined) {
+        generateParams.temperature = options.temperature;
+      }
+      
+      const result = await generateObject(generateParams);
 
       const computationTime = Date.now() - startTime;
       this.recordComputationTime(computationTime);
@@ -201,7 +203,7 @@ export class StructuredMemoizer {
         });
       }
 
-      return result.object;
+      return result.object as T;
     } catch (error) {
       const computationTime = Date.now() - startTime;
       this.recordComputationTime(computationTime);
@@ -218,7 +220,6 @@ export class StructuredMemoizer {
     schema: z.ZodSchema<T>,
     options?: {
       temperature?: number;
-      maxTokens?: number;
       dependencies?: string[];
       computationCost?: number;
       customKey?: string;
@@ -232,7 +233,6 @@ export class StructuredMemoizer {
         prompt,
         schemaKey: this.generateSchemaKey(schema),
         temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
         streaming: true,
       });
 
@@ -254,17 +254,21 @@ export class StructuredMemoizer {
     const streamChunks: Partial<T>[] = [];
 
     try {
-      const stream = await streamObject({
+      const streamParams: any = {
         model,
         prompt,
         schema,
-        temperature: options?.temperature,
-        maxTokens: options?.maxTokens,
-      });
+      };
+      
+      if (options?.temperature !== undefined) {
+        streamParams.temperature = options.temperature;
+      }
+      
+      const stream = await streamObject(streamParams);
 
       // Create caching stream
       return this.createCachingStream(
-        stream.partialObjectStream,
+        stream.partialObjectStream as AsyncIterable<Partial<T>>,
         resultKey,
         streamChunks,
         {
@@ -291,8 +295,7 @@ export class StructuredMemoizer {
       schema: z.ZodSchema<T>;
       options?: {
         temperature?: number;
-        maxTokens?: number;
-        dependencies?: string[];
+          dependencies?: string[];
         customKey?: string;
       };
     }>
@@ -476,7 +479,6 @@ export class StructuredMemoizer {
     prompt: string;
     schemaKey: string;
     temperature?: number;
-    maxTokens?: number;
     streaming?: boolean;
   }): string {
     const keyData = {
@@ -484,7 +486,7 @@ export class StructuredMemoizer {
       prompt: this.hashString(params.prompt),
       schema: params.schemaKey,
       temp: params.temperature || 0.7,
-      tokens: params.maxTokens || 1000,
+      tokens: 1000,
       stream: params.streaming,
     };
 
@@ -841,7 +843,6 @@ export async function memoizedGenerateObject<T>(
   schema: z.ZodSchema<T>,
   options?: {
     temperature?: number;
-    maxTokens?: number;
     dependencies?: string[];
     computationCost?: number;
     customKey?: string;
@@ -862,7 +863,6 @@ export async function memoizedStreamObject<T>(
   schema: z.ZodSchema<T>,
   options?: {
     temperature?: number;
-    maxTokens?: number;
     dependencies?: string[];
     computationCost?: number;
     customKey?: string;

@@ -1190,16 +1190,6 @@ export class ExperimentalAI {
     return await generateText({
       model: getAIModel(options?.model),
       prompt: finalPrompt,
-      experimental_providerMetadata: {
-        contextManagement: {
-          originalContextItems: context.length,
-          includedContextItems: orderedContext.filter((item) =>
-            contextText.includes(item)
-          ).length,
-          estimatedTokensUsed: tokensUsed,
-          maxOutputTokens,
-        },
-      },
     });
   }
 

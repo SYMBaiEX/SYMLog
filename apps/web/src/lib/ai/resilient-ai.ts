@@ -535,7 +535,6 @@ export class ResilientAIService {
         await generateText({
           model,
           prompt: 'Respond with "OK"',
-          maxTokens: 10,
         });
 
         const latency = Date.now() - startTime;
@@ -685,7 +684,6 @@ export class ResilientAIService {
     // Reduce quality settings for fallback attempts
     return {
       ...options,
-      maxTokens: Math.min(options?.maxTokens || 1000, 500),
       temperature: 0.5,
       topP: 0.9,
     };

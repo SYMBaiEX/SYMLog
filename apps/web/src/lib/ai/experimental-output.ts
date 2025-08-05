@@ -96,7 +96,6 @@ export class StructuredOutputService {
       messages?: any[];
       tools?: Record<string, any>;
       temperature?: number;
-      maxTokens?: number;
     }
   ): Promise<GenerateTextResult<any> & { output?: T }> {
     const model = getAIModel(options?.model);
@@ -127,7 +126,6 @@ export class StructuredOutputService {
       messages: options?.messages,
       tools: options?.tools,
       temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
       experimental_output: output,
     });
 
@@ -164,7 +162,6 @@ export class StructuredOutputService {
       messages?: any[];
       tools?: Record<string, any>;
       temperature?: number;
-      maxTokens?: number;
       onPartialOutput?: PartialOutputHandler<T>;
     }
   ): Promise<OutputStreamResult<T>> {
@@ -186,7 +183,6 @@ export class StructuredOutputService {
       messages: options?.messages,
       tools: options?.tools,
       temperature: options?.temperature,
-      maxTokens: options?.maxTokens,
       experimental_output: output,
     });
 

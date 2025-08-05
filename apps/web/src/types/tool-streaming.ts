@@ -139,7 +139,10 @@ export interface ToolStreamingSSEMessage {
     | 'execution-progress'
     | 'execution-complete'
     | 'error'
-    | 'end';
+    | 'end'
+    | 'connection-established'
+    | 'stream-close'
+    | 'stream-error';
   data: {
     toolName: string;
     executionId: string;

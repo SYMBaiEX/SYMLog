@@ -32,7 +32,6 @@ export interface ReasoningResult {
 export interface ReasoningOptions {
   model?: string;
   temperature?: number;
-  maxTokens?: number;
   tagName?: string;
   separator?: string;
   startWithReasoning?: boolean;
@@ -95,7 +94,6 @@ After reasoning, provide a clear and concise answer.`;
         system: enhancedSystem,
         prompt: enhancedPrompt,
         temperature: this.options.temperature,
-        maxTokens: this.options.maxTokens,
       });
 
       // Extract confidence if requested
@@ -149,7 +147,6 @@ After reasoning, provide a clear and concise answer.`;
       system: enhancedSystem,
       prompt: enhancedPrompt,
       temperature: this.options.temperature,
-      maxTokens: this.options.maxTokens,
       onStepFinish: async ({ reasoning }) => {
         // Process reasoning steps in real-time
         if (reasoning && reasoning.length > stepIndex) {
