@@ -18,6 +18,7 @@ import { GlassButton } from "@/components/ui/glass-button"
 import { ModeToggle } from "@/components/mode-toggle"
 import { cn } from "@/lib/utils"
 import { CrossmintWalletAuth } from "@/components/crossmint-wallet-auth"
+import { WebAuthFlow } from "@/components/web-auth-flow"
 import { useAuth } from "@crossmint/client-sdk-react-ui"
 
 const navigation = [
