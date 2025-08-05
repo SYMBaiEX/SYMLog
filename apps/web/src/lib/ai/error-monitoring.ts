@@ -1,4 +1,3 @@
-import { logError as logErrorToConsole } from '@/lib/logger';
 import {
   type EnhancedErrorInfo,
   type ErrorCategory,
@@ -6,16 +5,10 @@ import {
   getAdvancedErrorHandler,
 } from './advanced-error-handling';
 import { ErrorPattern, getErrorClassifier } from './error-classification';
+import { createLogger } from '../logger/unified-logger';
 
-// Create a logger wrapper
-const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
-    console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
-    console.debug(`[DEBUG] ${message}`, data),
-};
+// Create AI error monitoring logger
+const logger = createLogger({ service: 'ai-error-monitoring' });
 
 // Alert types
 export enum AlertType {
@@ -191,7 +184,7 @@ export class ErrorMonitoringService {
     // Check alerts
     await this.checkAlerts(errorInfo, classification, operationName, metadata);
 
-    loggingService.debug('Error recorded', {
+    logger.debug('Error recorded', {
       operation: operationName,
       category: errorInfo.category,
       pattern: classification.pattern,
@@ -298,7 +291,7 @@ export class ErrorMonitoringService {
    */
   configureAlert(config: AlertConfig): void {
     this.alerts.set(config.type, config);
-    loggingService.info('Alert configured', { type: config.type });
+    logger.info('Alert configured', { type: config.type });
   }
 
   /**
@@ -308,7 +301,7 @@ export class ErrorMonitoringService {
     const alert = this.alertHistory.find((a) => a.id === alertId);
     if (alert) {
       alert.acknowledged = true;
-      loggingService.info('Alert acknowledged', { alertId });
+      logger.info('Alert acknowledged', { alertId });
     }
   }
 
@@ -327,7 +320,7 @@ export class ErrorMonitoringService {
     this.operationMetrics.clear();
     this.alertHistory = [];
     this.lastAlertTime.clear();
-    loggingService.info('Monitoring system reset');
+    logger.info('Monitoring system reset');
   }
 
   // Private helper methods
@@ -468,17 +461,20 @@ export class ErrorMonitoringService {
   ): Promise<void> {
     switch (channel.type) {
       case 'console': {
-        const logMethod =
-          alert.severity === 'critical'
-            ? 'error'
-            : alert.severity === 'high'
-              ? 'warn'
-              : 'info';
-        loggingService[logMethod](`[ALERT] ${alert.title}`, {
+        const alertData = {
+          title: alert.title,
           message: alert.message,
           type: alert.type,
           metadata: alert.metadata,
-        });
+        };
+        
+        if (alert.severity === 'critical') {
+          logger.error(`[ALERT] ${alert.title}`, alertData);
+        } else if (alert.severity === 'high') {
+          logger.warn(`[ALERT] ${alert.title}`, alertData);
+        } else {
+          logger.info(`[ALERT] ${alert.title}`, alertData);
+        }
         break;
       }
 
@@ -574,7 +570,7 @@ export class ErrorMonitoringService {
       (alert) => alert.timestamp.getTime() > cutoff
     );
 
-    loggingService.debug('Cleaned up old metrics');
+    logger.debug('Cleaned up old metrics');
   }
 }
 

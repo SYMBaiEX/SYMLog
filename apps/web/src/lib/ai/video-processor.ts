@@ -1,6 +1,10 @@
 import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI video processor logger
+const logger = createLogger({ service: 'ai-video-processor' });
 
 // Configuration constants to replace magic numbers
 const VIDEO_PROCESSING_CONSTANTS = {
@@ -193,7 +197,9 @@ export class AdvancedVideoProcessor {
         try {
           audioTranscript = await this.extractAndTranscribeAudio(video);
         } catch (error) {
-          console.warn('Audio transcription failed:', error);
+          logger.warn('Audio transcription failed', {
+            error: error instanceof Error ? error.message : String(error),
+          });
         }
       }
 
@@ -496,7 +502,10 @@ export class AdvancedVideoProcessor {
           }))
         );
       } catch (error) {
-        console.warn(`Scene detection failed for batch at frame ${i}:`, error);
+        logger.warn('Scene detection failed for batch', {
+          frameIndex: i,
+          error: error instanceof Error ? error.message : String(error),
+        });
 
         // Add fallback basic scene detection
         for (const frame of batch) {
@@ -585,7 +594,9 @@ export class AdvancedVideoProcessor {
         });
       }
     } catch (error) {
-      console.warn('Object tracking failed:', error);
+      logger.warn('Object tracking failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     return objects;
@@ -637,7 +648,9 @@ Provide insights about the video content, main themes, and key moments.`,
 
       return summaryAnalysis.object;
     } catch (error) {
-      console.warn('Summary generation failed:', error);
+      logger.warn('Summary generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Fallback summary
       return {
@@ -804,7 +817,7 @@ Provide insights about the video content, main themes, and key moments.`,
     // Check for OffscreenCanvas support
     this.supportsOffscreenCanvas = 'OffscreenCanvas' in window;
 
-    console.log('Video processor capabilities:', {
+    logger.info('Video processor capabilities', {
       webCodecs: this.supportsWebCodecs,
       offscreenCanvas: this.supportsOffscreenCanvas,
       workers: 'Worker' in window,
@@ -877,7 +890,9 @@ Provide insights about the video content, main themes, and key moments.`,
       this.worker = new Worker(workerUrl);
 
       this.worker.onerror = (error) => {
-        console.warn('Video processing worker error:', error);
+        logger.warn('Video processing worker error', {
+          error: error instanceof Error ? error.message : String(error),
+        });
         this.worker?.terminate();
         this.worker = undefined;
       };
@@ -887,7 +902,9 @@ Provide insights about the video content, main themes, and key moments.`,
         URL.revokeObjectURL(workerUrl);
       }, VIDEO_PROCESSING_CONSTANTS.WORKER_CLEANUP_DELAY);
     } catch (error) {
-      console.warn('Failed to initialize video processing worker:', error);
+      logger.warn('Failed to initialize video processing worker', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.worker = undefined;
     }
   }
@@ -928,7 +945,9 @@ Provide insights about the video content, main themes, and key moments.`,
       this.supportsWebCodecs = false;
       this.supportsOffscreenCanvas = false;
     } catch (error) {
-      console.warn('Error during video processor cleanup:', error);
+      logger.warn('Error during video processor cleanup', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 }

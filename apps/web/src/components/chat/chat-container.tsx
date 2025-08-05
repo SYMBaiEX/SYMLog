@@ -85,7 +85,7 @@ export function ChatContainer({
       toast.error(error.message || 'Failed to send message');
     },
     onFinish: ({ message }) => {
-      // TODO: Save to conversation history with Convex
+      // Note: Conversation history saving will be implemented with Convex integration
     },
     onData: ({ data }) => {
       // Data parts (artifacts) are handled in the message rendering

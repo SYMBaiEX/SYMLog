@@ -1,6 +1,10 @@
 import { openai } from '@ai-sdk/openai';
 import { generateObject } from 'ai';
 import { z } from 'zod';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI streaming processor logger
+const logger = createLogger({ service: 'ai-streaming-processor' });
 
 // Configuration constants for streaming
 const STREAMING_CONSTANTS = {
@@ -321,13 +325,13 @@ export class RealtimeStreamingProcessor {
     try {
       // Comprehensive null checks
       if (!(this.videoElement && this.canvas && this.ctx)) {
-        console.warn('Video processing components not initialized');
+        logger.warn('Video processing components not initialized');
         return null;
       }
 
       // Check if video element is in a valid state
       if (this.videoElement.readyState < 2) {
-        console.debug('Video not ready for frame capture');
+        logger.debug('Video not ready for frame capture');
         return null;
       }
 
@@ -338,7 +342,7 @@ export class RealtimeStreamingProcessor {
 
       // Validate canvas dimensions
       if (this.canvas.width <= 0 || this.canvas.height <= 0) {
-        console.warn('Invalid canvas dimensions');
+        logger.warn('Invalid canvas dimensions');
         return null;
       }
 
@@ -352,14 +356,16 @@ export class RealtimeStreamingProcessor {
           this.canvas.height
         );
       } catch (drawError) {
-        console.warn('Failed to draw video frame to canvas:', drawError);
+        logger.warn('Failed to draw video frame to canvas', {
+          error: drawError instanceof Error ? drawError.message : String(drawError),
+        });
         return null;
       }
 
       // Generate frame data with size limit
       const frameData = this.canvas.toDataURL('image/jpeg', 0.8);
       if (frameData.length > STREAMING_CONSTANTS.FRAME_SIZE_LIMIT) {
-        console.warn('Frame data too large, skipping analysis');
+        logger.warn('Frame data too large, skipping analysis');
         return null;
       }
 
@@ -376,7 +382,9 @@ export class RealtimeStreamingProcessor {
           ),
         ]);
       } catch (analysisError) {
-        console.warn('Frame analysis failed:', analysisError);
+        logger.warn('Frame analysis failed', {
+          error: analysisError instanceof Error ? analysisError.message : String(analysisError),
+        });
         analysis = {
           scene: 'analysis_failed',
           objects: [],
@@ -390,7 +398,9 @@ export class RealtimeStreamingProcessor {
       try {
         audioLevel = await this.getAudioLevel();
       } catch (audioError) {
-        console.debug('Audio level detection failed:', audioError);
+        logger.debug('Audio level detection failed', {
+          error: audioError instanceof Error ? audioError.message : String(audioError),
+        });
         audioLevel = 0;
       }
 
@@ -407,10 +417,9 @@ export class RealtimeStreamingProcessor {
       this.emit({ type: 'frame', data: result });
       return result;
     } catch (error) {
-      console.error(
-        'Live frame processing encountered unexpected error:',
-        error
-      );
+      logger.error('Live frame processing encountered unexpected error', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.emit({
         type: 'error',
         error: `Frame processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -570,9 +579,9 @@ export class RealtimeStreamingProcessor {
         options.mimeType &&
         !MediaRecorder.isTypeSupported(options.mimeType)
       ) {
-        console.warn(
-          `MIME type ${options.mimeType} not supported, falling back to default`
-        );
+        logger.warn('MIME type not supported, falling back to default', {
+          mimeType: options.mimeType,
+        });
         delete options.mimeType;
       }
 
@@ -584,7 +593,9 @@ export class RealtimeStreamingProcessor {
             this.processRecordedChunk(event.data);
           }
         } catch (error) {
-          console.error('Error processing recorded chunk:', error);
+          logger.error('Error processing recorded chunk', {
+            error: error instanceof Error ? error.message : String(error),
+          });
           this.emit({
             type: 'error',
             error: `Chunk processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -593,24 +604,26 @@ export class RealtimeStreamingProcessor {
       };
 
       this.mediaRecorder.onerror = (event) => {
-        console.error('MediaRecorder error:', event);
+        logger.error('MediaRecorder error', {
+          error: event instanceof Error ? event.message : String(event),
+        });
         this.emit({ type: 'error', error: `MediaRecorder error: ${event}` });
       };
 
       this.mediaRecorder.onstart = () => {
-        console.debug('MediaRecorder started successfully');
+        logger.debug('MediaRecorder started successfully');
       };
 
       this.mediaRecorder.onstop = () => {
-        console.debug('MediaRecorder stopped');
+        logger.debug('MediaRecorder stopped');
       };
 
       this.mediaRecorder.onpause = () => {
-        console.debug('MediaRecorder paused');
+        logger.debug('MediaRecorder paused');
       };
 
       this.mediaRecorder.onresume = () => {
-        console.debug('MediaRecorder resumed');
+        logger.debug('MediaRecorder resumed');
       };
 
       // Start recording in small chunks for low latency
@@ -620,7 +633,9 @@ export class RealtimeStreamingProcessor {
         error instanceof Error
           ? error.message
           : 'Unknown MediaRecorder initialization error';
-      console.error('Failed to initialize MediaRecorder:', error);
+      logger.error('Failed to initialize MediaRecorder', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       this.emit({
         type: 'error',
         error: `MediaRecorder initialization failed: ${errorMessage}`,
@@ -813,7 +828,9 @@ export class RealtimeStreamingProcessor {
       const blob = new Blob([workerCode], { type: 'application/javascript' });
       this.analysisWorker = new Worker(URL.createObjectURL(blob));
     } catch (error) {
-      console.warn('Failed to initialize analysis worker:', error);
+      logger.warn('Failed to initialize analysis worker', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -823,7 +840,9 @@ export class RealtimeStreamingProcessor {
       try {
         callback(event);
       } catch (error) {
-        console.error('Event listener error:', error);
+        logger.error('Event listener error', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     });
 
@@ -833,7 +852,9 @@ export class RealtimeStreamingProcessor {
       try {
         callback(event);
       } catch (error) {
-        console.error('Universal event listener error:', error);
+        logger.error('Universal event listener error', {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     });
   }

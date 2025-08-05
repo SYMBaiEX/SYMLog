@@ -18,6 +18,10 @@ import {
   performanceMiddleware,
   securityMiddleware,
 } from './middleware';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI providers logger
+const logger = createLogger({ service: 'ai-providers' });
 
 // Create custom providers with model aliases and pre-configured settings
 const customOpenAI = customProvider({
@@ -194,10 +198,10 @@ export const getAIModel = (
 
     return model;
   } catch (error) {
-    console.warn(
-      `Model ${modelToUse} not found, falling back to default`,
-      error
-    );
+    logger.warn('Model not found, falling back to default', {
+      requestedModel: modelToUse,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return registry.languageModel('openai:premium');
   }
 };

@@ -4,7 +4,6 @@ import type {
   LanguageModelRequestMetadata,
   LanguageModelResponseMetadata,
 } from 'ai';
-import { logError as logErrorToConsole } from '@/lib/logger';
 import { v2ErrorHandler } from './error-handling';
 import { FallbackChainManager } from './fallback-chain';
 import {
@@ -14,16 +13,10 @@ import {
 } from './gateway';
 import { IntelligentRoutingEngine } from './intelligent-routing';
 import { ProviderMetricsService } from './provider-metrics';
+import { createLogger } from '../logger/unified-logger';
 
-// Create a logger wrapper
-const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
-    console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
-    console.debug(`[DEBUG] ${message}`, data),
-};
+// Create AI gateway middleware logger
+const logger = createLogger({ service: 'ai-gateway-middleware' });
 
 // Middleware configuration
 export interface MiddlewareConfig {
@@ -194,7 +187,7 @@ export class GatewayMiddleware {
     if (this.config.enableCache) {
       const cached = this.checkCache(context);
       if (cached) {
-        loggingService.info('Cache hit', {
+        logger.info('Cache hit', {
           requestId: context.requestId,
           cacheKey: this.getCacheKey(context),
         });
@@ -241,7 +234,7 @@ export class GatewayMiddleware {
       tags: ['aggregated', aggregationStrategy],
     };
 
-    loggingService.info('Processing aggregated request', {
+    logger.info('Processing aggregated request', {
       requestId: context.requestId,
       strategy: aggregationStrategy,
       modelCount,
@@ -285,7 +278,7 @@ export class GatewayMiddleware {
             },
           };
         } catch (error) {
-          loggingService.warn('Model failed in aggregation', {
+          logger.warn('Model failed in aggregation', {
             model: decision.primaryChoice.modelId,
             error: error instanceof Error ? error.message : 'Unknown error',
           });
@@ -364,7 +357,7 @@ export class GatewayMiddleware {
    */
   clearCache(): void {
     this.cache.clear();
-    loggingService.info('Cache cleared');
+    logger.info('Cache cleared');
   }
 
   /**
@@ -380,7 +373,7 @@ export class GatewayMiddleware {
     // Request logging interceptor
     if (this.config.enableRequestLogging) {
       this.addRequestInterceptor(async (context, next) => {
-        loggingService.info('Processing request', {
+        logger.info('Processing request', {
           requestId: context.requestId,
           task: context.requirements.task,
           priority: context.requirements.priority,
@@ -403,7 +396,7 @@ export class GatewayMiddleware {
         const handledError = v2ErrorHandler.handleError(error);
 
         if (handledError.retry && this.config.maxRetries) {
-          loggingService.warn('Retrying request', {
+          logger.warn('Retrying request', {
             requestId: context.requestId,
             error: handledError.message,
             severity: handledError.severity,
@@ -559,7 +552,7 @@ export class GatewayMiddleware {
     }
 
     if (expired.length > 0) {
-      loggingService.debug(
+      logger.debug(
         `Cleaned up ${expired.length} expired cache entries`
       );
     }
@@ -603,7 +596,7 @@ export class GatewayMiddleware {
             DEFAULT_CONFIG.circuitBreakerTimeout!)
       );
 
-      loggingService.warn('Circuit breaker opened', {
+      logger.warn('Circuit breaker opened', {
         modelId,
         failures: breaker.failures,
         nextRetry: breaker.nextRetry,
@@ -621,7 +614,7 @@ export class GatewayMiddleware {
         now >= breaker.nextRetry
       ) {
         breaker.state = 'half-open';
-        loggingService.info('Circuit breaker half-open', { modelId });
+        logger.info('Circuit breaker half-open', { modelId });
       }
     }
   }

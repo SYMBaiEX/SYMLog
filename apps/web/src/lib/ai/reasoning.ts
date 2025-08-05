@@ -9,6 +9,10 @@ import {
 } from 'ai';
 import { loggingMiddleware } from './middleware';
 import { getAIModel } from './providers';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI reasoning logger
+const logger = createLogger({ service: 'ai-reasoning' });
 
 export interface ReasoningStep {
   text: string;
@@ -115,7 +119,9 @@ After reasoning, provide a clear and concise answer.`;
         },
       };
     } catch (error) {
-      console.error('Reasoning generation failed:', error);
+      logger.error('Reasoning generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw new Error(
         `Failed to generate reasoning: ${error instanceof Error ? error.message : 'Unknown error'}`
       );
@@ -157,7 +163,10 @@ After reasoning, provide a clear and concise answer.`;
               timestamp: new Date(),
             };
 
-            console.log(`[Reasoning Step ${i + 1}]`, step.text);
+            logger.info('Reasoning Step', {
+              stepNumber: i + 1,
+              text: step.text,
+            });
 
             if (onReasoningStep) {
               onReasoningStep(step);

@@ -11,6 +11,10 @@ import {
   simulateStreamingMiddleware,
   wrapLanguageModel,
 } from 'ai';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI middleware logger
+const logger = createLogger({ service: 'ai-middleware' });
 
 // Define middleware types (not exported in AI SDK v5)
 interface LanguageModelV2Middleware {
@@ -50,11 +54,10 @@ interface LanguageModelV2CallSettings {
  */
 export const loggingMiddleware: LanguageModelV2Middleware = {
   transformParams: async ({ params }: TransformParamsOptions) => {
-    console.log('[AI Request]', {
+    logger.info('AI Request', {
       model: params.model,
       promptTokens: params.prompt?.length,
       temperature: params.temperature,
-      timestamp: new Date().toISOString(),
     });
     return params;
   },
@@ -62,18 +65,16 @@ export const loggingMiddleware: LanguageModelV2Middleware = {
     const start = Date.now();
     try {
       const result = await doGenerate();
-      console.log('[AI Response]', {
+      logger.info('AI Response', {
         duration: Date.now() - start,
         usage: result.usage,
         finishReason: result.finishReason,
-        timestamp: new Date().toISOString(),
       });
       return result;
     } catch (error) {
-      console.error('[AI Error]', {
+      logger.error('AI Error', {
         duration: Date.now() - start,
         error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString(),
       });
       throw error;
     }
@@ -93,17 +94,15 @@ export const loggingMiddleware: LanguageModelV2Middleware = {
           }
           yield chunk;
         }
-        console.log('[AI Stream Complete]', {
+        logger.info('AI Stream Complete', {
           duration: Date.now() - start,
           tokenCount,
-          timestamp: new Date().toISOString(),
         });
       } catch (error) {
-        console.error('[AI Stream Error]', {
+        logger.error('AI Stream Error', {
           duration: Date.now() - start,
           tokenCount,
           error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date().toISOString(),
         });
         throw error;
       }
@@ -188,10 +187,9 @@ export const securityMiddleware: LanguageModelV2Middleware = {
 
       // Log suspicious activity
       if (sanitized !== params.prompt) {
-        console.warn('[Security Middleware] Prompt sanitization applied:', {
+        logger.warn('Prompt sanitization applied', {
           original: params.prompt.substring(0, 100),
           sanitized: sanitized.substring(0, 100),
-          timestamp: new Date().toISOString(),
         });
       }
 
@@ -231,7 +229,9 @@ export const securityMiddleware: LanguageModelV2Middleware = {
       return result;
     } catch (error) {
       // Log security-related errors
-      console.error('[Security Middleware] Generation failed:', error);
+      logger.error('Generation failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   },
@@ -257,7 +257,7 @@ export function createCachingMiddleware(
       // Check cache
       const cached = cache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < ttl) {
-        console.log('[Cache Hit]', { cacheKey: cacheKey.substring(0, 50) });
+        logger.info('Cache Hit', { cacheKey: cacheKey.substring(0, 50) });
         return cached.result;
       }
 
@@ -518,10 +518,10 @@ export function createRetryMiddleware(
           return await doGenerate();
         } catch (error) {
           lastError = error as Error;
-          console.warn(
-            `[Retry Middleware] Attempt ${attempt + 1} failed:`,
-            error
-          );
+          logger.warn('Retry attempt failed', {
+            attempt: attempt + 1,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
 
           if (attempt < maxRetries) {
             const delay = initialDelay * 2 ** attempt;

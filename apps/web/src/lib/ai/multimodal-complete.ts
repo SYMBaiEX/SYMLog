@@ -10,6 +10,10 @@ import {
   type VideoAnalysisResult,
   type VideoProcessingConfig,
 } from './video-processor';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI multimodal complete logger
+const logger = createLogger({ service: 'ai-multimodal-complete' });
 
 /**
  * Complete Multi-Modal AI System - 100% Implementation
@@ -112,9 +116,7 @@ export class MultiModalCompleteSystem {
       this.config.streaming
     );
 
-    console.log(
-      '🚀 Multi-Modal Complete System initialized - 100% feature complete!'
-    );
+    logger.info('Multi-Modal Complete System initialized - 100% feature complete!');
   }
 
   /**
@@ -226,9 +228,10 @@ export class MultiModalCompleteSystem {
       ? Math.min(attachments.length, navigator.hardwareConcurrency || 4)
       : 1;
 
-    console.log(
-      `🔄 Processing batch of ${attachments.length} files with ${parallelizationFactor}x parallelization`
-    );
+    logger.info('Processing batch of files with parallelization', {
+      fileCount: attachments.length,
+      parallelizationFactor,
+    });
 
     // Process files with optimized parallel batching
     const batches = this.chunkArray(attachments, parallelizationFactor);
@@ -388,7 +391,9 @@ export class MultiModalCompleteSystem {
         },
       };
     } catch (error) {
-      console.warn('Cross-modal analysis failed:', error);
+      logger.warn('Cross-modal analysis failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
 
       // Return fallback analysis
       return {
@@ -856,14 +861,17 @@ export const processBatchAttachments = async (
 // Export singleton system
 export const multiModalCompleteSystem = new MultiModalCompleteSystem();
 
-console.log('🎉 Multi-Modal Support 100% COMPLETE! All features implemented:');
-console.log('✅ Image processing with OCR');
-console.log('✅ Audio transcription and analysis');
-console.log('✅ Document processing and extraction');
-console.log('✅ Advanced video processing with hardware acceleration');
-console.log('✅ Real-time streaming with WebRTC and MediaRecorder');
-console.log('✅ Cross-modal analysis and intelligent insights');
-console.log('✅ Batch processing with parallel optimization');
-console.log('✅ Performance monitoring and caching');
-console.log('✅ Worker threads and edge processing');
-console.log('✅ Complete error handling and fallbacks');
+logger.info('Multi-Modal Support 100% COMPLETE! All features implemented', {
+  features: [
+    'Image processing with OCR',
+    'Audio transcription and analysis',
+    'Document processing and extraction',
+    'Advanced video processing with hardware acceleration',
+    'Real-time streaming with WebRTC and MediaRecorder',
+    'Cross-modal analysis and intelligent insights',
+    'Batch processing with parallel optimization',
+    'Performance monitoring and caching',
+    'Worker threads and edge processing',
+    'Complete error handling and fallbacks',
+  ],
+});

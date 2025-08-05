@@ -2,6 +2,10 @@ import type { CoreMessage, CoreToolMessage } from 'ai';
 import { generateText, type StopCondition, stepCountIs, streamText } from 'ai';
 import { getAIModel } from './providers';
 import { artifactTools } from './tools/artifact-tools';
+import { createLogger } from '../logger/unified-logger';
+
+// Create AI workflow control logger
+const logger = createLogger({ service: 'ai-workflow-control' });
 
 export interface WorkflowStep {
   stepNumber: number;

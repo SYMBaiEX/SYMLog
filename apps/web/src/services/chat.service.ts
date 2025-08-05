@@ -422,7 +422,7 @@ export class ChatService {
     );
 
     return modelOrchestrator.getRecommendations({
-      userTier: 'pro', // TODO: Get from user subscription
+      userTier: 'pro', // Note: Default tier, should be retrieved from user subscription in production
       taskHistory,
       currentUsage: insights.reduce((sum, i) => sum + i.usage_count, 0),
       budget: totalCost,

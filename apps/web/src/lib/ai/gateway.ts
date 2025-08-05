@@ -32,7 +32,6 @@ export interface GatewayRequestMetadata extends LanguageModelRequestMetadata {
   timestamp?: string;
 }
 
-import { logError as logErrorToConsole } from '@/lib/logger';
 import { distributedTracing } from '../telemetry/distributed-tracing';
 import { v2ErrorHandler } from './error-handling';
 import { LoadBalancer, type LoadBalancingStrategy } from './load-balancing';
@@ -44,16 +43,10 @@ import {
 } from './provider-discovery';
 import { ProviderMetricsService } from './provider-metrics';
 import { registry } from './providers';
+import { createLogger } from '../logger/unified-logger';
 
-// Create a logger wrapper
-const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
-    console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
-    console.debug(`[DEBUG] ${message}`, data),
-};
+// Create AI Gateway logger
+const logger = createLogger({ service: 'ai-gateway' });
 
 // Enhanced Gateway configuration with real-time discovery
 export interface GatewayConfig {
@@ -184,7 +177,7 @@ export class AIGateway {
     }
 
     await this.discoveryService.start();
-    loggingService.info('Real-time provider discovery started');
+    logger.info('Real-time provider discovery started');
   }
 
   /**
@@ -193,7 +186,7 @@ export class AIGateway {
   async stopDiscovery(): Promise<void> {
     if (this.discoveryService) {
       await this.discoveryService.stop();
-      loggingService.info('Real-time provider discovery stopped');
+      logger.info('Real-time provider discovery stopped');
     }
   }
 
@@ -301,7 +294,7 @@ export class AIGateway {
     }
 
     // Log initialized providers
-    loggingService.info('AI Gateway initialized', {
+    logger.info('AI Gateway initialized', {
       providers: Array.from(this.providers.keys()),
       loadBalancing: this.config.loadBalancing,
       fallbackChain: this.config.fallbackChain,
@@ -388,7 +381,7 @@ export class AIGateway {
           'gateway.selection.healthy_providers': healthyProviders.length,
         });
 
-        loggingService.info('Model selected', {
+        logger.info('Model selected', {
           selected: selectedModel.modelId,
           provider: selectedModel.provider,
           reason: selectedModel.reason,
@@ -443,7 +436,7 @@ export class AIGateway {
         error as Error
       );
 
-      loggingService.warn('Primary model failed, attempting failover', {
+      logger.warn('Primary model failed, attempting failover', {
         model: modelSelection.modelId,
         error: lastError.message,
       });
@@ -474,7 +467,7 @@ export class AIGateway {
           Date.now() - startTime
         );
 
-        loggingService.info('Failover successful', {
+        logger.info('Failover successful', {
           original: modelSelection.modelId,
           fallback: fallbackModelId,
           attempts: attempts.length,
@@ -495,7 +488,7 @@ export class AIGateway {
     }
 
     // All attempts failed
-    loggingService.error('All failover attempts failed', {
+    logger.error('All failover attempts failed', {
       attempts,
       totalTime: Date.now() - startTime,
     });
@@ -557,7 +550,7 @@ export class AIGateway {
           if (this.config.autoRegisterDiscoveredProviders) {
             this.registerDiscoveredProvider(provider);
           }
-          loggingService.info('Provider discovered', {
+          logger.info('Provider discovered', {
             providerId: provider.id,
             models: provider.models.length,
             capabilities: provider.capabilities,
@@ -571,7 +564,7 @@ export class AIGateway {
           const provider = this.discoveredProviders.get(providerId);
           if (provider) {
             provider.health = health;
-            loggingService.info('Provider health changed', {
+            logger.info('Provider health changed', {
               providerId,
               status: health.status,
               successRate: health.successRate,
@@ -583,7 +576,7 @@ export class AIGateway {
       this.discoveryService.on(
         'provider:unavailable',
         (providerId: string, reason: string) => {
-          loggingService.warn('Provider became unavailable', {
+          logger.warn('Provider became unavailable', {
             providerId,
             reason,
           });
@@ -593,14 +586,16 @@ export class AIGateway {
       this.discoveryService.on(
         'discovery:error',
         (error: Error, providerId?: string) => {
-          loggingService.error('Provider discovery error', {
+          logger.error('Provider discovery error', {
             providerId,
             error: error.message,
           });
         }
       );
     } catch (error) {
-      loggingService.error('Failed to initialize provider discovery', error);
+      logger.error('Failed to initialize provider discovery', {
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 
@@ -610,7 +605,7 @@ export class AIGateway {
   private registerDiscoveredProvider(provider: DiscoveredProvider): void {
     this.discoveredProviders.set(provider.id, provider);
 
-    loggingService.info('Registered discovered provider', {
+    logger.info('Registered discovered provider', {
       providerId: provider.id,
       source: provider.discoverySource,
       modelCount: provider.models.length,

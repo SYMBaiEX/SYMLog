@@ -5,18 +5,11 @@ import {
   streamText,
 } from 'ai';
 import { z } from 'zod';
-import { logError as logErrorToConsole } from '@/lib/logger';
 import { responseCache as aiResponseCache } from './caching';
+import { createLogger } from '../logger/unified-logger';
 
-// Create a logger wrapper
-const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
-    console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
-    console.debug(`[DEBUG] ${message}`, data),
-};
+// Create AI streaming optimizer logger
+const logger = createLogger({ service: 'ai-streaming-optimizer' });
 
 // Stream optimization configuration with AI SDK v5 compatibility
 export interface StreamOptimizationConfig {
@@ -141,7 +134,7 @@ export class StreamingOptimizer {
     ) {
       const cached = await this.getCachedStream(options.cacheKey);
       if (cached) {
-        loggingService.debug('Stream cache hit', {
+        logger.debug('Stream cache hit', {
           streamId,
           cacheKey: options.cacheKey,
         });
@@ -197,7 +190,7 @@ export class StreamingOptimizer {
     ) {
       const cached = await this.getCachedStream(options.cacheKey);
       if (cached) {
-        loggingService.debug('Object stream cache hit', {
+        logger.debug('Object stream cache hit', {
           streamId,
           cacheKey: options.cacheKey,
         });
@@ -306,7 +299,7 @@ export class StreamingOptimizer {
   clearCache(): void {
     this.streamBuffer.clear();
     this.compressionCache.clear();
-    loggingService.info('Stream cache cleared');
+    logger.info('Stream cache cleared');
   }
 
   /**
@@ -315,7 +308,7 @@ export class StreamingOptimizer {
   shutdown(): void {
     this.clearCache();
     this.activeStreams.clear();
-    loggingService.info('Streaming optimizer shutdown');
+    logger.info('Streaming optimizer shutdown');
   }
 
   // Private helper methods
@@ -416,7 +409,7 @@ export class StreamingOptimizer {
           try {
             processedData = options.parser(data);
           } catch (error) {
-            loggingService.warn('Failed to parse chunk', { streamId, error });
+            logger.warn('Failed to parse chunk', { streamId, error });
             state.errors++;
             continue;
           }
@@ -424,7 +417,7 @@ export class StreamingOptimizer {
 
         // Validate if validator is provided
         if (options?.validator && !options.validator(processedData)) {
-          loggingService.warn('Chunk failed validation', { streamId });
+          logger.warn('Chunk failed validation', { streamId });
           state.errors++;
           continue;
         }
@@ -570,7 +563,7 @@ export class StreamingOptimizer {
       state.errors++;
     }
 
-    loggingService.error('Stream error', { streamId, error });
+    logger.error('Stream error', { streamId, error });
     this.finalizeStream(streamId);
   }
 
@@ -592,7 +585,7 @@ export class StreamingOptimizer {
       }
       return null;
     } catch (error) {
-      loggingService.warn('Failed to get cached stream', { cacheKey, error });
+      logger.warn('Failed to get cached stream', { cacheKey, error });
       return null;
     }
   }
@@ -609,12 +602,12 @@ export class StreamingOptimizer {
         this.streamBuffer.delete(cacheKey);
       }, this.config.cacheTTL);
 
-      loggingService.debug('Stream cached', {
+      logger.debug('Stream cached', {
         cacheKey,
         chunks: chunks.length,
       });
     } catch (error) {
-      loggingService.warn('Failed to cache stream', { cacheKey, error });
+      logger.warn('Failed to cache stream', { cacheKey, error });
     }
   }
 

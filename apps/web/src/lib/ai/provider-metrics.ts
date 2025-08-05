@@ -1,14 +1,7 @@
-import { logError as logErrorToConsole } from '@/lib/logger';
+import { createLogger } from '../logger/unified-logger';
 
-// Create a logger wrapper
-const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
-    console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
-    console.debug(`[DEBUG] ${message}`, data),
-};
+// Create AI provider metrics logger
+const logger = createLogger({ service: 'ai-provider-metrics' });
 
 // Metric data point
 export interface MetricDataPoint {
@@ -238,7 +231,7 @@ export class ProviderMetricsService {
     // Update performance scores
     this.updatePerformanceScores(modelMetrics);
 
-    loggingService.debug('Recorded success', {
+    logger.debug('Recorded success', {
       providerId,
       modelId,
       latency,
@@ -271,7 +264,7 @@ export class ProviderMetricsService {
     // Update performance scores
     this.updatePerformanceScores(modelMetrics);
 
-    loggingService.warn('Recorded failure', {
+    logger.warn('Recorded failure', {
       providerId,
       modelId,
       error: error.message,
@@ -464,7 +457,7 @@ export class ProviderMetricsService {
     metrics.optimizationMetrics.selectionCount++;
     metrics.optimizationMetrics.lastOptimizationTime = new Date();
 
-    loggingService.debug('Optimization selection recorded', {
+    logger.debug('Optimization selection recorded', {
       providerId,
       context,
       prediction,
@@ -501,7 +494,7 @@ export class ProviderMetricsService {
       this.updateContextualPerformance(providerId, context, actual);
     }
 
-    loggingService.debug('Optimization outcome recorded', {
+    logger.debug('Optimization outcome recorded', {
       providerId,
       context,
       actual,
@@ -538,7 +531,7 @@ export class ProviderMetricsService {
     const metrics = this.getOrCreateMetrics(providerId);
     this.updateQualityMetrics(metrics, assessments);
 
-    loggingService.debug('Quality assessment recorded', {
+    logger.debug('Quality assessment recorded', {
       providerId,
       quality,
       feedback,
@@ -1021,7 +1014,7 @@ export class ProviderMetricsService {
       }
     }
 
-    loggingService.debug('Cleaned up old metrics');
+    logger.debug('Cleaned up old metrics');
   }
 
   // New optimization-aware helper methods
