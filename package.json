@@ -38,5 +38,8 @@
       "npx ultracite format"
     ]
   },
+  "overrides": {
+    "siwe": "3.0.0"
+  },
   "packageManager": "bun@1.2.18"
 }

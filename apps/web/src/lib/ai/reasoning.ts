@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import {
   extractReasoningMiddleware,
   generateText,
-  type LanguageModelV2,
+  type LanguageModel,
   type StreamTextResult,
   streamText,
   wrapLanguageModel,
@@ -43,7 +43,7 @@ export interface ReasoningOptions {
  * Reasoning engine for chain-of-thought prompting and analysis
  */
 export class ReasoningEngine {
-  private reasoningModel: LanguageModelV2;
+  private reasoningModel: LanguageModel;
   private options: ReasoningOptions;
 
   constructor(options: ReasoningOptions = {}) {

@@ -3,7 +3,6 @@ import type {
   LanguageModel,
   LanguageModelRequestMetadata,
   LanguageModelResponseMetadata,
-  LanguageModelResult,
 } from 'ai';
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { FallbackChainManager } from './fallback-chain';

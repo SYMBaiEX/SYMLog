@@ -72,10 +72,11 @@ export const getAgentMemories = query({
       );
 
     if (args.type) {
+      const memoryType = args.type;
       query = ctx.db
         .query('agentMemories')
         .withIndex('by_agent_type', (q) =>
-          q.eq('agentId', args.agentId).eq('type', args.type)
+          q.eq('agentId', args.agentId).eq('type', memoryType)
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -110,20 +111,23 @@ export const getAgentMemoryTimeline = query({
       query = ctx.db.query('agentMemories').withIndex('by_timestamp');
 
       if (args.startTime && args.endTime) {
+        const startTime = args.startTime;
+        const endTime = args.endTime;
         query = query.filter((q) =>
           q.and(
             q.eq(q.field('userId'), args.userId),
             q.eq(q.field('agentId'), args.agentId),
-            q.gte(q.field('timestamp'), args.startTime!),
-            q.lte(q.field('timestamp'), args.endTime!)
+            q.gte(q.field('timestamp'), startTime),
+            q.lte(q.field('timestamp'), endTime)
           )
         );
       } else if (args.startTime) {
+        const startTime = args.startTime;
         query = query.filter((q) =>
           q.and(
             q.eq(q.field('userId'), args.userId),
             q.eq(q.field('agentId'), args.agentId),
-            q.gte(q.field('timestamp'), args.startTime!)
+            q.gte(q.field('timestamp'), startTime)
           )
         );
       }
@@ -164,10 +168,11 @@ export const getAgentKnowledge = query({
       );
 
     if (args.category) {
+      const category = args.category;
       query = ctx.db
         .query('agentKnowledge')
         .withIndex('by_agent_category', (q) =>
-          q.eq('agentId', args.agentId).eq('category', args.category)
+          q.eq('agentId', args.agentId).eq('category', category)
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -336,10 +341,11 @@ export const getAgentLearningEvents = query({
       );
 
     if (args.eventType) {
+      const eventType = args.eventType;
       query = ctx.db
         .query('agentLearningEvents')
         .withIndex('by_agent_type', (q) =>
-          q.eq('agentId', args.agentId).eq('eventType', args.eventType)
+          q.eq('agentId', args.agentId).eq('eventType', eventType)
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -375,7 +381,8 @@ export const getAgentLearningProgress = query({
     // Group events by day
     const eventsByDay = learningEvents.reduce(
       (acc, event) => {
-        const day = new Date(event.timestamp).toISOString().split('T')[0];
+        const dateString = new Date(event.timestamp).toISOString();
+        const day = dateString.split('T')[0] ?? dateString;
         if (!acc[day]) {
           acc[day] = [];
         }
@@ -390,7 +397,7 @@ export const getAgentLearningProgress = query({
       date: day,
       events: events.length,
       totalImpact: events.reduce((sum, e) => sum + e.impact, 0),
-      avgImpact: events.reduce((sum, e) => sum + e.impact, 0) / events.length,
+      avgImpact: events.length > 0 ? events.reduce((sum, e) => sum + e.impact, 0) / events.length : 0,
       eventTypes: events.reduce(
         (acc, e) => {
           acc[e.eventType] = (acc[e.eventType] || 0) + 1;

@@ -6,7 +6,7 @@ import {
 } from 'ai';
 import { z } from 'zod';
 import { logError as logErrorToConsole } from '@/lib/logger';
-import { aiResponseCache } from './caching';
+import { responseCache as aiResponseCache } from './caching';
 
 // Create a logger wrapper
 const loggingService = {
