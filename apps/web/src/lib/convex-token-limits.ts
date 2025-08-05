@@ -1,14 +1,14 @@
-import { api } from "../../convex/_generated/api";
-import { Id } from "../../convex/_generated/dataModel";
-import { getConvexClient } from "./convex-client";
+import { api } from '../../convex/_generated/api';
+import type { Id } from '../../convex/_generated/dataModel';
 import { config } from './config';
+import { getConvexClient } from './convex-client';
 
 /**
  * Token reservation service for preventing concurrent requests from bypassing limits
  */
 export class TokenReservationService {
   private static instance: TokenReservationService;
-  
+
   // Estimate tokens based on message content
   // Using rough estimate: 1 token ≈ 4 characters
   private static readonly CHARS_PER_TOKEN = 4;
@@ -45,7 +45,8 @@ export class TokenReservationService {
 
     // Convert to tokens and add minimum response size
     const promptTokens = Math.ceil(totalChars / this.CHARS_PER_TOKEN);
-    const estimatedTotal = (promptTokens + this.MIN_RESPONSE_TOKENS) * this.SAFETY_MULTIPLIER;
+    const estimatedTotal =
+      (promptTokens + this.MIN_RESPONSE_TOKENS) * this.SAFETY_MULTIPLIER;
 
     return Math.ceil(estimatedTotal);
   }
@@ -115,7 +116,7 @@ export class TokenReservationService {
     try {
       const convex = getConvexClient();
       await convex.mutation(api.tokenLimits.completeTokenReservation, {
-        reservationId: reservationId as Id<"tokenUsage">,
+        reservationId: reservationId as Id<'tokenUsage'>,
         actualTokens,
       });
       return true;
@@ -132,7 +133,7 @@ export class TokenReservationService {
     try {
       const convex = getConvexClient();
       await convex.mutation(api.tokenLimits.cancelTokenReservation, {
-        reservationId: reservationId as Id<"tokenUsage">,
+        reservationId: reservationId as Id<'tokenUsage'>,
       });
       return true;
     } catch (error) {

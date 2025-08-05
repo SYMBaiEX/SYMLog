@@ -1,27 +1,27 @@
-import { describe, test, expect, beforeEach, jest } from 'bun:test'
+import { beforeEach, describe, expect, jest, test } from 'bun:test';
 import {
   APICallError,
+  EmptyResponseBodyError,
   InvalidArgumentError,
+  InvalidResponseDataError,
+  InvalidToolInputError,
+  JSONParseError,
+  LoadAPIKeyError,
   NoObjectGeneratedError,
   NoSuchModelError,
   NoSuchProviderError,
   NoSuchToolError,
-  InvalidToolInputError,
   RetryError,
-  JSONParseError,
   TypeValidationError,
-  EmptyResponseBodyError,
-  LoadAPIKeyError,
-  InvalidResponseDataError,
-  UnsupportedFunctionalityError
-} from 'ai'
+  UnsupportedFunctionalityError,
+} from 'ai';
 
 // Import the error handler directly to avoid config issues
 const v2ErrorHandler = {
   handleError: (error: unknown) => {
     // Simplified error handling logic for testing
     if (error instanceof APICallError) {
-      const statusCode = (error as any).statusCode
+      const statusCode = (error as any).statusCode;
       if (statusCode === 429) {
         return {
           message: 'Rate limit exceeded',
@@ -29,8 +29,8 @@ const v2ErrorHandler = {
           fallback: 'Implement exponential backoff',
           code: 'RATE_LIMIT',
           details: error.message,
-          userMessage: 'Too many requests. Please wait a moment and try again.'
-        }
+          userMessage: 'Too many requests. Please wait a moment and try again.',
+        };
       }
       if (statusCode === 401 || statusCode === 403) {
         return {
@@ -38,8 +38,8 @@ const v2ErrorHandler = {
           retry: false,
           code: 'AUTH_ERROR',
           details: error.message,
-          userMessage: 'Authentication error. Please check your credentials.'
-        }
+          userMessage: 'Authentication error. Please check your credentials.',
+        };
       }
       if (statusCode >= 500) {
         return {
@@ -48,8 +48,9 @@ const v2ErrorHandler = {
           fallback: 'Switch to backup model or provider',
           code: 'SERVER_ERROR',
           details: error.message,
-          userMessage: 'AI service is temporarily unavailable. Trying backup service...'
-        }
+          userMessage:
+            'AI service is temporarily unavailable. Trying backup service...',
+        };
       }
       if (statusCode === 503) {
         return {
@@ -58,8 +59,8 @@ const v2ErrorHandler = {
           fallback: 'Switch to less busy model',
           code: 'MODEL_OVERLOADED',
           details: error.message,
-          userMessage: 'AI model is busy. Switching to alternative model...'
-        }
+          userMessage: 'AI model is busy. Switching to alternative model...',
+        };
       }
     }
 
@@ -69,8 +70,9 @@ const v2ErrorHandler = {
         retry: false,
         code: 'INVALID_ARGUMENT',
         details: error.message,
-        userMessage: 'Unable to process your request. Please check your input and try again.'
-      }
+        userMessage:
+          'Unable to process your request. Please check your input and try again.',
+      };
     }
 
     if (error instanceof NoObjectGeneratedError) {
@@ -80,8 +82,9 @@ const v2ErrorHandler = {
         fallback: 'Try with simpler schema or different model',
         code: 'NO_OBJECT_GENERATED',
         details: error.message,
-        userMessage: 'Unable to generate the requested format. Trying alternative approach...'
-      }
+        userMessage:
+          'Unable to generate the requested format. Trying alternative approach...',
+      };
     }
 
     if (error instanceof NoSuchModelError) {
@@ -91,8 +94,8 @@ const v2ErrorHandler = {
         fallback: 'Use default model',
         code: 'NO_SUCH_MODEL',
         details: error.message,
-        userMessage: 'AI model not available. Using alternative model...'
-      }
+        userMessage: 'AI model not available. Using alternative model...',
+      };
     }
 
     if (error instanceof Error) {
@@ -101,8 +104,8 @@ const v2ErrorHandler = {
         retry: false,
         code: 'UNKNOWN_ERROR',
         details: error.stack,
-        userMessage: 'An unexpected error occurred. Please try again.'
-      }
+        userMessage: 'An unexpected error occurred. Please try again.',
+      };
     }
 
     return {
@@ -110,10 +113,10 @@ const v2ErrorHandler = {
       retry: false,
       code: 'UNKNOWN',
       details: String(error),
-      userMessage: 'An unexpected error occurred. Please try again.'
-    }
-  }
-}
+      userMessage: 'An unexpected error occurred. Please try again.',
+    };
+  },
+};
 
 describe('V2 Error Handling', () => {
   test('should handle APICallError with rate limit (429)', () => {
@@ -126,20 +129,20 @@ describe('V2 Error Handling', () => {
       responseBody: 'Rate limit exceeded',
       cause: undefined,
       isRetryable: true,
-      data: undefined
-    })
+      data: undefined,
+    });
 
-    const handled = v2ErrorHandler.handleError(error)
-    
-    expect(handled.code).toBe('RATE_LIMIT')
-    expect(handled.retry).toBe(true)
-    expect(handled.userMessage.toLowerCase()).toContain('too many requests')
-  })
+    const handled = v2ErrorHandler.handleError(error);
+
+    expect(handled.code).toBe('RATE_LIMIT');
+    expect(handled.retry).toBe(true);
+    expect(handled.userMessage.toLowerCase()).toContain('too many requests');
+  });
 
   test('should handle authentication errors (401/403)', () => {
-    const testCases = [401, 403]
-    
-    testCases.forEach(statusCode => {
+    const testCases = [401, 403];
+
+    testCases.forEach((statusCode) => {
       const error = new APICallError({
         message: 'API call failed',
         url: 'https://api.openai.com/v1/chat/completions',
@@ -149,16 +152,16 @@ describe('V2 Error Handling', () => {
         responseBody: 'Unauthorized',
         cause: undefined,
         isRetryable: false,
-        data: undefined
-      })
+        data: undefined,
+      });
 
-      const handled = v2ErrorHandler.handleError(error)
-      
-      expect(handled.code).toBe('AUTH_ERROR')
-      expect(handled.retry).toBe(false)
-      expect(handled.userMessage.toLowerCase()).toContain('authentication')
-    })
-  })
+      const handled = v2ErrorHandler.handleError(error);
+
+      expect(handled.code).toBe('AUTH_ERROR');
+      expect(handled.retry).toBe(false);
+      expect(handled.userMessage.toLowerCase()).toContain('authentication');
+    });
+  });
 
   test('should handle server errors (500+)', () => {
     const error = new APICallError({
@@ -170,81 +173,85 @@ describe('V2 Error Handling', () => {
       responseBody: 'Server error',
       cause: undefined,
       isRetryable: true,
-      data: undefined
-    })
+      data: undefined,
+    });
 
-    const handled = v2ErrorHandler.handleError(error)
-    
-    expect(handled.code).toBe('SERVER_ERROR')
-    expect(handled.retry).toBe(true)
-    expect(handled.fallback).toContain('backup')
-  })
+    const handled = v2ErrorHandler.handleError(error);
+
+    expect(handled.code).toBe('SERVER_ERROR');
+    expect(handled.retry).toBe(true);
+    expect(handled.fallback).toContain('backup');
+  });
 
   test('should handle InvalidArgumentError', () => {
     const error = new InvalidArgumentError({
       parameter: 'model',
       value: 'invalid-model',
-      message: 'Invalid model specified'
-    })
+      message: 'Invalid model specified',
+    });
 
-    const handled = v2ErrorHandler.handleError(error)
-    
-    expect(handled.code).toBe('INVALID_ARGUMENT')
-    expect(handled.retry).toBe(false)
-    expect(handled.userMessage).toContain('check your input')
-  })
+    const handled = v2ErrorHandler.handleError(error);
+
+    expect(handled.code).toBe('INVALID_ARGUMENT');
+    expect(handled.retry).toBe(false);
+    expect(handled.userMessage).toContain('check your input');
+  });
 
   test('should handle NoObjectGeneratedError', () => {
     const error = new NoObjectGeneratedError({
       message: 'Could not generate object',
       text: 'Invalid JSON response',
-      response: {}
-    })
+      response: {},
+    });
 
-    const handled = v2ErrorHandler.handleError(error)
-    
-    expect(handled.code).toBe('NO_OBJECT_GENERATED')
-    expect(handled.retry).toBe(true)
-    expect(handled.fallback).toContain('simpler schema')
-  })
+    const handled = v2ErrorHandler.handleError(error);
+
+    expect(handled.code).toBe('NO_OBJECT_GENERATED');
+    expect(handled.retry).toBe(true);
+    expect(handled.fallback).toContain('simpler schema');
+  });
 
   test('should handle NoSuchModelError', () => {
     const error = new NoSuchModelError({
       modelId: 'non-existent-model',
       modelType: 'languageModel',
-      message: 'Model not found'
-    })
+      message: 'Model not found',
+    });
 
-    const handled = v2ErrorHandler.handleError(error)
-    
-    expect(handled.code).toBe('NO_SUCH_MODEL')
-    expect(handled.retry).toBe(false)
-    expect(handled.fallback).toContain('default model')
-  })
+    const handled = v2ErrorHandler.handleError(error);
+
+    expect(handled.code).toBe('NO_SUCH_MODEL');
+    expect(handled.retry).toBe(false);
+    expect(handled.fallback).toContain('default model');
+  });
 
   test('should handle generic errors', () => {
-    const error = new Error('Something went wrong')
-    const handled = v2ErrorHandler.handleError(error)
-    
-    expect(handled.code).toBe('UNKNOWN_ERROR')
-    expect(handled.retry).toBe(false)
-    expect(handled.userMessage).toContain('unexpected error')
-  })
+    const error = new Error('Something went wrong');
+    const handled = v2ErrorHandler.handleError(error);
+
+    expect(handled.code).toBe('UNKNOWN_ERROR');
+    expect(handled.retry).toBe(false);
+    expect(handled.userMessage).toContain('unexpected error');
+  });
 
   test('should handle non-Error objects', () => {
-    const handled = v2ErrorHandler.handleError('string error')
-    
-    expect(handled.code).toBe('UNKNOWN')
-    expect(handled.retry).toBe(false)
-    expect(handled.details).toBe('string error')
-  })
+    const handled = v2ErrorHandler.handleError('string error');
+
+    expect(handled.code).toBe('UNKNOWN');
+    expect(handled.retry).toBe(false);
+    expect(handled.details).toBe('string error');
+  });
 
   test('should provide user-friendly messages', () => {
-    const technicalError = new Error('ECONNREFUSED: Connection refused to upstream service at 10.0.0.1:8080')
-    const handled = v2ErrorHandler.handleError(technicalError)
-    
-    expect(handled.userMessage).not.toContain('ECONNREFUSED')
-    expect(handled.userMessage).not.toContain('10.0.0.1')
-    expect(handled.userMessage).toBe('An unexpected error occurred. Please try again.')
-  })
-})
+    const technicalError = new Error(
+      'ECONNREFUSED: Connection refused to upstream service at 10.0.0.1:8080'
+    );
+    const handled = v2ErrorHandler.handleError(technicalError);
+
+    expect(handled.userMessage).not.toContain('ECONNREFUSED');
+    expect(handled.userMessage).not.toContain('10.0.0.1');
+    expect(handled.userMessage).toBe(
+      'An unexpected error occurred. Please try again.'
+    );
+  });
+});

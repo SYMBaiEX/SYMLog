@@ -1,29 +1,29 @@
-import { openai } from '@ai-sdk/openai'
-import { anthropic } from '@ai-sdk/anthropic'
-import { 
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic';
+import { anthropic } from '@ai-sdk/anthropic';
+import { openai } from '@ai-sdk/openai';
+import {
   createProviderRegistry,
   customProvider,
-  wrapLanguageModel,
   defaultSettingsMiddleware,
   type LanguageModelRequestMetadata,
   type LanguageModelResponseMetadata,
-  type ProviderMetadata 
-} from 'ai'
-import type { AnthropicProviderOptions } from '@ai-sdk/anthropic'
-import { config } from '../config'
-import { 
-  loggingMiddleware, 
-  performanceMiddleware, 
-  securityMiddleware, 
+  type ProviderMetadata,
+  wrapLanguageModel,
+} from 'ai';
+import { config } from '../config';
+import {
+  composeMiddleware,
   createCachingMiddleware,
-  composeMiddleware 
-} from './middleware'
+  loggingMiddleware,
+  performanceMiddleware,
+  securityMiddleware,
+} from './middleware';
 
 // Create custom providers with model aliases and pre-configured settings
 const customOpenAI = customProvider({
   languageModels: {
     // Fast model for quick responses
-    'fast': wrapLanguageModel({
+    fast: wrapLanguageModel({
       model: openai('gpt-4o-mini'),
       middleware: composeMiddleware(
         loggingMiddleware,
@@ -32,13 +32,13 @@ const customOpenAI = customProvider({
           settings: {
             temperature: 0.7,
             maxOutputTokens: 2048,
-          }
+          },
         })
-      )
+      ),
     }),
-    
+
     // Coding specialist with low temperature
-    'code': wrapLanguageModel({
+    code: wrapLanguageModel({
       model: openai('gpt-4.1-2025-04-14'),
       middleware: composeMiddleware(
         loggingMiddleware,
@@ -48,14 +48,14 @@ const customOpenAI = customProvider({
           settings: {
             temperature: 0.1,
             maxOutputTokens: 8192,
-            stopSequences: ['```end', '// END']
-          }
+            stopSequences: ['```end', '// END'],
+          },
         })
-      )
+      ),
     }),
-    
+
     // High-quality model for complex tasks
-    'premium': wrapLanguageModel({
+    premium: wrapLanguageModel({
       model: openai('gpt-4.1-nano'),
       middleware: composeMiddleware(
         loggingMiddleware,
@@ -65,19 +65,19 @@ const customOpenAI = customProvider({
           settings: {
             temperature: 0.3,
             maxOutputTokens: 4096,
-            topP: 0.9
-          }
+            topP: 0.9,
+          },
         })
-      )
+      ),
     }),
   },
-  fallbackProvider: openai
-})
+  fallbackProvider: openai,
+});
 
 const customAnthropic = customProvider({
   languageModels: {
     // Fast Haiku model
-    'fast': wrapLanguageModel({
+    fast: wrapLanguageModel({
       model: anthropic('claude-3-haiku-20240307'),
       middleware: composeMiddleware(
         loggingMiddleware,
@@ -87,13 +87,13 @@ const customAnthropic = customProvider({
           settings: {
             temperature: 0.7,
             maxOutputTokens: 2048,
-          }
+          },
         })
-      )
+      ),
     }),
-    
+
     // Sonnet for balanced quality/speed
-    'balanced': wrapLanguageModel({
+    balanced: wrapLanguageModel({
       model: anthropic('claude-3-5-sonnet-20241022'),
       middleware: composeMiddleware(
         loggingMiddleware,
@@ -103,35 +103,35 @@ const customAnthropic = customProvider({
           settings: {
             temperature: 0.5,
             maxOutputTokens: 4096,
-          }
+          },
         })
-      )
+      ),
     }),
-    
+
     // Claude 3.7 with reasoning capabilities
-    'reasoning': wrapLanguageModel({
+    reasoning: wrapLanguageModel({
       model: anthropic('claude-3-7-sonnet-20250219'),
       middleware: composeMiddleware(
         loggingMiddleware,
         performanceMiddleware,
         defaultSettingsMiddleware({
           settings: {
-            maxOutputTokens: 100000,
+            maxOutputTokens: 100_000,
             providerMetadata: {
               anthropic: {
                 thinking: {
                   type: 'enabled',
-                  budgetTokens: 32000,
+                  budgetTokens: 32_000,
                 },
               } satisfies AnthropicProviderOptions,
             },
-          }
+          },
         })
-      )
+      ),
     }),
-    
+
     // Creative writing model
-    'creative': wrapLanguageModel({
+    creative: wrapLanguageModel({
       model: anthropic('claude-3-opus-20240229'),
       middleware: composeMiddleware(
         loggingMiddleware,
@@ -142,20 +142,23 @@ const customAnthropic = customProvider({
             maxOutputTokens: 4096,
             topP: 0.95,
             frequencyPenalty: 0.5,
-            presencePenalty: 0.5
-          }
+            presencePenalty: 0.5,
+          },
         })
-      )
+      ),
     }),
   },
-  fallbackProvider: anthropic
-})
+  fallbackProvider: anthropic,
+});
 
 // Create enhanced provider registry with V2 specification compliance
-export const registry = createProviderRegistry({
-  openai: customOpenAI,
-  anthropic: customAnthropic,
-}, { separator: ':' })
+export const registry = createProviderRegistry(
+  {
+    openai: customOpenAI,
+    anthropic: customAnthropic,
+  },
+  { separator: ':' }
+);
 
 // Model configuration with metadata and fallback chain
 export const getAIModel = (
@@ -165,57 +168,62 @@ export const getAIModel = (
   // Model aliases for easy access
   const modelAliases: Record<string, string> = {
     // Primary models
-    'fast': 'openai:fast',
-    'balanced': 'anthropic:balanced',
-    'premium': 'openai:premium',
-    
+    fast: 'openai:fast',
+    balanced: 'anthropic:balanced',
+    premium: 'openai:premium',
+
     // Specialized models
-    'code': 'openai:code',
-    'reasoning': 'anthropic:reasoning',
-    'creative': 'anthropic:creative',
-    
+    code: 'openai:code',
+    reasoning: 'anthropic:reasoning',
+    creative: 'anthropic:creative',
+
     // Direct model access (backward compatibility)
     'gpt-4.1-nano': 'openai:premium',
     'claude-3-5-sonnet-20241022': 'anthropic:balanced',
     'gpt-4o-mini': 'openai:fast',
     'claude-3-haiku-20240307': 'anthropic:fast',
-  }
+  };
 
   // Resolve model alias or use direct model ID
-  const modelToUse = preferredModel 
-    ? (modelAliases[preferredModel] || preferredModel)
-    : 'openai:premium'
-  
+  const modelToUse = preferredModel
+    ? modelAliases[preferredModel] || preferredModel
+    : 'openai:premium';
+
   try {
     // Get model from registry
-    const model = registry.languageModel(modelToUse)
-    
+    const model = registry.languageModel(modelToUse);
+
     // Add request metadata if provided
     if (metadata) {
       // Note: AI SDK v5 doesn't have withMetadata method
       // Metadata is passed directly to generation functions
-      return model
+      return model;
     }
-    
-    return model
+
+    return model;
   } catch (error) {
-    console.warn(`Model ${modelToUse} not found, falling back to default`, error)
-    return registry.languageModel('openai:premium')
+    console.warn(
+      `Model ${modelToUse} not found, falling back to default`,
+      error
+    );
+    return registry.languageModel('openai:premium');
   }
-}
+};
 
 // Helper function to get model with metadata
 export const getModelWithMetadata = (
   modelId: string,
   requestMetadata: LanguageModelRequestMetadata
 ) => {
-  const model = getAIModel(modelId)
+  const model = getAIModel(modelId);
   // Metadata will be passed during generation
-  return { model, metadata: requestMetadata }
-}
+  return { model, metadata: requestMetadata };
+};
 
 // Response metadata collection for monitoring
-export const collectResponseMetadata = (response: any): LanguageModelResponseMetadata => {
+export const collectResponseMetadata = (
+  response: any
+): LanguageModelResponseMetadata => {
   return {
     id: response.id || crypto.randomUUID(),
     modelId: response.modelId,
@@ -224,17 +232,17 @@ export const collectResponseMetadata = (response: any): LanguageModelResponseMet
     custom: {
       timestamp: new Date().toISOString(),
       latency: response.latency,
-      cached: response.cached || false,
+      cached: response.cached,
       provider: response.provider,
-    }
-  }
-}
+    },
+  };
+};
 
 // Rate limiting configuration
 export const rateLimitConfig = {
   maxRequestsPerHour: config.get().rateLimitMaxRequests,
   maxTokensPerRequest: config.get().aiMaxTokensPerRequest,
-}
+};
 
 // Provider metadata helpers
 export const providerMetadata: Record<string, ProviderMetadata> = {
@@ -250,7 +258,7 @@ export const providerMetadata: Record<string, ProviderMetadata> = {
       'X-Custom-Header': 'SYMLog-AI',
     },
   },
-}
+};
 
 // System prompts for different contexts
 export const systemPrompts = {
@@ -266,7 +274,7 @@ You can create interactive artifacts including:
 When users ask for code, documents, data, or visualizations, use the appropriate artifact tools to create interactive, editable artifacts.
 You have access to information about the user's Web3 wallet and can help with various tasks.
 Be concise, helpful, and accurate in your responses.`,
-  
+
   technical: `You are a technical AI assistant specializing in Web3, blockchain, and software development with advanced artifact capabilities.
 You can create:
 - Executable code artifacts (JavaScript, TypeScript, Python, React components, Solidity)
@@ -279,7 +287,7 @@ You can create:
 Use artifact tools to create interactive code that users can run, edit, and learn from.
 Provide detailed technical explanations alongside your artifacts.
 Always consider security best practices in your recommendations.`,
-  
+
   creative: `You are a creative AI assistant with multimedia artifact capabilities for the SYMLog platform.
 You can create:
 - Creative writing documents with rich formatting
@@ -291,4 +299,4 @@ You can create:
 
 Use artifact tools to bring creative ideas to life in interactive formats.
 Think outside the box while remaining practical and actionable in your suggestions.`,
-}
+};

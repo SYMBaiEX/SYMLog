@@ -1,60 +1,60 @@
-import { 
-  generateText, 
-  streamText, 
-  extractReasoningMiddleware, 
-  wrapLanguageModel,
+import { openai } from '@ai-sdk/openai';
+import {
+  extractReasoningMiddleware,
+  generateText,
   type LanguageModelV2,
-  type StreamTextResult
-} from 'ai'
-import { openai } from '@ai-sdk/openai'
-import { getAIModel } from './providers'
-import { loggingMiddleware } from './middleware'
+  type StreamTextResult,
+  streamText,
+  wrapLanguageModel,
+} from 'ai';
+import { loggingMiddleware } from './middleware';
+import { getAIModel } from './providers';
 
 export interface ReasoningStep {
-  text: string
-  index: number
-  timestamp: Date
+  text: string;
+  index: number;
+  timestamp: Date;
 }
 
 export interface ReasoningResult {
-  reasoning: Array<{ text: string }>
-  reasoningText: string
-  finalAnswer: string
-  steps: string[]
-  confidence?: number
+  reasoning: Array<{ text: string }>;
+  reasoningText: string;
+  finalAnswer: string;
+  steps: string[];
+  confidence?: number;
   metadata?: {
-    model: string
-    duration: number
-    tokenCount?: number
-  }
+    model: string;
+    duration: number;
+    tokenCount?: number;
+  };
 }
 
 export interface ReasoningOptions {
-  model?: string
-  temperature?: number
-  maxTokens?: number
-  tagName?: string
-  separator?: string
-  startWithReasoning?: boolean
-  includeConfidence?: boolean
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  tagName?: string;
+  separator?: string;
+  startWithReasoning?: boolean;
+  includeConfidence?: boolean;
 }
 
 /**
  * Reasoning engine for chain-of-thought prompting and analysis
  */
 export class ReasoningEngine {
-  private reasoningModel: LanguageModelV2
-  private options: ReasoningOptions
-  
+  private reasoningModel: LanguageModelV2;
+  private options: ReasoningOptions;
+
   constructor(options: ReasoningOptions = {}) {
     this.options = {
       tagName: 'think',
       separator: '\n---\n',
       startWithReasoning: true,
       includeConfidence: true,
-      ...options
-    }
-    
+      ...options,
+    };
+
     // Create reasoning model with middleware
     this.reasoningModel = wrapLanguageModel({
       model: getAIModel(options.model || 'gpt-4'),
@@ -63,12 +63,12 @@ export class ReasoningEngine {
         extractReasoningMiddleware({
           tagName: this.options.tagName!,
           separator: this.options.separator,
-          startWithReasoning: this.options.startWithReasoning
-        })
-      ]
-    })
+          startWithReasoning: this.options.startWithReasoning,
+        }),
+      ],
+    });
   }
-  
+
   /**
    * Generate text with reasoning extraction
    */
@@ -76,50 +76,54 @@ export class ReasoningEngine {
     prompt: string,
     systemPrompt?: string
   ): Promise<ReasoningResult> {
-    const start = Date.now()
-    
+    const start = Date.now();
+
     // Enhance prompt for reasoning
     const enhancedPrompt = this.options.startWithReasoning
       ? `${prompt}\n\nThink step by step about this problem before providing your answer.`
-      : prompt
-    
-    const enhancedSystem = systemPrompt || `You are a helpful assistant that thinks through problems step by step.
+      : prompt;
+
+    const enhancedSystem =
+      systemPrompt ||
+      `You are a helpful assistant that thinks through problems step by step.
 When you need to reason about something, wrap your thinking process in <${this.options.tagName}> tags.
-After reasoning, provide a clear and concise answer.`
-    
+After reasoning, provide a clear and concise answer.`;
+
     try {
       const result = await generateText({
         model: this.reasoningModel,
         system: enhancedSystem,
         prompt: enhancedPrompt,
         temperature: this.options.temperature,
-        maxTokens: this.options.maxTokens
-      })
-      
+        maxTokens: this.options.maxTokens,
+      });
+
       // Extract confidence if requested
-      let confidence: number | undefined
+      let confidence: number | undefined;
       if (this.options.includeConfidence && result.text) {
-        confidence = this.extractConfidence(result.text)
+        confidence = this.extractConfidence(result.text);
       }
-      
+
       return {
         reasoning: result.reasoning || [],
         reasoningText: result.reasoningText || '',
         finalAnswer: result.text,
-        steps: result.reasoning?.map(r => r.text) || [],
+        steps: result.reasoning?.map((r) => r.text) || [],
         confidence,
         metadata: {
           model: this.options.model || 'gpt-4',
           duration: Date.now() - start,
-          tokenCount: result.usage?.totalTokens
-        }
-      }
+          tokenCount: result.usage?.totalTokens,
+        },
+      };
     } catch (error) {
-      console.error('Reasoning generation failed:', error)
-      throw new Error(`Failed to generate reasoning: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.error('Reasoning generation failed:', error);
+      throw new Error(
+        `Failed to generate reasoning: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
-  
+
   /**
    * Stream text with reasoning extraction
    */
@@ -130,14 +134,16 @@ After reasoning, provide a clear and concise answer.`
   ): Promise<StreamTextResult> {
     const enhancedPrompt = this.options.startWithReasoning
       ? `${prompt}\n\nThink step by step about this problem before providing your answer.`
-      : prompt
-    
-    const enhancedSystem = systemPrompt || `You are a helpful assistant that thinks through problems step by step.
+      : prompt;
+
+    const enhancedSystem =
+      systemPrompt ||
+      `You are a helpful assistant that thinks through problems step by step.
 When you need to reason about something, wrap your thinking process in <${this.options.tagName}> tags.
-After reasoning, provide a clear and concise answer.`
-    
-    let stepIndex = 0
-    
+After reasoning, provide a clear and concise answer.`;
+
+    let stepIndex = 0;
+
     return streamText({
       model: this.reasoningModel,
       system: enhancedSystem,
@@ -151,21 +157,21 @@ After reasoning, provide a clear and concise answer.`
             const step: ReasoningStep = {
               text: reasoning[i].text,
               index: i,
-              timestamp: new Date()
-            }
-            
-            console.log(`[Reasoning Step ${i + 1}]`, step.text)
-            
+              timestamp: new Date(),
+            };
+
+            console.log(`[Reasoning Step ${i + 1}]`, step.text);
+
             if (onReasoningStep) {
-              onReasoningStep(step)
+              onReasoningStep(step);
             }
           }
-          stepIndex = reasoning.length
+          stepIndex = reasoning.length;
         }
-      }
-    })
+      },
+    });
   }
-  
+
   /**
    * Analyze a problem with structured reasoning
    */
@@ -182,26 +188,26 @@ Please analyze this problem using the following structure:
 3. Possible approaches
 4. Evaluation of each approach
 5. Recommended solution
-6. Potential challenges and mitigations`
-    
-    const result = await this.generateWithReasoning(analysisPrompt)
-    
+6. Potential challenges and mitigations`;
+
+    const result = await this.generateWithReasoning(analysisPrompt);
+
     // Parse structured analysis from the final answer
-    const analysis = this.parseStructuredAnalysis(result.finalAnswer)
-    
+    const analysis = this.parseStructuredAnalysis(result.finalAnswer);
+
     return {
       ...result,
-      analysis
-    }
+      analysis,
+    };
   }
-  
+
   /**
    * Debug code with reasoning
    */
   async debugCode(
     code: string,
     error?: string,
-    language: string = 'typescript'
+    language = 'typescript'
   ): Promise<ReasoningResult & { fixes: string[] }> {
     const debugPrompt = `Debug the following ${language} code:
 
@@ -215,19 +221,19 @@ Think through:
 1. What the code is trying to do
 2. What might be causing the issue
 3. Step-by-step debugging process
-4. Proposed fixes`
-    
-    const result = await this.generateWithReasoning(debugPrompt)
-    
+4. Proposed fixes`;
+
+    const result = await this.generateWithReasoning(debugPrompt);
+
     // Extract code fixes from the answer
-    const fixes = this.extractCodeBlocks(result.finalAnswer)
-    
+    const fixes = this.extractCodeBlocks(result.finalAnswer);
+
     return {
       ...result,
-      fixes
-    }
+      fixes,
+    };
   }
-  
+
   /**
    * Make a decision with reasoning
    */
@@ -235,7 +241,9 @@ Think through:
     options: string[],
     criteria: string[],
     context?: string
-  ): Promise<ReasoningResult & { decision: string; scores: Record<string, number> }> {
+  ): Promise<
+    ReasoningResult & { decision: string; scores: Record<string, number> }
+  > {
     const decisionPrompt = `Make a decision between these options:
 ${options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}
 
@@ -244,21 +252,21 @@ ${criteria.map((crit, i) => `- ${crit}`).join('\n')}
 
 ${context ? `Additional context: ${context}` : ''}
 
-Think through each option against each criterion, then make a recommendation.`
-    
-    const result = await this.generateWithReasoning(decisionPrompt)
-    
+Think through each option against each criterion, then make a recommendation.`;
+
+    const result = await this.generateWithReasoning(decisionPrompt);
+
     // Extract decision and scores
-    const decision = this.extractDecision(result.finalAnswer, options)
-    const scores = this.extractScores(result.finalAnswer, options)
-    
+    const decision = this.extractDecision(result.finalAnswer, options);
+    const scores = this.extractScores(result.finalAnswer, options);
+
     return {
       ...result,
       decision,
-      scores
-    }
+      scores,
+    };
   }
-  
+
   /**
    * Extract confidence level from text
    */
@@ -268,25 +276,25 @@ Think through each option against each criterion, then make a recommendation.`
       /confidence:?\s*(\d+)%/i,
       /(\d+)%\s*confident/i,
       /certainty:?\s*(\d+)%/i,
-      /confidence level:?\s*(\d+)/i
-    ]
-    
+      /confidence level:?\s*(\d+)/i,
+    ];
+
     for (const pattern of confidencePatterns) {
-      const match = text.match(pattern)
+      const match = text.match(pattern);
       if (match && match[1]) {
-        return parseInt(match[1]) / 100
+        return Number.parseInt(match[1]) / 100;
       }
     }
-    
+
     // Look for qualitative indicators
-    if (/very confident|high confidence|certain/i.test(text)) return 0.9
-    if (/confident|likely|probable/i.test(text)) return 0.7
-    if (/somewhat confident|possibly|perhaps/i.test(text)) return 0.5
-    if (/uncertain|unsure|low confidence/i.test(text)) return 0.3
-    
-    return undefined
+    if (/very confident|high confidence|certain/i.test(text)) return 0.9;
+    if (/confident|likely|probable/i.test(text)) return 0.7;
+    if (/somewhat confident|possibly|perhaps/i.test(text)) return 0.5;
+    if (/uncertain|unsure|low confidence/i.test(text)) return 0.3;
+
+    return;
   }
-  
+
   /**
    * Parse structured analysis from text
    */
@@ -297,93 +305,103 @@ Think through each option against each criterion, then make a recommendation.`
       approaches: [],
       evaluation: '',
       recommendation: '',
-      challenges: []
-    }
-    
+      challenges: [],
+    };
+
     // Simple parsing based on numbered sections
-    const lines = text.split('\n')
-    let currentSection = ''
-    
+    const lines = text.split('\n');
+    let currentSection = '';
+
     for (const line of lines) {
-      if (line.match(/^1\./)) currentSection = 'understanding'
-      else if (line.match(/^2\./)) currentSection = 'components'
-      else if (line.match(/^3\./)) currentSection = 'approaches'
-      else if (line.match(/^4\./)) currentSection = 'evaluation'
-      else if (line.match(/^5\./)) currentSection = 'recommendation'
-      else if (line.match(/^6\./)) currentSection = 'challenges'
-      
+      if (line.match(/^1\./)) currentSection = 'understanding';
+      else if (line.match(/^2\./)) currentSection = 'components';
+      else if (line.match(/^3\./)) currentSection = 'approaches';
+      else if (line.match(/^4\./)) currentSection = 'evaluation';
+      else if (line.match(/^5\./)) currentSection = 'recommendation';
+      else if (line.match(/^6\./)) currentSection = 'challenges';
+
       if (currentSection && !line.match(/^\d\./)) {
-        const trimmed = line.trim()
+        const trimmed = line.trim();
         if (trimmed) {
-          if (Array.isArray(sections[currentSection as keyof typeof sections])) {
-            (sections[currentSection as keyof typeof sections] as string[]).push(trimmed)
+          if (
+            Array.isArray(sections[currentSection as keyof typeof sections])
+          ) {
+            (
+              sections[currentSection as keyof typeof sections] as string[]
+            ).push(trimmed);
           } else {
-            sections[currentSection as keyof typeof sections] = 
-              sections[currentSection as keyof typeof sections] + ' ' + trimmed
+            sections[currentSection as keyof typeof sections] =
+              sections[currentSection as keyof typeof sections] + ' ' + trimmed;
           }
         }
       }
     }
-    
-    return sections
+
+    return sections;
   }
-  
+
   /**
    * Extract code blocks from text
    */
   private extractCodeBlocks(text: string): string[] {
-    const codeBlocks: string[] = []
-    const regex = /```[\w]*\n([\s\S]*?)```/g
-    let match
-    
+    const codeBlocks: string[] = [];
+    const regex = /```[\w]*\n([\s\S]*?)```/g;
+    let match;
+
     while ((match = regex.exec(text)) !== null) {
-      codeBlocks.push(match[1].trim())
+      codeBlocks.push(match[1].trim());
     }
-    
-    return codeBlocks
+
+    return codeBlocks;
   }
-  
+
   /**
    * Extract decision from text
    */
   private extractDecision(text: string, options: string[]): string {
     // Look for explicit recommendation
-    const recommendPattern = /recommend|suggest|choose|select/i
-    const lines = text.split('\n')
-    
+    const recommendPattern = /recommend|suggest|choose|select/i;
+    const lines = text.split('\n');
+
     for (const line of lines) {
       if (recommendPattern.test(line)) {
         for (const option of options) {
           if (line.toLowerCase().includes(option.toLowerCase())) {
-            return option
+            return option;
           }
         }
       }
     }
-    
+
     // Default to first mentioned option
-    return options[0]
+    return options[0];
   }
-  
+
   /**
    * Extract scores from text
    */
-  private extractScores(text: string, options: string[]): Record<string, number> {
-    const scores: Record<string, number> = {}
-    
+  private extractScores(
+    text: string,
+    options: string[]
+  ): Record<string, number> {
+    const scores: Record<string, number> = {};
+
     for (const option of options) {
-      scores[option] = 0.5 // Default score
-      
+      scores[option] = 0.5; // Default score
+
       // Look for numeric scores
-      const scorePattern = new RegExp(`${option}.*?(\\d+)(?:/10|%|\\s*points)`, 'i')
-      const match = text.match(scorePattern)
+      const scorePattern = new RegExp(
+        `${option}.*?(\\d+)(?:/10|%|\\s*points)`,
+        'i'
+      );
+      const match = text.match(scorePattern);
       if (match && match[1]) {
-        const score = parseInt(match[1])
-        scores[option] = score > 10 ? score / 100 : score / 10
+        const score = Number.parseInt(match[1]);
+        scores[option] = score > 10 ? score / 100 : score / 10;
       }
     }
-    
-    return scores
+
+    return scores;
   }
 }
 
@@ -407,7 +425,7 @@ Please think through this step-by-step:
 2. Consider different approaches
 3. Evaluate trade-offs
 4. Provide a solution
-5. Explain your reasoning`
+5. Explain your reasoning`;
 }
 
 /**
@@ -456,8 +474,8 @@ Analyze:
 4. Trade-offs of each approach
 5. Recommended optimizations
 
-Think through the optimization process systematically.`
-}
+Think through the optimization process systematically.`,
+};
 
 // Export singleton instance with default configuration
-export const reasoningEngine = new ReasoningEngine()
+export const reasoningEngine = new ReasoningEngine();

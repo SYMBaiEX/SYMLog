@@ -1,0 +1,480 @@
+import {
+  type LanguageModel,
+  type LanguageModelRequestMetadata,
+  type LanguageModelResponseMetadata,
+  wrapLanguageModel,
+} from 'ai';
+import { logError as logErrorToConsole } from '@/lib/logger';
+import { config } from '../config';
+import { FallbackChainManager } from './fallback-chain';
+import {
+  AIGateway,
+  type ModelRequirements,
+  type ModelSelection,
+} from './gateway';
+import { GatewayMiddleware, type MiddlewareConfig } from './gateway-middleware';
+import { IntelligentRoutingEngine } from './intelligent-routing';
+import type { LoadBalancingStrategy } from './load-balancing';
+import { ProviderMetricsService } from './provider-metrics';
+import { getAIModel, registry, systemPrompts } from './providers';
+
+// Create a logger wrapper
+const loggingService = {
+  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
+  warn: (message: string, data?: any) =>
+    console.warn(`[WARN] ${message}`, data),
+  error: (message: string, data?: any) => logErrorToConsole(message, data),
+  debug: (message: string, data?: any) =>
+    console.debug(`[DEBUG] ${message}`, data),
+};
+
+// Enhanced model configuration with gateway integration
+export interface EnhancedModelConfig {
+  modelId?: string;
+  task?: ModelRequirements['task'];
+  priority?: ModelRequirements['priority'];
+  complexity?: ModelRequirements['complexity'];
+  capabilities?: string[];
+  maxCost?: number;
+  maxLatency?: number;
+  metadata?: LanguageModelRequestMetadata;
+  fallbackEnabled?: boolean;
+  loadBalancing?: LoadBalancingStrategy;
+  aggregation?: boolean;
+  aggregationStrategy?: 'consensus' | 'best-of' | 'ensemble';
+  aggregationCount?: number;
+}
+
+// Gateway configuration defaults
+const DEFAULT_GATEWAY_CONFIG = {
+  providers: ['openai', 'anthropic'],
+  fallbackChain: ['openai:fast', 'anthropic:fast', 'openai:premium'],
+  loadBalancing: 'adaptive' as LoadBalancingStrategy,
+  maxRetries: 3,
+  retryDelay: 1000,
+  cooldownPeriod: 60_000,
+  performanceSLA: {
+    maxLatency: 5000,
+    minSuccessRate: 0.95,
+  },
+  enableCache: true,
+  cacheTTL: 5 * 60 * 1000,
+};
+
+// Middleware configuration defaults
+const DEFAULT_MIDDLEWARE_CONFIG: MiddlewareConfig = {
+  enableCache: true,
+  cacheTTL: 5 * 60 * 1000,
+  enableRequestLogging: true,
+  enableResponseAggregation: true,
+  enableMetrics: true,
+  enableRetryLogic: true,
+  maxRetries: 3,
+  retryDelay: 1000,
+  enableCircuitBreaker: true,
+  circuitBreakerThreshold: 5,
+  circuitBreakerTimeout: 60_000,
+};
+
+/**
+ * Enhanced AI Gateway Registry
+ * Provides high-level access to AI models with intelligent routing and failover
+ */
+export class GatewayRegistry {
+  private static instance: GatewayRegistry;
+  private gateway: AIGateway;
+  private middleware: GatewayMiddleware;
+  private routingEngine: IntelligentRoutingEngine;
+  private fallbackManager: FallbackChainManager;
+  private metricsService: ProviderMetricsService;
+  private initialized = false;
+
+  private constructor() {
+    // Initialize components
+    this.gateway = AIGateway.getInstance(DEFAULT_GATEWAY_CONFIG);
+    this.middleware = GatewayMiddleware.getInstance(DEFAULT_MIDDLEWARE_CONFIG);
+    this.routingEngine = IntelligentRoutingEngine.getInstance();
+    this.fallbackManager = FallbackChainManager.getInstance();
+    this.metricsService = ProviderMetricsService.getInstance();
+
+    this.initialized = true;
+
+    loggingService.info('Gateway Registry initialized', {
+      providers: DEFAULT_GATEWAY_CONFIG.providers,
+      loadBalancing: DEFAULT_GATEWAY_CONFIG.loadBalancing,
+    });
+  }
+
+  static getInstance(): GatewayRegistry {
+    if (!GatewayRegistry.instance) {
+      GatewayRegistry.instance = new GatewayRegistry();
+    }
+    return GatewayRegistry.instance;
+  }
+
+  /**
+   * Get an enhanced AI model with gateway features
+   */
+  async getEnhancedModel(
+    config: EnhancedModelConfig = {}
+  ): Promise<LanguageModel> {
+    // Build model requirements
+    const requirements: ModelRequirements = {
+      task: config.task || 'chat',
+      priority: config.priority || 'balanced',
+      complexity: config.complexity,
+      capabilities: config.capabilities,
+      maxCost: config.maxCost,
+      maxLatency: config.maxLatency,
+    };
+
+    // Handle aggregated requests
+    if (config.aggregation) {
+      return this.createAggregatedModel(requirements, config);
+    }
+
+    // Get optimal model through gateway
+    const modelSelection = await this.gateway.getOptimalModel(requirements);
+
+    // Wrap model with gateway features
+    return this.wrapModelWithGateway(modelSelection, requirements, config);
+  }
+
+  /**
+   * Get a model by specific ID with gateway features
+   */
+  async getModelById(
+    modelId: string,
+    config: Omit<EnhancedModelConfig, 'modelId'> = {}
+  ): Promise<LanguageModel> {
+    // Try to get model from registry first
+    try {
+      const baseModel = registry.languageModel(modelId);
+
+      if (!config.fallbackEnabled) {
+        return baseModel;
+      }
+
+      // Create model selection for gateway features
+      const [providerId, modelName] = modelId.split(':');
+      const modelSelection: ModelSelection = {
+        provider: providerId,
+        modelId,
+        model: baseModel,
+        reason: 'Direct model request',
+        fallbackOptions: this.buildFallbackChain(modelId),
+      };
+
+      const requirements: ModelRequirements = {
+        task: config.task || 'chat',
+        priority: config.priority || 'balanced',
+      };
+
+      return this.wrapModelWithGateway(modelSelection, requirements, config);
+    } catch (error) {
+      loggingService.warn(
+        'Model not found in registry, using gateway selection',
+        {
+          modelId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }
+      );
+
+      // Fallback to gateway selection
+      return this.getEnhancedModel({ ...config, modelId });
+    }
+  }
+
+  /**
+   * Get model recommendations based on task
+   */
+  async getRecommendedModels(
+    task: ModelRequirements['task'],
+    limit = 5
+  ): Promise<
+    Array<{
+      modelId: string;
+      reason: string;
+      score: number;
+      capabilities: string[];
+      costPerToken: number;
+    }>
+  > {
+    const requirements: ModelRequirements = {
+      task,
+      priority: 'balanced',
+    };
+
+    const providers = Array.from(
+      this.gateway.getAllProviderStatuses().entries()
+    )
+      .filter(([_, health]) => health.status !== 'unhealthy')
+      .map(([id]) => ({
+        id,
+        name: id,
+        models: [],
+        health: this.gateway.getProviderHealth(id)!,
+        capabilities: [],
+        costTier: 'standard' as const,
+      }));
+
+    const routingDecision = await this.routingEngine.routeRequest(
+      requirements,
+      providers
+    );
+
+    const recommendations = [
+      {
+        modelId: routingDecision.primaryChoice.modelId,
+        reason: routingDecision.primaryChoice.reason,
+        score: routingDecision.primaryChoice.confidence,
+        capabilities: this.getModelCapabilities(
+          routingDecision.primaryChoice.modelId
+        ),
+        costPerToken: this.getModelCost(routingDecision.primaryChoice.modelId),
+      },
+      ...routingDecision.alternatives.slice(0, limit - 1).map((alt) => ({
+        modelId: alt.modelId,
+        reason: alt.reason,
+        score: alt.confidence,
+        capabilities: this.getModelCapabilities(alt.modelId),
+        costPerToken: this.getModelCost(alt.modelId),
+      })),
+    ];
+
+    return recommendations;
+  }
+
+  /**
+   * Execute a request with automatic failover
+   */
+  async executeWithFailover<T>(
+    modelId: string,
+    executor: (model: LanguageModel) => Promise<T>,
+    config: EnhancedModelConfig = {}
+  ): Promise<T> {
+    const model = await this.getModelById(modelId, {
+      ...config,
+      fallbackEnabled: true,
+    });
+
+    return this.middleware.processRequest(
+      {
+        task: config.task || 'chat',
+        priority: config.priority || 'balanced',
+        capabilities: config.capabilities,
+        maxCost: config.maxCost,
+        maxLatency: config.maxLatency,
+      },
+      (model) => executor(model),
+      config.metadata
+    );
+  }
+
+  /**
+   * Get gateway statistics
+   */
+  getGatewayStats(): {
+    providers: Map<string, any>;
+    models: Map<string, any>;
+    cache: any;
+    routing: any;
+    circuitBreakers: Map<string, any>;
+  } {
+    return {
+      providers: this.metricsService.getAllProviderMetrics(),
+      models: this.metricsService.getAllModelMetrics(),
+      cache: this.middleware.getCacheStats(),
+      routing: this.routingEngine.getRoutingStats(),
+      circuitBreakers: this.middleware.getCircuitBreakerStatus(),
+    };
+  }
+
+  /**
+   * Get model performance metrics
+   */
+  getModelMetrics(modelId: string): any {
+    const [providerId, modelName] = modelId.split(':');
+    return this.metricsService.getModelMetrics(providerId, modelName);
+  }
+
+  /**
+   * Clear all caches
+   */
+  clearCaches(): void {
+    this.middleware.clearCache();
+    loggingService.info('All caches cleared');
+  }
+
+  /**
+   * Update load balancing strategy
+   */
+  updateLoadBalancingStrategy(strategy: LoadBalancingStrategy): void {
+    // This would require updating the gateway config
+    loggingService.info('Load balancing strategy updated', { strategy });
+  }
+
+  // Private helper methods
+
+  private wrapModelWithGateway(
+    modelSelection: ModelSelection,
+    requirements: ModelRequirements,
+    config: EnhancedModelConfig
+  ): LanguageModel {
+    // Create a wrapped model that includes gateway features
+    return wrapLanguageModel({
+      model: modelSelection.model,
+      middleware: async (params, options, doGenerate) => {
+        // Process through middleware
+        return this.middleware.processRequest(
+          requirements,
+          async (model) => doGenerate(params, options),
+          config.metadata
+        );
+      },
+    });
+  }
+
+  private createAggregatedModel(
+    requirements: ModelRequirements,
+    config: EnhancedModelConfig
+  ): LanguageModel {
+    // Create a model that aggregates responses from multiple models
+    const aggregatedModel: LanguageModel = {
+      id: 'gateway:aggregated',
+      provider: 'gateway',
+      maxOutputTokens: config.maxCost
+        ? Math.floor(config.maxCost * 10_000)
+        : 4096,
+
+      doGenerate: async (params, options) => {
+        const result = await this.middleware.processAggregatedRequest(
+          requirements,
+          async (model) => model.doGenerate(params, options),
+          config.aggregationStrategy || 'consensus',
+          config.aggregationCount || 3
+        );
+
+        // Convert aggregated response to standard format
+        return {
+          text: result.primary,
+          usage: result.metadata.tokens || {
+            promptTokens: 0,
+            completionTokens: 0,
+          },
+          finishReason: 'stop',
+          logprobs: undefined,
+          warnings: undefined,
+          rawResponse: result,
+        };
+      },
+
+      doStream: async (params, options) => {
+        throw new Error('Streaming not supported for aggregated models');
+      },
+    };
+
+    return aggregatedModel;
+  }
+
+  private buildFallbackChain(primaryModelId: string): string[] {
+    // Build a fallback chain based on model type
+    const fallbackChains: Record<string, string[]> = {
+      'openai:fast': ['anthropic:fast', 'openai:premium', 'anthropic:balanced'],
+      'anthropic:fast': ['openai:fast', 'anthropic:balanced', 'openai:premium'],
+      'openai:premium': [
+        'anthropic:balanced',
+        'openai:fast',
+        'anthropic:reasoning',
+      ],
+      'anthropic:balanced': ['openai:premium', 'anthropic:fast', 'openai:fast'],
+      'openai:code': [
+        'anthropic:balanced',
+        'openai:premium',
+        'anthropic:reasoning',
+      ],
+      'anthropic:reasoning': [
+        'openai:premium',
+        'anthropic:balanced',
+        'openai:code',
+      ],
+      'anthropic:creative': [
+        'openai:premium',
+        'anthropic:balanced',
+        'openai:fast',
+      ],
+    };
+
+    return (
+      fallbackChains[primaryModelId] || DEFAULT_GATEWAY_CONFIG.fallbackChain
+    );
+  }
+
+  private getModelCapabilities(modelId: string): string[] {
+    // Get capabilities for a model
+    const capabilities: Record<string, string[]> = {
+      'openai:fast': ['chat', 'code', 'analysis'],
+      'openai:code': ['code', 'analysis', 'debugging'],
+      'openai:premium': ['chat', 'code', 'analysis', 'reasoning'],
+      'anthropic:fast': ['chat', 'code', 'analysis'],
+      'anthropic:balanced': ['chat', 'code', 'analysis', 'creative'],
+      'anthropic:reasoning': ['reasoning', 'analysis', 'problem-solving'],
+      'anthropic:creative': ['creative', 'storytelling', 'ideation'],
+    };
+
+    return capabilities[modelId] || ['chat'];
+  }
+
+  private getModelCost(modelId: string): number {
+    // Get cost per token for a model
+    const costs: Record<string, number> = {
+      'openai:fast': 0.000_03,
+      'openai:code': 0.000_1,
+      'openai:premium': 0.000_15,
+      'anthropic:fast': 0.000_02,
+      'anthropic:balanced': 0.000_06,
+      'anthropic:reasoning': 0.000_08,
+      'anthropic:creative': 0.000_3,
+    };
+
+    return costs[modelId] || 0.000_1;
+  }
+}
+
+// Export singleton instance
+export const gatewayRegistry = GatewayRegistry.getInstance();
+
+// Convenience functions for backward compatibility
+
+/**
+ * Get an AI model with gateway features
+ */
+export const getGatewayModel = async (
+  config: EnhancedModelConfig = {}
+): Promise<LanguageModel> => {
+  return gatewayRegistry.getEnhancedModel(config);
+};
+
+/**
+ * Get a model by ID with gateway features
+ */
+export const getGatewayModelById = async (
+  modelId: string,
+  config: Omit<EnhancedModelConfig, 'modelId'> = {}
+): Promise<LanguageModel> => {
+  return gatewayRegistry.getModelById(modelId, config);
+};
+
+/**
+ * Execute with automatic failover
+ */
+export const executeWithGateway = async <T>(
+  modelId: string,
+  executor: (model: LanguageModel) => Promise<T>,
+  config: EnhancedModelConfig = {}
+): Promise<T> => {
+  return gatewayRegistry.executeWithFailover(modelId, executor, config);
+};
+
+// Export system prompts for consistency
+export { systemPrompts } from './providers';

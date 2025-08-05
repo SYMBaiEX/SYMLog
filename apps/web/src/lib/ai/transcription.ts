@@ -1,55 +1,63 @@
-import { openai } from '@ai-sdk/openai'
+import { openai } from '@ai-sdk/openai';
 
 // Constants for transcription
-const DEFAULT_MODEL = 'whisper-1'
-const MAX_FILE_SIZE = 25 * 1024 * 1024 // 25MB
+const DEFAULT_MODEL = 'whisper-1';
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const SUPPORTED_FORMATS = [
-  'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'wav', 'webm', 'ogg', 'flac'
-] as const
-const DEFAULT_LANGUAGE = 'en'
-const DEFAULT_TEMPERATURE = 0
-const MAX_PROMPT_LENGTH = 224 // Whisper's limit for prompts
+  'mp3',
+  'mp4',
+  'mpeg',
+  'mpga',
+  'm4a',
+  'wav',
+  'webm',
+  'ogg',
+  'flac',
+] as const;
+const DEFAULT_LANGUAGE = 'en';
+const DEFAULT_TEMPERATURE = 0;
+const MAX_PROMPT_LENGTH = 224; // Whisper's limit for prompts
 
 // Type definitions
-export type AudioFormat = typeof SUPPORTED_FORMATS[number]
+export type AudioFormat = (typeof SUPPORTED_FORMATS)[number];
 
 export interface TranscriptionOptions {
   /** Language of the audio (ISO 639-1) */
-  language?: string
+  language?: string;
   /** Optional prompt to guide the transcription */
-  prompt?: string
+  prompt?: string;
   /** Sampling temperature (0-1) */
-  temperature?: number
+  temperature?: number;
   /** Response format */
-  responseFormat?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt'
+  responseFormat?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt';
 }
 
 export interface TranscriptionResult {
   /** Transcribed text */
-  text: string
+  text: string;
   /** Language detected or specified */
-  language?: string
+  language?: string;
   /** Duration of the audio in seconds */
-  duration?: number
+  duration?: number;
   /** Segments with timestamps (if verbose_json format) */
   segments?: Array<{
-    id: number
-    seek: number
-    start: number
-    end: number
-    text: string
-    tokens: number[]
-    temperature: number
-    avg_logprob: number
-    compression_ratio: number
-    no_speech_prob: number
-  }>
+    id: number;
+    seek: number;
+    start: number;
+    end: number;
+    text: string;
+    tokens: number[];
+    temperature: number;
+    avg_logprob: number;
+    compression_ratio: number;
+    no_speech_prob: number;
+  }>;
   /** Words with timestamps (if available) */
   words?: Array<{
-    word: string
-    start: number
-    end: number
-  }>
+    word: string;
+    start: number;
+    end: number;
+  }>;
 }
 
 /**
@@ -65,41 +73,46 @@ function validateTranscriptionParams(
   options: TranscriptionOptions
 ): void {
   // Check file format
-  const extension = filename.split('.').pop()?.toLowerCase()
-  if (!extension || !SUPPORTED_FORMATS.includes(extension as AudioFormat)) {
+  const extension = filename.split('.').pop()?.toLowerCase();
+  if (!(extension && SUPPORTED_FORMATS.includes(extension as AudioFormat))) {
     throw new Error(
       `Unsupported audio format. Supported formats: ${SUPPORTED_FORMATS.join(', ')}`
-    )
+    );
   }
 
   // Check file size
-  let size = 0
+  let size = 0;
   if (audioData instanceof Uint8Array) {
-    size = audioData.length
+    size = audioData.length;
   } else if (audioData instanceof File || audioData instanceof Blob) {
-    size = audioData.size
+    size = audioData.size;
   } else if (typeof audioData === 'string') {
     // Base64 string - estimate size
-    size = (audioData.length * 3) / 4
+    size = (audioData.length * 3) / 4;
   }
 
   if (size > MAX_FILE_SIZE) {
-    throw new Error(`File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`)
+    throw new Error(
+      `File too large. Maximum size is ${MAX_FILE_SIZE / 1024 / 1024}MB`
+    );
   }
 
   // Validate options
-  if (options.temperature !== undefined) {
-    if (options.temperature < 0 || options.temperature > 1) {
-      throw new Error('Temperature must be between 0 and 1')
-    }
+  if (
+    options.temperature !== undefined &&
+    (options.temperature < 0 || options.temperature > 1)
+  ) {
+    throw new Error('Temperature must be between 0 and 1');
   }
 
   if (options.prompt && options.prompt.length > MAX_PROMPT_LENGTH) {
-    throw new Error(`Prompt too long. Maximum length is ${MAX_PROMPT_LENGTH} characters`)
+    throw new Error(
+      `Prompt too long. Maximum length is ${MAX_PROMPT_LENGTH} characters`
+    );
   }
 
   if (options.language && options.language.length !== 2) {
-    throw new Error('Language must be a 2-letter ISO 639-1 code')
+    throw new Error('Language must be a 2-letter ISO 639-1 code');
   }
 }
 
@@ -109,20 +122,20 @@ function validateTranscriptionParams(
  * @returns Sanitized prompt
  */
 function sanitizeTranscriptionPrompt(prompt: string): string {
-  if (!prompt) return ''
-  
+  if (!prompt) return '';
+
   // Remove potentially problematic content
   let sanitized = prompt
     .replace(/[<>{}[\]]/g, '') // Remove brackets and braces
     .replace(/\n+/g, ' ') // Replace newlines with spaces
-    .trim()
-  
+    .trim();
+
   // Truncate if too long
   if (sanitized.length > MAX_PROMPT_LENGTH) {
-    sanitized = sanitized.substring(0, MAX_PROMPT_LENGTH)
+    sanitized = sanitized.substring(0, MAX_PROMPT_LENGTH);
   }
-  
-  return sanitized
+
+  return sanitized;
 }
 
 /**
@@ -142,38 +155,40 @@ export async function transcribeAudio(
     language,
     prompt,
     temperature = DEFAULT_TEMPERATURE,
-    responseFormat = 'json'
-  } = options
+    responseFormat = 'json',
+  } = options;
 
   // Validate parameters
-  validateTranscriptionParams(audioData, filename, options)
+  validateTranscriptionParams(audioData, filename, options);
 
   // Sanitize prompt if provided
-  const sanitizedPrompt = prompt ? sanitizeTranscriptionPrompt(prompt) : undefined
+  const sanitizedPrompt = prompt
+    ? sanitizeTranscriptionPrompt(prompt)
+    : undefined;
 
   try {
     // Note: This is a placeholder for AI SDK 5.0 transcription
     // The actual implementation would use experimental_transcribe
     // TODO: Replace with actual AI SDK 5.0 implementation when available
-    
-    const transcriptionModel = openai.transcription(DEFAULT_MODEL)
-    
+
+    const transcriptionModel = openai.transcription(DEFAULT_MODEL);
+
     // Convert audio data to appropriate format
-    let audioInput: Uint8Array
+    let audioInput: Uint8Array;
     if (audioData instanceof Uint8Array) {
-      audioInput = audioData
+      audioInput = audioData;
     } else if (typeof audioData === 'string') {
       // Assume base64 string
-      const binaryString = atob(audioData)
-      audioInput = new Uint8Array(binaryString.length)
+      const binaryString = atob(audioData);
+      audioInput = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
-        audioInput[i] = binaryString.charCodeAt(i)
+        audioInput[i] = binaryString.charCodeAt(i);
       }
     } else if (audioData instanceof File || audioData instanceof Blob) {
-      const arrayBuffer = await audioData.arrayBuffer()
-      audioInput = new Uint8Array(arrayBuffer)
+      const arrayBuffer = await audioData.arrayBuffer();
+      audioInput = new Uint8Array(arrayBuffer);
     } else {
-      throw new Error('Invalid audio data format')
+      throw new Error('Invalid audio data format');
     }
 
     // This would be the actual implementation with AI SDK 5.0:
@@ -191,29 +206,31 @@ export async function transcribeAudio(
       text: `[Placeholder] Transcription feature not yet implemented. Audio file: ${filename}`,
       language: language || 'en',
       duration: 0,
-    }
+    };
 
     if (responseFormat === 'verbose_json') {
-      mockTranscription.segments = [{
-        id: 0,
-        seek: 0,
-        start: 0,
-        end: 10.5,
-        text: mockTranscription.text,
-        tokens: [1, 2, 3],
-        temperature: 0,
-        avg_logprob: -0.5,
-        compression_ratio: 1.2,
-        no_speech_prob: 0.01
-      }]
+      mockTranscription.segments = [
+        {
+          id: 0,
+          seek: 0,
+          start: 0,
+          end: 10.5,
+          text: mockTranscription.text,
+          tokens: [1, 2, 3],
+          temperature: 0,
+          avg_logprob: -0.5,
+          compression_ratio: 1.2,
+          no_speech_prob: 0.01,
+        },
+      ];
     }
 
-    return mockTranscription
+    return mockTranscription;
   } catch (error) {
-    console.error('Transcription failed:', error)
+    console.error('Transcription failed:', error);
     throw new Error(
       `Transcription failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    );
   }
 }
 
@@ -229,23 +246,23 @@ export async function transcribeAudioFromURL(
 ): Promise<TranscriptionResult> {
   try {
     // Fetch audio file
-    const response = await fetch(audioUrl)
+    const response = await fetch(audioUrl);
     if (!response.ok) {
-      throw new Error(`Failed to fetch audio: ${response.statusText}`)
+      throw new Error(`Failed to fetch audio: ${response.statusText}`);
     }
 
-    const blob = await response.blob()
-    
-    // Extract filename from URL or use default
-    const urlParts = audioUrl.split('/')
-    const filename = urlParts[urlParts.length - 1] || 'audio.mp3'
+    const blob = await response.blob();
 
-    return transcribeAudio(blob, filename, options)
+    // Extract filename from URL or use default
+    const urlParts = audioUrl.split('/');
+    const filename = urlParts[urlParts.length - 1] || 'audio.mp3';
+
+    return transcribeAudio(blob, filename, options);
   } catch (error) {
-    console.error('Failed to transcribe from URL:', error)
+    console.error('Failed to transcribe from URL:', error);
     throw new Error(
       `Failed to transcribe from URL: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    );
   }
 }
 
@@ -253,16 +270,16 @@ export async function transcribeAudioFromURL(
  * Transcription service for managing multiple operations
  */
 export class TranscriptionService {
-  private static instance: TranscriptionService
-  private activeTranscriptions = new Map<string, AbortController>()
+  private static instance: TranscriptionService;
+  private activeTranscriptions = new Map<string, AbortController>();
 
   private constructor() {}
 
   static getInstance(): TranscriptionService {
     if (!TranscriptionService.instance) {
-      TranscriptionService.instance = new TranscriptionService()
+      TranscriptionService.instance = new TranscriptionService();
     }
-    return TranscriptionService.instance
+    return TranscriptionService.instance;
   }
 
   /**
@@ -281,18 +298,18 @@ export class TranscriptionService {
   ): Promise<TranscriptionResult> {
     // Cancel existing transcription with same ID
     if (this.activeTranscriptions.has(id)) {
-      this.cancel(id)
+      this.cancel(id);
     }
 
-    const abortController = new AbortController()
-    this.activeTranscriptions.set(id, abortController)
+    const abortController = new AbortController();
+    this.activeTranscriptions.set(id, abortController);
 
     try {
       // In the real implementation, we would pass the abort signal
-      const result = await transcribeAudio(audioData, filename, options)
-      return result
+      const result = await transcribeAudio(audioData, filename, options);
+      return result;
     } finally {
-      this.activeTranscriptions.delete(id)
+      this.activeTranscriptions.delete(id);
     }
   }
 
@@ -301,10 +318,10 @@ export class TranscriptionService {
    * @param id Transcription ID to cancel
    */
   cancel(id: string): void {
-    const controller = this.activeTranscriptions.get(id)
+    const controller = this.activeTranscriptions.get(id);
     if (controller) {
-      controller.abort()
-      this.activeTranscriptions.delete(id)
+      controller.abort();
+      this.activeTranscriptions.delete(id);
     }
   }
 
@@ -313,21 +330,21 @@ export class TranscriptionService {
    */
   cancelAll(): void {
     for (const [id, controller] of this.activeTranscriptions) {
-      controller.abort()
+      controller.abort();
     }
-    this.activeTranscriptions.clear()
+    this.activeTranscriptions.clear();
   }
 
   /**
    * Get active transcription IDs
    */
   getActiveTranscriptions(): string[] {
-    return Array.from(this.activeTranscriptions.keys())
+    return Array.from(this.activeTranscriptions.keys());
   }
 }
 
 // Export singleton instance
-export const transcriptionService = TranscriptionService.getInstance()
+export const transcriptionService = TranscriptionService.getInstance();
 
 /**
  * Extract audio from video file
@@ -348,7 +365,7 @@ export async function extractAudioFromVideo(videoFile: File): Promise<Blob> {
  */
 export async function splitAudioIntoChunks(
   audioData: Uint8Array,
-  chunkDurationMs: number = 60000 // 1 minute
+  chunkDurationMs = 60_000 // 1 minute
 ): Promise<Uint8Array[]> {
   // This is a placeholder - actual implementation would use
   // Web Audio API to split audio into time-based chunks
@@ -421,7 +438,7 @@ export function generateSubtitles(
         return `${index + 1}\n${start} --> ${end}\n${segment.text.trim()}\n`
       })
       .join('\n')
-  } else {
+  }
     // VTT format
     let vtt = 'WEBVTT\n\n'
     vtt += result.segments
@@ -432,7 +449,6 @@ export function generateSubtitles(
       })
       .join('\n')
     return vtt
-  }
 }
 
 // Helper functions for time formatting
@@ -454,6 +470,6 @@ function formatTimeVTT(seconds: number): string {
   return `${pad(hours)}:${pad(minutes)}:${pad(secs)}.${pad(ms, 3)}`
 }
 
-function pad(num: number, size: number = 2): string {
+function pad(num: number, size = 2): string {
   return num.toString().padStart(size, '0')
 }

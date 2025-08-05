@@ -1,53 +1,64 @@
-import * as React from "react"
-import { cn } from "@/lib/utils"
+import * as React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface GlassCardProps extends React.HTMLAttributes<HTMLDivElement> {
-  blur?: "sm" | "md" | "lg" | "xl"
-  hover?: boolean
-  glow?: "periwinkle" | "green" | "none"
-  variant?: "default" | "dark"
+  blur?: 'sm' | 'md' | 'lg' | 'xl';
+  hover?: boolean;
+  glow?: 'periwinkle' | 'green' | 'none';
+  variant?: 'default' | 'dark';
 }
 
 const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
-  ({ className, blur = "lg", hover = true, glow = "none", variant = "default", children, ...props }, ref) => {
+  (
+    {
+      className,
+      blur = 'lg',
+      hover = true,
+      glow = 'none',
+      variant = 'default',
+      children,
+      ...props
+    },
+    ref
+  ) => {
     const blurClass = {
-      sm: "backdrop-blur-sm",
-      md: "backdrop-blur-md",
-      lg: "backdrop-blur-lg",
-      xl: "backdrop-blur-xl",
-    }[blur]
+      sm: 'backdrop-blur-sm',
+      md: 'backdrop-blur-md',
+      lg: 'backdrop-blur-lg',
+      xl: 'backdrop-blur-xl',
+    }[blur];
 
     const glowClass = {
-      periwinkle: "glow-periwinkle",
-      green: "glow-green",
-      none: "",
-    }[glow]
+      periwinkle: 'glow-periwinkle',
+      green: 'glow-green',
+      none: '',
+    }[glow];
 
     const variantClass = {
-      default: "glass",
-      dark: "glass-dark",
-    }[variant]
+      default: 'glass',
+      dark: 'glass-dark',
+    }[variant];
 
     return (
       <div
-        ref={ref}
         className={cn(
           variantClass,
           blurClass,
-          "rounded-xl p-6 transition-all duration-300 relative",
-          hover && "hover-lift",
+          'relative rounded-xl p-6 transition-all duration-300',
+          hover && 'hover-lift',
           glowClass,
-          "glass-shadow",
-          "before:absolute before:inset-0 before:bg-background/5 before:rounded-xl before:pointer-events-none", // Extra contrast layer
+          'glass-shadow',
+          'before:pointer-events-none before:absolute before:inset-0 before:rounded-xl before:bg-background/5', // Extra contrast layer
           className
         )}
+        ref={ref}
         {...props}
       >
         {children}
       </div>
-    )
+    );
   }
-)
-GlassCard.displayName = "GlassCard"
+);
+GlassCard.displayName = 'GlassCard';
 
-export { GlassCard }
+export { GlassCard };

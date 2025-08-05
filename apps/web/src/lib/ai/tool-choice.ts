@@ -1,16 +1,18 @@
-import { CoreTool, ToolChoice } from 'ai'
-import { z } from 'zod'
-import { logError as logErrorToConsole } from '@/lib/logger'
-import { enhancedArtifactTools } from './tools/enhanced-tools'
-import { standardErrorHandler, ToolError } from './error-handler'
+import type { CoreTool, ToolChoice } from 'ai';
+import { z } from 'zod';
+import { logError as logErrorToConsole } from '@/lib/logger';
+import { standardErrorHandler, type ToolError } from './error-handler';
+import { enhancedArtifactTools } from './tools/enhanced-tools';
 
 // Create a logger wrapper
 const loggingService = {
   info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) => console.warn(`[WARN] ${message}`, data),
+  warn: (message: string, data?: any) =>
+    console.warn(`[WARN] ${message}`, data),
   error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) => console.debug(`[DEBUG] ${message}`, data),
-}
+  debug: (message: string, data?: any) =>
+    console.debug(`[DEBUG] ${message}`, data),
+};
 
 // Constants for tool choice configuration
 const CONFIDENCE_THRESHOLDS = {
@@ -20,53 +22,57 @@ const CONFIDENCE_THRESHOLDS = {
   BOOST_EXECUTE: 0.3,
   BOOST_SIMPLE: 0.1,
   PERFORMANCE_BONUS_MAX: 0.2,
-  RECENCY_BONUS_MAX: 0.1
-} as const
+  RECENCY_BONUS_MAX: 0.1,
+} as const;
 
 const DEFAULT_METRICS = {
   SUCCESS_RATE: 1.0,
   AVG_EXECUTION_TIME: 1000,
-  LEARNING_RATE: 0.1
-} as const
+  LEARNING_RATE: 0.1,
+} as const;
 
 // Tool choice configuration interface
 export interface ToolChoiceConfig {
-  mode: 'auto' | 'required' | 'none' | 'tool'
-  toolName?: string
-  fallbackBehavior?: 'error' | 'retry' | 'bypass'
-  maxRetries?: number
-  timeout?: number
-  priority?: 'high' | 'medium' | 'low'
+  mode: 'auto' | 'required' | 'none' | 'tool';
+  toolName?: string;
+  fallbackBehavior?: 'error' | 'retry' | 'bypass';
+  maxRetries?: number;
+  timeout?: number;
+  priority?: 'high' | 'medium' | 'low';
 }
 
 // Tool selection criteria
 export interface ToolSelectionCriteria {
-  outputType?: 'code' | 'document' | 'chart' | 'data' | 'image' | 'spreadsheet'
-  contentType?: 'unknown' | 'code' | 'visualization' | 'data' | 'text'
-  complexity?: 'simple' | 'moderate' | 'complex'
-  userIntent?: 'create' | 'analyze' | 'transform' | 'execute'
-  securityLevel?: 'low' | 'medium' | 'high'
+  outputType?: 'code' | 'document' | 'chart' | 'data' | 'image' | 'spreadsheet';
+  contentType?: 'unknown' | 'code' | 'visualization' | 'data' | 'text';
+  complexity?: 'simple' | 'moderate' | 'complex';
+  userIntent?: 'create' | 'analyze' | 'transform' | 'execute';
+  securityLevel?: 'low' | 'medium' | 'high';
 }
 
 // Tool recommendation result
 export interface ToolRecommendation {
-  toolName: string
-  confidence: number // 0-1
-  reasoning: string
-  alternativeTools: string[]
-  choiceMode: ToolChoice
+  toolName: string;
+  confidence: number; // 0-1
+  reasoning: string;
+  alternativeTools: string[];
+  choiceMode: ToolChoice;
 }
 
 // Enhanced tool choice errors
 export class ToolChoiceError extends Error {
   constructor(
     message: string,
-    public readonly errorType: 'validation' | 'execution' | 'timeout' | 'unavailable',
+    public readonly errorType:
+      | 'validation'
+      | 'execution'
+      | 'timeout'
+      | 'unavailable',
     public readonly toolName?: string,
     public readonly retryable: boolean = false
   ) {
-    super(message)
-    this.name = 'ToolChoiceError'
+    super(message);
+    this.name = 'ToolChoiceError';
   }
 }
 
@@ -75,24 +81,27 @@ export class ToolChoiceError extends Error {
  * Manages required tool usage, smart tool selection, and fallback strategies
  */
 export class ToolChoiceEnforcer {
-  private static instance: ToolChoiceEnforcer
-  private toolRegistry = new Map<string, CoreTool>()
-  private toolMetrics = new Map<string, {
-    successRate: number
-    avgExecutionTime: number
-    lastUsed: number
-    usageCount: number
-  }>()
+  private static instance: ToolChoiceEnforcer;
+  private toolRegistry = new Map<string, CoreTool>();
+  private toolMetrics = new Map<
+    string,
+    {
+      successRate: number;
+      avgExecutionTime: number;
+      lastUsed: number;
+      usageCount: number;
+    }
+  >();
 
   private constructor() {
-    this.initializeToolRegistry()
+    this.initializeToolRegistry();
   }
 
   static getInstance(): ToolChoiceEnforcer {
     if (!ToolChoiceEnforcer.instance) {
-      ToolChoiceEnforcer.instance = new ToolChoiceEnforcer()
+      ToolChoiceEnforcer.instance = new ToolChoiceEnforcer();
     }
-    return ToolChoiceEnforcer.instance
+    return ToolChoiceEnforcer.instance;
   }
 
   /**
@@ -101,21 +110,21 @@ export class ToolChoiceEnforcer {
   private initializeToolRegistry(): void {
     // Register enhanced artifact tools
     Object.entries(enhancedArtifactTools).forEach(([name, tool]) => {
-      this.toolRegistry.set(name, tool as CoreTool)
-      
+      this.toolRegistry.set(name, tool as CoreTool);
+
       // Initialize metrics with default values
       this.toolMetrics.set(name, {
         successRate: DEFAULT_METRICS.SUCCESS_RATE,
         avgExecutionTime: DEFAULT_METRICS.AVG_EXECUTION_TIME,
         lastUsed: 0,
-        usageCount: 0
-      })
-    })
+        usageCount: 0,
+      });
+    });
 
     loggingService.info('Tool registry initialized', {
       registeredTools: Array.from(this.toolRegistry.keys()),
-      totalTools: this.toolRegistry.size
-    })
+      totalTools: this.toolRegistry.size,
+    });
   }
 
   /**
@@ -126,8 +135,8 @@ export class ToolChoiceEnforcer {
     config: ToolChoiceConfig = { mode: 'required' }
   ): ToolChoice {
     try {
-      const recommendation = this.recommendTool(criteria)
-      
+      const recommendation = this.recommendTool(criteria);
+
       switch (config.mode) {
         case 'required':
           // Force tool usage - return specific tool choice
@@ -135,57 +144,57 @@ export class ToolChoiceEnforcer {
             loggingService.info('Enforcing required tool usage', {
               toolName: recommendation.toolName,
               confidence: recommendation.confidence,
-              reasoning: recommendation.reasoning
-            })
-            
+              reasoning: recommendation.reasoning,
+            });
+
             return {
               type: 'tool',
-              toolName: recommendation.toolName
-            }
+              toolName: recommendation.toolName,
+            };
           }
-          
+
           // Fallback to any required tool if specific recommendation isn't confident enough
-          return { type: 'required' }
+          return { type: 'required' };
 
         case 'tool':
           // Force specific tool
           if (config.toolName && this.toolRegistry.has(config.toolName)) {
             return {
-              type: 'tool', 
-              toolName: config.toolName
-            }
+              type: 'tool',
+              toolName: config.toolName,
+            };
           }
           throw new ToolChoiceError(
             `Tool ${config.toolName} not available`,
             'unavailable',
             config.toolName
-          )
+          );
 
         case 'auto':
           // Smart tool selection with preference
           if (recommendation.confidence > CONFIDENCE_THRESHOLDS.MEDIUM) {
             return {
               type: 'tool',
-              toolName: recommendation.toolName
-            }
+              toolName: recommendation.toolName,
+            };
           }
-          return { type: 'auto' }
+          return { type: 'auto' };
 
         case 'none':
-          return { type: 'none' }
+          return { type: 'none' };
 
         default:
-          return { type: 'auto' }
+          return { type: 'auto' };
       }
     } catch (error) {
       const toolError = standardErrorHandler.handleError(error, {
         criteria,
         config,
-        context: 'tool-choice-enforcement'
-      })
+        context: 'tool-choice-enforcement',
+      });
 
       // Apply fallback behavior
-      return this.handleToolChoiceError(toolError, config)
+      return this.handleToolChoiceError(toolError, config);
     }
   }
 
@@ -193,29 +202,29 @@ export class ToolChoiceEnforcer {
    * Smart tool recommendation based on criteria
    */
   recommendTool(criteria: ToolSelectionCriteria): ToolRecommendation {
-    const scores = new Map<string, number>()
-    const reasoning: string[] = []
+    const scores = new Map<string, number>();
+    const reasoning: string[] = [];
 
     // Score tools based on output type
     if (criteria.outputType) {
       switch (criteria.outputType) {
         case 'code':
-          scores.set('createCodeArtifact', 0.9)
-          reasoning.push('Code output type detected')
-          break
+          scores.set('createCodeArtifact', 0.9);
+          reasoning.push('Code output type detected');
+          break;
         case 'document':
-          scores.set('createDocumentArtifact', 0.9)
-          reasoning.push('Document output type detected')
-          break
+          scores.set('createDocumentArtifact', 0.9);
+          reasoning.push('Document output type detected');
+          break;
         case 'chart':
-          scores.set('createChartArtifact', 0.9)
-          reasoning.push('Chart output type detected')
-          break
+          scores.set('createChartArtifact', 0.9);
+          reasoning.push('Chart output type detected');
+          break;
         case 'data':
-          scores.set('createCodeArtifact', 0.7) // Can create JSON/CSV
-          scores.set('createDocumentArtifact', 0.5) // Can document data
-          reasoning.push('Data output type - flexible tools selected')
-          break
+          scores.set('createCodeArtifact', 0.7); // Can create JSON/CSV
+          scores.set('createDocumentArtifact', 0.5); // Can document data
+          reasoning.push('Data output type - flexible tools selected');
+          break;
       }
     }
 
@@ -224,19 +233,39 @@ export class ToolChoiceEnforcer {
       switch (criteria.userIntent) {
         case 'create':
           // Boost creation tools
-          this.boostScore(scores, 'createCodeArtifact', CONFIDENCE_THRESHOLDS.BOOST_CREATE)
-          this.boostScore(scores, 'createDocumentArtifact', CONFIDENCE_THRESHOLDS.BOOST_CREATE)
-          this.boostScore(scores, 'createChartArtifact', CONFIDENCE_THRESHOLDS.BOOST_CREATE)
-          reasoning.push('Creation intent detected')
-          break
+          this.boostScore(
+            scores,
+            'createCodeArtifact',
+            CONFIDENCE_THRESHOLDS.BOOST_CREATE
+          );
+          this.boostScore(
+            scores,
+            'createDocumentArtifact',
+            CONFIDENCE_THRESHOLDS.BOOST_CREATE
+          );
+          this.boostScore(
+            scores,
+            'createChartArtifact',
+            CONFIDENCE_THRESHOLDS.BOOST_CREATE
+          );
+          reasoning.push('Creation intent detected');
+          break;
         case 'execute':
-          this.boostScore(scores, 'executeWorkflow', CONFIDENCE_THRESHOLDS.BOOST_EXECUTE)
-          reasoning.push('Execution intent detected')
-          break
+          this.boostScore(
+            scores,
+            'executeWorkflow',
+            CONFIDENCE_THRESHOLDS.BOOST_EXECUTE
+          );
+          reasoning.push('Execution intent detected');
+          break;
         case 'analyze':
-          this.boostScore(scores, 'generateStructuredOutput', CONFIDENCE_THRESHOLDS.BOOST_CREATE)
-          reasoning.push('Analysis intent detected')
-          break
+          this.boostScore(
+            scores,
+            'generateStructuredOutput',
+            CONFIDENCE_THRESHOLDS.BOOST_CREATE
+          );
+          reasoning.push('Analysis intent detected');
+          break;
       }
     }
 
@@ -244,38 +273,50 @@ export class ToolChoiceEnforcer {
     if (criteria.complexity) {
       switch (criteria.complexity) {
         case 'complex':
-          this.boostScore(scores, 'executeWorkflow', CONFIDENCE_THRESHOLDS.BOOST_EXECUTE)
-          reasoning.push('Complex task - workflow tool preferred')
-          break
+          this.boostScore(
+            scores,
+            'executeWorkflow',
+            CONFIDENCE_THRESHOLDS.BOOST_EXECUTE
+          );
+          reasoning.push('Complex task - workflow tool preferred');
+          break;
         case 'simple':
           // Prefer simpler tools
-          this.boostScore(scores, 'createDocumentArtifact', CONFIDENCE_THRESHOLDS.BOOST_SIMPLE)
-          reasoning.push('Simple task - basic tools preferred')
-          break
+          this.boostScore(
+            scores,
+            'createDocumentArtifact',
+            CONFIDENCE_THRESHOLDS.BOOST_SIMPLE
+          );
+          reasoning.push('Simple task - basic tools preferred');
+          break;
       }
     }
 
     // Factor in tool performance metrics
     for (const [toolName, score] of scores) {
-      const metrics = this.toolMetrics.get(toolName)
+      const metrics = this.toolMetrics.get(toolName);
       if (metrics) {
-        const performanceBonus = metrics.successRate * CONFIDENCE_THRESHOLDS.PERFORMANCE_BONUS_MAX
-        const recencyBonus = this.calculateRecencyBonus(metrics.lastUsed)
-        scores.set(toolName, score + performanceBonus + recencyBonus)
+        const performanceBonus =
+          metrics.successRate * CONFIDENCE_THRESHOLDS.PERFORMANCE_BONUS_MAX;
+        const recencyBonus = this.calculateRecencyBonus(metrics.lastUsed);
+        scores.set(toolName, score + performanceBonus + recencyBonus);
       }
     }
 
     // Get best tool
-    const bestTool = this.getBestTool(scores)
-    const alternatives = this.getAlternativeTools(scores, bestTool.name)
+    const bestTool = this.getBestTool(scores);
+    const alternatives = this.getAlternativeTools(scores, bestTool.name);
 
     return {
       toolName: bestTool.name,
-      confidence: bestTool.score,  
+      confidence: bestTool.score,
       reasoning: reasoning.join('; '),
       alternativeTools: alternatives,
-      choiceMode: bestTool.score > CONFIDENCE_THRESHOLDS.HIGH ? { type: 'tool', toolName: bestTool.name } : { type: 'auto' }
-    }
+      choiceMode:
+        bestTool.score > CONFIDENCE_THRESHOLDS.HIGH
+          ? { type: 'tool', toolName: bestTool.name }
+          : { type: 'auto' },
+    };
   }
 
   /**
@@ -283,67 +324,76 @@ export class ToolChoiceEnforcer {
    */
   selectToolForOutput(outputType: string, content?: string): string {
     // Validate outputType against known types
-    const validOutputTypes = ['code', 'document', 'chart', 'data', 'image', 'spreadsheet']
-    const validatedOutputType = validOutputTypes.includes(outputType) 
-      ? outputType as ToolSelectionCriteria['outputType']
-      : 'document' // Safe fallback
-    
-    const contentAnalysis = this.analyzeContent(content)
-    
+    const validOutputTypes = [
+      'code',
+      'document',
+      'chart',
+      'data',
+      'image',
+      'spreadsheet',
+    ];
+    const validatedOutputType = validOutputTypes.includes(outputType)
+      ? (outputType as ToolSelectionCriteria['outputType'])
+      : 'document'; // Safe fallback
+
+    const contentAnalysis = this.analyzeContent(content);
+
     const criteria: ToolSelectionCriteria = {
       outputType: validatedOutputType,
       contentType: contentAnalysis.type,
       complexity: contentAnalysis.complexity,
-      userIntent: contentAnalysis.intent
-    }
+      userIntent: contentAnalysis.intent,
+    };
 
-    const recommendation = this.recommendTool(criteria)
-    return recommendation.toolName
+    const recommendation = this.recommendTool(criteria);
+    return recommendation.toolName;
   }
 
   /**
    * Tool availability check
    */
   isToolAvailable(toolName: string): boolean {
-    return this.toolRegistry.has(toolName)
+    return this.toolRegistry.has(toolName);
   }
 
   /**
    * Get all available tools
    */
   getAvailableTools(): string[] {
-    return Array.from(this.toolRegistry.keys())
+    return Array.from(this.toolRegistry.keys());
   }
 
   /**
    * Update tool metrics after execution
    */
   updateToolMetrics(
-    toolName: string, 
-    success: boolean, 
+    toolName: string,
+    success: boolean,
     executionTime: number
   ): void {
-    const metrics = this.toolMetrics.get(toolName)
-    if (!metrics) return
+    const metrics = this.toolMetrics.get(toolName);
+    if (!metrics) return;
 
     // Update success rate using exponential moving average
-    const alpha = DEFAULT_METRICS.LEARNING_RATE
-    metrics.successRate = metrics.successRate * (1 - alpha) + (success ? 1 : 0) * alpha
-    
+    const alpha = DEFAULT_METRICS.LEARNING_RATE;
+    metrics.successRate =
+      metrics.successRate * (1 - alpha) + (success ? 1 : 0) * alpha;
+
     // Update average execution time
-    metrics.avgExecutionTime = metrics.avgExecutionTime * (1 - alpha) + executionTime * alpha
-    
+    metrics.avgExecutionTime =
+      metrics.avgExecutionTime * (1 - alpha) + executionTime * alpha;
+
     // Update usage stats
-    metrics.lastUsed = Date.now()
-    metrics.usageCount++
+    metrics.lastUsed = Date.now();
+    metrics.usageCount++;
 
     loggingService.debug('Tool metrics updated', {
       toolName,
       success,
       executionTime,
       newSuccessRate: metrics.successRate,
-      newAvgTime: metrics.avgExecutionTime
-    })
+      newAvgTime: metrics.avgExecutionTime,
+    });
   }
 
   /**
@@ -351,122 +401,140 @@ export class ToolChoiceEnforcer {
    */
   getToolMetrics(toolName?: string): Map<string, any> | any {
     if (toolName) {
-      return this.toolMetrics.get(toolName)
+      return this.toolMetrics.get(toolName);
     }
-    return this.toolMetrics
+    return this.toolMetrics;
   }
 
   // Private helper methods
 
-  private boostScore(scores: Map<string, number>, toolName: string, boost: number): void {
-    const currentScore = scores.get(toolName) || 0
-    scores.set(toolName, Math.min(1.0, currentScore + boost))
+  private boostScore(
+    scores: Map<string, number>,
+    toolName: string,
+    boost: number
+  ): void {
+    const currentScore = scores.get(toolName) || 0;
+    scores.set(toolName, Math.min(1.0, currentScore + boost));
   }
 
-  private getBestTool(scores: Map<string, number>): { name: string; score: number } {
-    let bestTool = { name: '', score: 0 }
-    
+  private getBestTool(scores: Map<string, number>): {
+    name: string;
+    score: number;
+  } {
+    let bestTool = { name: '', score: 0 };
+
     for (const [toolName, score] of scores) {
       if (score > bestTool.score) {
-        bestTool = { name: toolName, score }
+        bestTool = { name: toolName, score };
       }
     }
 
     // Default to createCodeArtifact if no clear winner
     if (bestTool.score === 0) {
-      bestTool = { name: 'createCodeArtifact', score: 0.5 }
+      bestTool = { name: 'createCodeArtifact', score: 0.5 };
     }
 
-    return bestTool
+    return bestTool;
   }
 
-  private getAlternativeTools(scores: Map<string, number>, excludeTool: string): string[] {
+  private getAlternativeTools(
+    scores: Map<string, number>,
+    excludeTool: string
+  ): string[] {
     return Array.from(scores.entries())
       .filter(([name]) => name !== excludeTool)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([name]) => name)
+      .map(([name]) => name);
   }
 
   private calculateRecencyBonus(lastUsed: number): number {
-    if (lastUsed === 0) return 0
-    
-    const hoursSinceUsed = (Date.now() - lastUsed) / (1000 * 60 * 60)
+    if (lastUsed === 0) return 0;
+
+    const hoursSinceUsed = (Date.now() - lastUsed) / (1000 * 60 * 60);
     // Bonus decreases over time, max RECENCY_BONUS_MAX
-    return Math.max(0, CONFIDENCE_THRESHOLDS.RECENCY_BONUS_MAX * Math.exp(-hoursSinceUsed / 24))
+    return Math.max(
+      0,
+      CONFIDENCE_THRESHOLDS.RECENCY_BONUS_MAX * Math.exp(-hoursSinceUsed / 24)
+    );
   }
 
   /**
    * Analyze content to determine type, complexity, and intent
    */
   public analyzeContent(content?: string): {
-    type: 'unknown' | 'code' | 'visualization' | 'data' | 'text'
-    complexity: 'simple' | 'moderate' | 'complex'
-    intent: 'create' | 'analyze' | 'transform' | 'execute'
+    type: 'unknown' | 'code' | 'visualization' | 'data' | 'text';
+    complexity: 'simple' | 'moderate' | 'complex';
+    intent: 'create' | 'analyze' | 'transform' | 'execute';
   } {
     if (!content) {
-      return { type: 'unknown', complexity: 'simple', intent: 'create' }
+      return { type: 'unknown', complexity: 'simple', intent: 'create' };
     }
 
-    const length = content.length
-    const codePatterns = /(?:function|class|import|export|const|let|var|\{|\}|\[|\])/g
-    const codeMatches = content.match(codePatterns)?.length || 0
-    
+    const length = content.length;
+    const codePatterns =
+      /(?:function|class|import|export|const|let|var|\{|\}|\[|\])/g;
+    const codeMatches = content.match(codePatterns)?.length || 0;
+
     // Determine complexity
-    let complexity: 'simple' | 'moderate' | 'complex' = 'simple'
+    let complexity: 'simple' | 'moderate' | 'complex' = 'simple';
     if (length > 1000 || codeMatches > 20) {
-      complexity = 'complex'
+      complexity = 'complex';
     } else if (length > 200 || codeMatches > 5) {
-      complexity = 'moderate'
+      complexity = 'moderate';
     }
 
     // Determine intent
-    let intent: 'create' | 'analyze' | 'transform' | 'execute' = 'create'
+    let intent: 'create' | 'analyze' | 'transform' | 'execute' = 'create';
     if (content.includes('analyze') || content.includes('explain')) {
-      intent = 'analyze'
+      intent = 'analyze';
     } else if (content.includes('transform') || content.includes('convert')) {
-      intent = 'transform'
+      intent = 'transform';
     } else if (content.includes('run') || content.includes('execute')) {
-      intent = 'execute'
+      intent = 'execute';
     }
 
     // Determine type
-    let type: 'unknown' | 'code' | 'visualization' | 'data' | 'text' = 'text'
+    let type: 'unknown' | 'code' | 'visualization' | 'data' | 'text' = 'text';
     if (codeMatches > 3) {
-      type = 'code'
+      type = 'code';
     } else if (content.includes('chart') || content.includes('graph')) {
-      type = 'visualization'
+      type = 'visualization';
     } else if (content.includes('data') || content.includes('json')) {
-      type = 'data'
+      type = 'data';
     }
 
-    return { type, complexity, intent }
+    return { type, complexity, intent };
   }
 
-  private handleToolChoiceError(error: ToolError, config: ToolChoiceConfig): ToolChoice {
-    const errorType = error.code === 'TOOL_CHOICE_ERROR' ? 'unavailable' : 'execution'
-    
+  private handleToolChoiceError(
+    error: ToolError,
+    config: ToolChoiceConfig
+  ): ToolChoice {
+    const errorType =
+      error.code === 'TOOL_CHOICE_ERROR' ? 'unavailable' : 'execution';
+
     switch (config.fallbackBehavior) {
       case 'retry':
         // Return a safe fallback tool choice
-        return { type: 'auto' }
-      
+        return { type: 'auto' };
+
       case 'bypass':
-        return { type: 'none' }
-      
+        return { type: 'none' };
+
       case 'error':
       default:
         // Re-throw the error
         if (error instanceof Error) {
-          throw error
+          throw error;
         }
-        throw new ToolChoiceError('Unknown tool choice error', errorType)
+        throw new ToolChoiceError('Unknown tool choice error', errorType);
     }
   }
 }
 
 // Export singleton instance
-export const toolChoiceEnforcer = ToolChoiceEnforcer.getInstance()
+export const toolChoiceEnforcer = ToolChoiceEnforcer.getInstance();
 
 // Convenience functions for common use cases
 
@@ -480,7 +548,7 @@ export function enforceStructuredOutput(
   return toolChoiceEnforcer.enforceToolUsage(
     { outputType, complexity, userIntent: 'create' },
     { mode: 'required', fallbackBehavior: 'retry' }
-  )
+  );
 }
 
 /**
@@ -491,21 +559,29 @@ export function recommendToolForContent(
   outputType?: string
 ): ToolRecommendation {
   // Validate outputType if provided
-  const validOutputTypes = ['code', 'document', 'chart', 'data', 'image', 'spreadsheet']
-  const validatedOutputType = outputType && validOutputTypes.includes(outputType) 
-    ? outputType as ToolSelectionCriteria['outputType']
-    : undefined
-    
-  const contentAnalysis = toolChoiceEnforcer.analyzeContent(content)
-  
+  const validOutputTypes = [
+    'code',
+    'document',
+    'chart',
+    'data',
+    'image',
+    'spreadsheet',
+  ];
+  const validatedOutputType =
+    outputType && validOutputTypes.includes(outputType)
+      ? (outputType as ToolSelectionCriteria['outputType'])
+      : undefined;
+
+  const contentAnalysis = toolChoiceEnforcer.analyzeContent(content);
+
   const criteria: ToolSelectionCriteria = {
     outputType: validatedOutputType,
     contentType: contentAnalysis.type,
     complexity: contentAnalysis.complexity,
-    userIntent: contentAnalysis.intent
-  }
-  
-  return toolChoiceEnforcer.recommendTool(criteria)
+    userIntent: contentAnalysis.intent,
+  };
+
+  return toolChoiceEnforcer.recommendTool(criteria);
 }
 
 /**
@@ -515,35 +591,51 @@ export function selectOptimalTool(
   userMessage: string,
   previousContext?: any[]
 ): string {
-  const outputType = inferOutputType(userMessage)
-  return toolChoiceEnforcer.selectToolForOutput(outputType, userMessage)
+  const outputType = inferOutputType(userMessage);
+  return toolChoiceEnforcer.selectToolForOutput(outputType, userMessage);
 }
 
 // Helper function to infer output type from user message
 function inferOutputType(message: string): string {
-  const lowerMessage = message.toLowerCase()
-  
-  if (lowerMessage.includes('code') || lowerMessage.includes('function') || 
-      lowerMessage.includes('script') || lowerMessage.includes('program')) {
-    return 'code'
+  const lowerMessage = message.toLowerCase();
+
+  if (
+    lowerMessage.includes('code') ||
+    lowerMessage.includes('function') ||
+    lowerMessage.includes('script') ||
+    lowerMessage.includes('program')
+  ) {
+    return 'code';
   }
-  
-  if (lowerMessage.includes('chart') || lowerMessage.includes('graph') || 
-      lowerMessage.includes('visualize') || lowerMessage.includes('plot')) {
-    return 'chart'
+
+  if (
+    lowerMessage.includes('chart') ||
+    lowerMessage.includes('graph') ||
+    lowerMessage.includes('visualize') ||
+    lowerMessage.includes('plot')
+  ) {
+    return 'chart';
   }
-  
-  if (lowerMessage.includes('document') || lowerMessage.includes('write') || 
-      lowerMessage.includes('article') || lowerMessage.includes('report')) {
-    return 'document'
+
+  if (
+    lowerMessage.includes('document') ||
+    lowerMessage.includes('write') ||
+    lowerMessage.includes('article') ||
+    lowerMessage.includes('report')
+  ) {
+    return 'document';
   }
-  
-  if (lowerMessage.includes('data') || lowerMessage.includes('json') || 
-      lowerMessage.includes('csv') || lowerMessage.includes('table')) {
-    return 'data'
+
+  if (
+    lowerMessage.includes('data') ||
+    lowerMessage.includes('json') ||
+    lowerMessage.includes('csv') ||
+    lowerMessage.includes('table')
+  ) {
+    return 'data';
   }
-  
-  return 'document' // Default fallback
+
+  return 'document'; // Default fallback
 }
 
 // Validation schemas for API integration
@@ -552,17 +644,21 @@ export const toolChoiceConfigSchema = z.object({
   toolName: z.string().optional(),
   fallbackBehavior: z.enum(['error', 'retry', 'bypass']).optional(),
   maxRetries: z.number().min(0).max(5).optional(),
-  timeout: z.number().min(1000).max(60000).optional(),
-  priority: z.enum(['high', 'medium', 'low']).optional()
-})
+  timeout: z.number().min(1000).max(60_000).optional(),
+  priority: z.enum(['high', 'medium', 'low']).optional(),
+});
 
 export const toolSelectionCriteriaSchema = z.object({
-  outputType: z.enum(['code', 'document', 'chart', 'data', 'image', 'spreadsheet']).optional(),
+  outputType: z
+    .enum(['code', 'document', 'chart', 'data', 'image', 'spreadsheet'])
+    .optional(),
   contentType: z.string().optional(),
   complexity: z.enum(['simple', 'moderate', 'complex']).optional(),
   userIntent: z.enum(['create', 'analyze', 'transform', 'execute']).optional(),
-  securityLevel: z.enum(['low', 'medium', 'high']).optional()
-})
+  securityLevel: z.enum(['low', 'medium', 'high']).optional(),
+});
 
-export type ToolChoiceConfigType = z.infer<typeof toolChoiceConfigSchema>
-export type ToolSelectionCriteriaType = z.infer<typeof toolSelectionCriteriaSchema>
+export type ToolChoiceConfigType = z.infer<typeof toolChoiceConfigSchema>;
+export type ToolSelectionCriteriaType = z.infer<
+  typeof toolSelectionCriteriaSchema
+>;

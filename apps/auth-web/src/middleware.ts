@@ -1,14 +1,14 @@
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const response = NextResponse.next()
+  const response = NextResponse.next();
 
   // Basic security headers
-  response.headers.set('X-Frame-Options', 'DENY')
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  
+  response.headers.set('X-Frame-Options', 'DENY');
+  response.headers.set('X-Content-Type-Options', 'nosniff');
+  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+
   // Content Security Policy for Crossmint, Convex, and Dynamic
   const csp = [
     "default-src 'self'",
@@ -23,15 +23,13 @@ export function middleware(request: NextRequest) {
     "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
-  ].join('; ')
-  
-  response.headers.set('Content-Security-Policy', csp)
+  ].join('; ');
 
-  return response
+  response.headers.set('Content-Security-Policy', csp);
+
+  return response;
 }
 
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|manifest.json).*)',
-  ],
-}
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|manifest.json).*)'],
+};

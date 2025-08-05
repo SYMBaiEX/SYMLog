@@ -1,7 +1,8 @@
-import { MetadataRoute } from 'next'
+import type { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL || 'http://localhost:3002'
+  const baseUrl =
+    process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL || 'http://localhost:3002';
 
   return [
     {
@@ -10,5 +11,5 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: 'monthly',
       priority: 1,
     },
-  ]
+  ];
 }

@@ -1,55 +1,55 @@
-import { openai } from '@ai-sdk/openai'
+import { openai } from '@ai-sdk/openai';
 
 // Constants for image generation
-const DEFAULT_SIZE = '1024x1024'
-const DEFAULT_QUALITY = 'standard'
-const DEFAULT_STYLE = 'vivid'
-const DEFAULT_MODEL = 'dall-e-3'
-const MAX_PROMPT_LENGTH = 4000
-const MAX_GENERATIONS_PER_REQUEST = 1
-const VALID_SIZES = ['1024x1024', '1792x1024', '1024x1792'] as const
-const VALID_QUALITIES = ['standard', 'hd'] as const
-const VALID_STYLES = ['vivid', 'natural'] as const
+const DEFAULT_SIZE = '1024x1024';
+const DEFAULT_QUALITY = 'standard';
+const DEFAULT_STYLE = 'vivid';
+const DEFAULT_MODEL = 'dall-e-3';
+const MAX_PROMPT_LENGTH = 4000;
+const MAX_GENERATIONS_PER_REQUEST = 1;
+const VALID_SIZES = ['1024x1024', '1792x1024', '1024x1792'] as const;
+const VALID_QUALITIES = ['standard', 'hd'] as const;
+const VALID_STYLES = ['vivid', 'natural'] as const;
 
 // Type definitions
-export type ImageSize = typeof VALID_SIZES[number]
-export type ImageQuality = typeof VALID_QUALITIES[number]
-export type ImageStyle = typeof VALID_STYLES[number]
+export type ImageSize = (typeof VALID_SIZES)[number];
+export type ImageQuality = (typeof VALID_QUALITIES)[number];
+export type ImageStyle = (typeof VALID_STYLES)[number];
 
 export interface ImageGenerationOptions {
   /** Size of the generated image */
-  size?: ImageSize
+  size?: ImageSize;
   /** Quality of the generated image */
-  quality?: ImageQuality
+  quality?: ImageQuality;
   /** Style preset for the generated image */
-  style?: ImageStyle
+  style?: ImageStyle;
   /** Number of images to generate (currently limited to 1 for DALL-E 3) */
-  n?: number
+  n?: number;
   /** User identifier for tracking */
-  user?: string
+  user?: string;
 }
 
 export interface ImageGenerationResult {
   /** Generated image URL */
-  url: string
+  url: string;
   /** Revised prompt used by the model */
-  revisedPrompt?: string
+  revisedPrompt?: string;
   /** Base64 encoded image data (if requested) */
-  b64Json?: string
+  b64Json?: string;
   /** Generation metadata */
   metadata: {
-    model: string
-    size: ImageSize
-    quality: ImageQuality
-    style: ImageStyle
-    timestamp: Date
-  }
+    model: string;
+    size: ImageSize;
+    quality: ImageQuality;
+    style: ImageStyle;
+    timestamp: Date;
+  };
 }
 
 export interface ImageGenerationError {
-  error: string
-  code?: string
-  details?: any
+  error: string;
+  code?: string;
+  details?: any;
 }
 
 /**
@@ -63,27 +63,35 @@ function validateImageGenerationParams(
   options: ImageGenerationOptions
 ): void {
   if (!prompt || typeof prompt !== 'string') {
-    throw new Error('Prompt is required and must be a string')
+    throw new Error('Prompt is required and must be a string');
   }
 
   if (prompt.length > MAX_PROMPT_LENGTH) {
-    throw new Error(`Prompt too long. Maximum length is ${MAX_PROMPT_LENGTH} characters`)
+    throw new Error(
+      `Prompt too long. Maximum length is ${MAX_PROMPT_LENGTH} characters`
+    );
   }
 
   if (options.size && !VALID_SIZES.includes(options.size)) {
-    throw new Error(`Invalid size. Must be one of: ${VALID_SIZES.join(', ')}`)
+    throw new Error(`Invalid size. Must be one of: ${VALID_SIZES.join(', ')}`);
   }
 
   if (options.quality && !VALID_QUALITIES.includes(options.quality)) {
-    throw new Error(`Invalid quality. Must be one of: ${VALID_QUALITIES.join(', ')}`)
+    throw new Error(
+      `Invalid quality. Must be one of: ${VALID_QUALITIES.join(', ')}`
+    );
   }
 
   if (options.style && !VALID_STYLES.includes(options.style)) {
-    throw new Error(`Invalid style. Must be one of: ${VALID_STYLES.join(', ')}`)
+    throw new Error(
+      `Invalid style. Must be one of: ${VALID_STYLES.join(', ')}`
+    );
   }
 
   if (options.n && (options.n < 1 || options.n > MAX_GENERATIONS_PER_REQUEST)) {
-    throw new Error(`Number of images must be between 1 and ${MAX_GENERATIONS_PER_REQUEST}`)
+    throw new Error(
+      `Number of images must be between 1 and ${MAX_GENERATIONS_PER_REQUEST}`
+    );
   }
 }
 
@@ -94,23 +102,25 @@ function validateImageGenerationParams(
  */
 function sanitizeImagePrompt(prompt: string): string {
   if (!prompt || typeof prompt !== 'string') {
-    throw new Error('Prompt must be a non-empty string')
+    throw new Error('Prompt must be a non-empty string');
   }
-  
+
   // Remove potentially problematic content
   let sanitized = prompt
     .replace(/[<>{}[\]]/g, '') // Remove brackets and braces
     .replace(/\b(eval|function|script|javascript|vbscript)\b/gi, '') // Remove code keywords
     .replace(/https?:\/\/[^\s]+/g, '') // Remove URLs
-    .trim()
-  
+    .trim();
+
   // Truncate if too long
   if (sanitized.length > MAX_PROMPT_LENGTH) {
-    console.warn(`Prompt truncated from ${sanitized.length} to ${MAX_PROMPT_LENGTH} characters`)
-    sanitized = sanitized.substring(0, MAX_PROMPT_LENGTH)
+    console.warn(
+      `Prompt truncated from ${sanitized.length} to ${MAX_PROMPT_LENGTH} characters`
+    );
+    sanitized = sanitized.substring(0, MAX_PROMPT_LENGTH);
   }
-  
-  return sanitized
+
+  return sanitized;
 }
 
 /**
@@ -124,23 +134,23 @@ export async function createImageArtifact(
   options: ImageGenerationOptions = {}
 ): Promise<ImageGenerationResult> {
   // Set defaults
-  const size = options.size || DEFAULT_SIZE
-  const quality = options.quality || DEFAULT_QUALITY
-  const style = options.style || DEFAULT_STYLE
-  const n = options.n || 1
+  const size = options.size || DEFAULT_SIZE;
+  const quality = options.quality || DEFAULT_QUALITY;
+  const style = options.style || DEFAULT_STYLE;
+  const n = options.n || 1;
 
   // Validate parameters
-  validateImageGenerationParams(prompt, { size, quality, style, n })
+  validateImageGenerationParams(prompt, { size, quality, style, n });
 
   // Sanitize prompt
-  const sanitizedPrompt = sanitizeImagePrompt(prompt)
+  const sanitizedPrompt = sanitizeImagePrompt(prompt);
 
   try {
     // Note: This is a placeholder for AI SDK 5.0 image generation
     // The actual implementation would use experimental_generateImage
-    
-    const imageModel = openai.image(DEFAULT_MODEL)
-    
+
+    const imageModel = openai.image(DEFAULT_MODEL);
+
     // This would be the actual implementation with AI SDK 5.0:
     // const result = await experimental_generateImage({
     //   model: imageModel,
@@ -153,8 +163,8 @@ export async function createImageArtifact(
     // })
 
     // Simulated response for now
-    const mockUrl = `https://placeholder.com/generated-image-${Date.now()}.png`
-    const mockRevisedPrompt = `Enhanced: ${sanitizedPrompt}`
+    const mockUrl = `https://placeholder.com/generated-image-${Date.now()}.png`;
+    const mockRevisedPrompt = `Enhanced: ${sanitizedPrompt}`;
 
     return {
       url: mockUrl,
@@ -164,14 +174,14 @@ export async function createImageArtifact(
         size,
         quality,
         style,
-        timestamp: new Date()
-      }
-    }
+        timestamp: new Date(),
+      },
+    };
   } catch (error) {
-    console.error('Image generation failed:', error)
+    console.error('Image generation failed:', error);
     throw new Error(
       `Image generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-    )
+    );
   }
 }
 
@@ -188,11 +198,11 @@ export async function generateImageBase64(
   const result = await createImageArtifact(prompt, {
     ...options,
     // Request base64 format in the actual implementation
-  })
+  });
 
   // In the actual implementation, this would return the b64Json field
   // For now, we'll throw an error indicating it's not yet supported
-  throw new Error('Base64 image generation not yet implemented')
+  throw new Error('Base64 image generation not yet implemented');
 }
 
 /**
@@ -205,55 +215,55 @@ export async function generateImageBase64(
 export async function generateImageBatch(
   prompts: string[],
   options: ImageGenerationOptions = {},
-  delayMs: number = 1000
+  delayMs = 1000
 ): Promise<Array<ImageGenerationResult | ImageGenerationError>> {
   if (!prompts || prompts.length === 0) {
-    throw new Error('Prompts array cannot be empty')
+    throw new Error('Prompts array cannot be empty');
   }
 
-  const results: Array<ImageGenerationResult | ImageGenerationError> = []
+  const results: Array<ImageGenerationResult | ImageGenerationError> = [];
 
   for (let i = 0; i < prompts.length; i++) {
     try {
-      const result = await createImageArtifact(prompts[i], options)
-      results.push(result)
-      
+      const result = await createImageArtifact(prompts[i], options);
+      results.push(result);
+
       // Add delay between requests to avoid rate limiting
       if (i < prompts.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs))
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     } catch (error) {
       results.push({
         error: error instanceof Error ? error.message : 'Unknown error',
-        details: { promptIndex: i, prompt: prompts[i] }
-      })
+        details: { promptIndex: i, prompt: prompts[i] },
+      });
     }
   }
 
-  return results
+  return results;
 }
 
 /**
  * Image generation service for managing operations
  */
 export class ImageGenerationService {
-  private static instance: ImageGenerationService
+  private static instance: ImageGenerationService;
   private generationQueue: Array<{
-    prompt: string
-    options: ImageGenerationOptions
-    resolve: (result: ImageGenerationResult) => void
-    reject: (error: Error) => void
-  }> = []
-  private isProcessing = false
-  private disposed = false
+    prompt: string;
+    options: ImageGenerationOptions;
+    resolve: (result: ImageGenerationResult) => void;
+    reject: (error: Error) => void;
+  }> = [];
+  private isProcessing = false;
+  private disposed = false;
 
   private constructor() {}
 
   static getInstance(): ImageGenerationService {
     if (!ImageGenerationService.instance) {
-      ImageGenerationService.instance = new ImageGenerationService()
+      ImageGenerationService.instance = new ImageGenerationService();
     }
-    return ImageGenerationService.instance
+    return ImageGenerationService.instance;
   }
 
   /**
@@ -267,69 +277,78 @@ export class ImageGenerationService {
     options: ImageGenerationOptions = {}
   ): Promise<ImageGenerationResult> {
     return new Promise((resolve, reject) => {
-      this.generationQueue.push({ prompt, options, resolve, reject })
-      this.processQueue()
-    })
+      this.generationQueue.push({ prompt, options, resolve, reject });
+      this.processQueue();
+    });
   }
 
   /**
    * Process generation queue
    */
   private async processQueue(): Promise<void> {
-    if (this.isProcessing || this.generationQueue.length === 0 || this.disposed) {
-      return
+    if (
+      this.isProcessing ||
+      this.generationQueue.length === 0 ||
+      this.disposed
+    ) {
+      return;
     }
 
-    this.isProcessing = true
+    this.isProcessing = true;
 
     while (this.generationQueue.length > 0) {
-      const request = this.generationQueue.shift()
-      if (!request) continue
+      const request = this.generationQueue.shift();
+      if (!request) continue;
 
       try {
-        const result = await createImageArtifact(request.prompt, request.options)
-        request.resolve(result)
+        const result = await createImageArtifact(
+          request.prompt,
+          request.options
+        );
+        request.resolve(result);
       } catch (error) {
-        request.reject(error instanceof Error ? error : new Error('Generation failed'))
+        request.reject(
+          error instanceof Error ? error : new Error('Generation failed')
+        );
       }
 
       // Rate limiting delay
       if (this.generationQueue.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise((resolve) => setTimeout(resolve, 1000));
       }
     }
 
-    this.isProcessing = false
+    this.isProcessing = false;
   }
 
   /**
    * Get queue size
    */
   getQueueSize(): number {
-    return this.generationQueue.length
+    return this.generationQueue.length;
   }
 
   /**
    * Clear generation queue
    */
   clearQueue(): void {
-    this.generationQueue.forEach(request => {
-      request.reject(new Error('Queue cleared'))
-    })
-    this.generationQueue = []
+    this.generationQueue.forEach((request) => {
+      request.reject(new Error('Queue cleared'));
+    });
+    this.generationQueue = [];
   }
 
   /**
    * Dispose of the service and clean up resources
    */
   dispose(): void {
-    this.disposed = true
-    this.clearQueue()
+    this.disposed = true;
+    this.clearQueue();
   }
 }
 
 // Export singleton instance
-export const imageGenerationService = ImageGenerationService.getInstance()
+export const imageGenerationService = ImageGenerationService.getInstance();
 
 /**
  * Create image URL from generation result
@@ -339,18 +358,18 @@ export const imageGenerationService = ImageGenerationService.getInstance()
 export function createImageObjectURL(result: ImageGenerationResult): string {
   if (result.b64Json) {
     // Convert base64 to blob
-    const byteCharacters = atob(result.b64Json)
-    const byteNumbers = new Array(byteCharacters.length)
+    const byteCharacters = atob(result.b64Json);
+    const byteNumbers = new Array(byteCharacters.length);
     for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i)
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
     }
-    const byteArray = new Uint8Array(byteNumbers)
-    const blob = new Blob([byteArray], { type: 'image/png' })
-    return URL.createObjectURL(blob)
+    const byteArray = new Uint8Array(byteNumbers);
+    const blob = new Blob([byteArray], { type: 'image/png' });
+    return URL.createObjectURL(blob);
   }
-  
+
   // Return the URL directly
-  return result.url
+  return result.url;
 }
 
 /**
@@ -362,24 +381,24 @@ export async function downloadGeneratedImage(
   result: ImageGenerationResult,
   filename?: string
 ): Promise<void> {
-  const imageUrl = result.url
-  
+  const imageUrl = result.url;
+
   try {
     // Fetch the image
-    const response = await fetch(imageUrl)
-    const blob = await response.blob()
-    
+    const response = await fetch(imageUrl);
+    const blob = await response.blob();
+
     // Create download link
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename || `ai-generated-${Date.now()}.png`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename || `ai-generated-${Date.now()}.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (error) {
-    console.error('Failed to download image:', error)
-    throw new Error('Failed to download generated image')
+    console.error('Failed to download image:', error);
+    throw new Error('Failed to download generated image');
   }
 }

@@ -1,50 +1,52 @@
 import {
   APICallError,
-  InvalidArgumentError,
-  NoObjectGeneratedError,
-  UnsupportedFunctionalityError,
-  InvalidResponseDataError,
-  LoadAPIKeyError,
   EmptyResponseBodyError,
-  TypeValidationError,
-  JSONParseError,
+  InvalidArgumentError,
+  InvalidResponseDataError,
   InvalidToolInputError,
+  JSONParseError,
+  LoadAPIKeyError,
+  NoObjectGeneratedError,
   NoSuchModelError,
   NoSuchProviderError,
   NoSuchToolError,
-  RetryError
-} from 'ai'
-import { logError as logErrorToConsole } from '@/lib/logger'
+  RetryError,
+  TypeValidationError,
+  UnsupportedFunctionalityError,
+} from 'ai';
+import { logError as logErrorToConsole } from '@/lib/logger';
 
 // Create a logger wrapper
 const loggingService = {
   info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) => console.warn(`[WARN] ${message}`, data),
+  warn: (message: string, data?: any) =>
+    console.warn(`[WARN] ${message}`, data),
   error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) => console.debug(`[DEBUG] ${message}`, data),
-}
+  debug: (message: string, data?: any) =>
+    console.debug(`[DEBUG] ${message}`, data),
+};
 
 export interface ErrorHandlerOptions {
-  maxRetries?: number
-  enableFallback?: boolean
-  logErrors?: boolean
-  userFriendly?: boolean
+  maxRetries?: number;
+  enableFallback?: boolean;
+  logErrors?: boolean;
+  userFriendly?: boolean;
 }
 
 export interface HandledError {
-  message: string
-  retry: boolean
-  fallback?: string
-  code?: string
-  details?: any
-  userMessage?: string
+  message: string;
+  retry: boolean;
+  fallback?: string;
+  code?: string;
+  details?: any;
+  userMessage?: string;
 }
 
 /**
  * V2 Specification compliant error handler for AI SDK 5.0
  */
 export class V2ErrorHandler {
-  private static instance: V2ErrorHandler
+  private static instance: V2ErrorHandler;
 
   constructor(private options: ErrorHandlerOptions = {}) {
     this.options = {
@@ -52,15 +54,15 @@ export class V2ErrorHandler {
       enableFallback: true,
       logErrors: true,
       userFriendly: true,
-      ...options
-    }
+      ...options,
+    };
   }
 
   static getInstance(options?: ErrorHandlerOptions): V2ErrorHandler {
     if (!V2ErrorHandler.instance) {
-      V2ErrorHandler.instance = new V2ErrorHandler(options)
+      V2ErrorHandler.instance = new V2ErrorHandler(options);
     }
-    return V2ErrorHandler.instance
+    return V2ErrorHandler.instance;
   }
 
   /**
@@ -68,12 +70,12 @@ export class V2ErrorHandler {
    */
   handleError(error: unknown): HandledError {
     if (this.options.logErrors) {
-      loggingService.error('AI SDK Error', { error })
+      loggingService.error('AI SDK Error', { error });
     }
 
     // API Call Errors
     if (error instanceof APICallError) {
-      return this.handleAPICallError(error)
+      return this.handleAPICallError(error);
     }
 
     // Invalid Argument Errors
@@ -83,10 +85,10 @@ export class V2ErrorHandler {
         retry: false,
         code: 'INVALID_ARGUMENT',
         details: error.message,
-        userMessage: this.options.userFriendly 
+        userMessage: this.options.userFriendly
           ? 'Unable to process your request. Please check your input and try again.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Object Generation Errors
@@ -99,8 +101,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Unable to generate the requested format. Trying alternative approach...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Unsupported Functionality
@@ -113,8 +115,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'This feature is not available with the current AI model.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Data Validation Errors
@@ -126,8 +128,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Received unexpected response. Retrying...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // API Key Errors
@@ -139,8 +141,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Authentication error. Please check your API configuration.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Empty Response Errors
@@ -152,8 +154,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'No response received. Retrying...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Type Validation Errors
@@ -166,8 +168,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Data format mismatch. Please check your input.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // JSON Parse Errors
@@ -180,8 +182,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Unable to process response format. Trying alternative format...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Tool Errors
@@ -193,8 +195,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Tool configuration error. Please try a different approach.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     if (error instanceof NoSuchToolError) {
@@ -206,8 +208,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Requested feature not available.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Model/Provider Errors
@@ -220,8 +222,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'AI model not available. Using alternative model...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     if (error instanceof NoSuchProviderError) {
@@ -233,12 +235,15 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'AI service not available. Switching to backup service...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Large request errors (generic handling for embedding/token limits)
-    if (error instanceof Error && error.message.includes('too many') || error.message.includes('too large')) {
+    if (
+      (error instanceof Error && error.message.includes('too many')) ||
+      error.message.includes('too large')
+    ) {
       return {
         message: 'Request size exceeds limits',
         retry: false,
@@ -247,8 +252,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Request too large. Processing in smaller chunks...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Retry Errors
@@ -261,8 +266,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Service temporarily unavailable. Please try again later.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Generic Error handling
@@ -274,8 +279,8 @@ export class V2ErrorHandler {
         details: error.stack,
         userMessage: this.options.userFriendly
           ? 'An unexpected error occurred. Please try again.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Non-Error thrown
@@ -284,15 +289,15 @@ export class V2ErrorHandler {
       retry: false,
       code: 'UNKNOWN',
       details: String(error),
-      userMessage: 'An unexpected error occurred. Please try again.'
-    }
+      userMessage: 'An unexpected error occurred. Please try again.',
+    };
   }
 
   /**
    * Handle API call errors with specific strategies
    */
   private handleAPICallError(error: APICallError): HandledError {
-    const statusCode = (error as any).statusCode
+    const statusCode = (error as any).statusCode;
 
     // Rate limiting
     if (statusCode === 429) {
@@ -304,8 +309,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Too many requests. Please wait a moment and try again.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Authentication errors
@@ -317,8 +322,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'Authentication error. Please check your credentials.'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Server errors
@@ -331,8 +336,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'AI service is temporarily unavailable. Trying backup service...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Model overload
@@ -345,8 +350,8 @@ export class V2ErrorHandler {
         details: error.message,
         userMessage: this.options.userFriendly
           ? 'AI model is busy. Switching to alternative model...'
-          : error.message
-      }
+          : error.message,
+      };
     }
 
     // Generic API error
@@ -358,29 +363,29 @@ export class V2ErrorHandler {
       details: error.message,
       userMessage: this.options.userFriendly
         ? 'Unable to connect to AI service. Retrying...'
-        : error.message
-    }
+        : error.message,
+    };
   }
 
   /**
    * Create user-friendly error messages
    */
   getUserMessage(error: HandledError): string {
-    return error.userMessage || error.message
+    return error.userMessage || error.message;
   }
 
   /**
    * Determine if error should trigger a retry
    */
   shouldRetry(error: HandledError): boolean {
-    return error.retry && this.options.maxRetries! > 0
+    return error.retry && this.options.maxRetries! > 0;
   }
 
   /**
    * Get fallback strategy for error
    */
   getFallbackStrategy(error: HandledError): string | undefined {
-    return this.options.enableFallback ? error.fallback : undefined
+    return this.options.enableFallback ? error.fallback : undefined;
   }
 
   /**
@@ -393,14 +398,14 @@ export class V2ErrorHandler {
         message: error.message,
         retry: error.retry,
         fallback: error.fallback,
-        context
-      })
+        context,
+      });
     }
   }
 }
 
 // Export singleton instance
-export const v2ErrorHandler = V2ErrorHandler.getInstance()
+export const v2ErrorHandler = V2ErrorHandler.getInstance();
 
 /**
  * Error recovery strategies
@@ -409,35 +414,35 @@ export class ErrorRecoveryService {
   async executeWithRecovery<T>(
     action: () => Promise<T>,
     options: {
-      maxRetries?: number
-      retryDelay?: number
-      fallbacks?: Array<() => Promise<T>>
-      onError?: (error: HandledError, attempt: number) => void
+      maxRetries?: number;
+      retryDelay?: number;
+      fallbacks?: Array<() => Promise<T>>;
+      onError?: (error: HandledError, attempt: number) => void;
     } = {}
   ): Promise<T> {
-    const maxRetries = options.maxRetries || 3
-    const retryDelay = options.retryDelay || 1000
-    let lastError: HandledError
+    const maxRetries = options.maxRetries || 3;
+    const retryDelay = options.retryDelay || 1000;
+    let lastError: HandledError;
 
     // Try primary action with retries
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        return await action()
+        return await action();
       } catch (error) {
-        lastError = v2ErrorHandler.handleError(error)
-        
+        lastError = v2ErrorHandler.handleError(error);
+
         if (options.onError) {
-          options.onError(lastError, attempt)
+          options.onError(lastError, attempt);
         }
 
         if (!lastError.retry || attempt === maxRetries) {
-          break
+          break;
         }
 
         // Exponential backoff
-        await new Promise(resolve => 
-          setTimeout(resolve, retryDelay * Math.pow(2, attempt - 1))
-        )
+        await new Promise((resolve) =>
+          setTimeout(resolve, retryDelay * 2 ** (attempt - 1))
+        );
       }
     }
 
@@ -445,18 +450,17 @@ export class ErrorRecoveryService {
     if (options.fallbacks && options.fallbacks.length > 0) {
       for (const fallback of options.fallbacks) {
         try {
-          loggingService.info('Attempting fallback strategy')
-          return await fallback()
+          loggingService.info('Attempting fallback strategy');
+          return await fallback();
         } catch (fallbackError) {
-          lastError = v2ErrorHandler.handleError(fallbackError)
-          continue
+          lastError = v2ErrorHandler.handleError(fallbackError);
         }
       }
     }
 
     // All attempts failed
-    throw new Error(lastError!.userMessage || lastError!.message)
+    throw new Error(lastError!.userMessage || lastError!.message);
   }
 }
 
-export const errorRecoveryService = new ErrorRecoveryService()
+export const errorRecoveryService = new ErrorRecoveryService();

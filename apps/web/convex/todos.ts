@@ -1,9 +1,9 @@
-import { query, mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { v } from 'convex/values';
+import { mutation, query } from './_generated/server';
 
 export const getAll = query({
   handler: async (ctx) => {
-    return await ctx.db.query("todos").collect();
+    return await ctx.db.query('todos').collect();
   },
 });
 
@@ -12,7 +12,7 @@ export const create = mutation({
     text: v.string(),
   },
   handler: async (ctx, args) => {
-    const newTodoId = await ctx.db.insert("todos", {
+    const newTodoId = await ctx.db.insert('todos', {
       text: args.text,
       completed: false,
     });
@@ -22,7 +22,7 @@ export const create = mutation({
 
 export const toggle = mutation({
   args: {
-    id: v.id("todos"),
+    id: v.id('todos'),
     completed: v.boolean(),
   },
   handler: async (ctx, args) => {
@@ -33,7 +33,7 @@ export const toggle = mutation({
 
 export const deleteTodo = mutation({
   args: {
-    id: v.id("todos"),
+    id: v.id('todos'),
   },
   handler: async (ctx, args) => {
     await ctx.db.delete(args.id);

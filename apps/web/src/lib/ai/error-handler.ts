@@ -1,4 +1,4 @@
-import { loggingService } from '@/lib/logger'
+import { loggingService } from '@/lib/logger';
 
 /**
  * Standardized error handling for the enhanced tool system
@@ -6,33 +6,33 @@ import { loggingService } from '@/lib/logger'
  */
 
 export interface ToolError {
-  code: string
-  message: string
-  severity: 'critical' | 'high' | 'medium' | 'low'
-  context?: Record<string, any>
-  originalError?: Error
-  timestamp: number
-  retryable: boolean
+  code: string;
+  message: string;
+  severity: 'critical' | 'high' | 'medium' | 'low';
+  context?: Record<string, any>;
+  originalError?: Error;
+  timestamp: number;
+  retryable: boolean;
 }
 
 export interface ErrorHandlingOptions {
-  logLevel?: 'error' | 'warn' | 'info' | 'debug'
-  includeStack?: boolean
-  sanitizeContext?: boolean
-  maxRetries?: number
+  logLevel?: 'error' | 'warn' | 'info' | 'debug';
+  includeStack?: boolean;
+  sanitizeContext?: boolean;
+  maxRetries?: number;
 }
 
 /**
  * Standard error handling utility for all tool modules
  */
 export class StandardErrorHandler {
-  private static instance: StandardErrorHandler
+  private static instance: StandardErrorHandler;
 
   static getInstance(): StandardErrorHandler {
     if (!StandardErrorHandler.instance) {
-      StandardErrorHandler.instance = new StandardErrorHandler()
+      StandardErrorHandler.instance = new StandardErrorHandler();
     }
-    return StandardErrorHandler.instance
+    return StandardErrorHandler.instance;
   }
 
   /**
@@ -47,21 +47,21 @@ export class StandardErrorHandler {
       logLevel = 'error',
       includeStack = true,
       sanitizeContext = true,
-      maxRetries = 0
-    } = options
+      maxRetries = 0,
+    } = options;
 
     // Normalize error to ToolError format
-    const toolError = this.normalizeError(error, context)
+    const toolError = this.normalizeError(error, context);
 
     // Sanitize context if requested
     if (sanitizeContext && toolError.context) {
-      toolError.context = this.sanitizeContext(toolError.context)
+      toolError.context = this.sanitizeContext(toolError.context);
     }
 
     // Log error based on severity and logLevel
-    this.logError(toolError, logLevel, includeStack)
+    this.logError(toolError, logLevel, includeStack);
 
-    return toolError
+    return toolError;
   }
 
   /**
@@ -71,13 +71,15 @@ export class StandardErrorHandler {
     fn: () => Promise<T>,
     context?: Record<string, any>,
     options: ErrorHandlingOptions = {}
-  ): Promise<{ success: true; data: T } | { success: false; error: ToolError }> {
+  ): Promise<
+    { success: true; data: T } | { success: false; error: ToolError }
+  > {
     try {
-      const result = await fn()
-      return { success: true, data: result }
+      const result = await fn();
+      return { success: true, data: result };
     } catch (error) {
-      const toolError = this.handleError(error, context, options)
-      return { success: false, error: toolError }
+      const toolError = this.handleError(error, context, options);
+      return { success: false, error: toolError };
     }
   }
 
@@ -90,11 +92,11 @@ export class StandardErrorHandler {
     options: ErrorHandlingOptions = {}
   ): { success: true; data: T } | { success: false; error: ToolError } {
     try {
-      const result = fn()
-      return { success: true, data: result }
+      const result = fn();
+      return { success: true, data: result };
     } catch (error) {
-      const toolError = this.handleError(error, context, options)
-      return { success: false, error: toolError }
+      const toolError = this.handleError(error, context, options);
+      return { success: false, error: toolError };
     }
   }
 
@@ -103,40 +105,47 @@ export class StandardErrorHandler {
    */
   async withRetry<T>(
     fn: () => Promise<T>,
-    maxRetries: number = 3,
+    maxRetries = 3,
     context?: Record<string, any>,
     options: ErrorHandlingOptions = {}
-  ): Promise<{ success: true; data: T } | { success: false; error: ToolError; attempts: number }> {
-    let lastError: ToolError | null = null
-    let attempts = 0
+  ): Promise<
+    | { success: true; data: T }
+    | { success: false; error: ToolError; attempts: number }
+  > {
+    let lastError: ToolError | null = null;
+    let attempts = 0;
 
     for (let i = 0; i <= maxRetries; i++) {
-      attempts++
+      attempts++;
       try {
-        const result = await fn()
-        return { success: true, data: result }
+        const result = await fn();
+        return { success: true, data: result };
       } catch (error) {
-        lastError = this.handleError(error, { ...context, attempt: i + 1 }, {
-          ...options,
-          logLevel: i === maxRetries ? 'error' : 'warn'
-        })
+        lastError = this.handleError(
+          error,
+          { ...context, attempt: i + 1 },
+          {
+            ...options,
+            logLevel: i === maxRetries ? 'error' : 'warn',
+          }
+        );
 
         if (!lastError.retryable || i === maxRetries) {
-          break
+          break;
         }
 
         // Exponential backoff for retries
         if (i < maxRetries) {
-          await this.delay(Math.pow(2, i) * 1000)
+          await this.delay(2 ** i * 1000);
         }
       }
     }
 
-    return { 
-      success: false, 
-      error: lastError!, 
-      attempts 
-    }
+    return {
+      success: false,
+      error: lastError!,
+      attempts,
+    };
   }
 
   /**
@@ -146,15 +155,15 @@ export class StandardErrorHandler {
     error: Error | ToolError | unknown,
     context?: Record<string, any>
   ): ToolError {
-    const timestamp = Date.now()
+    const timestamp = Date.now();
 
     // Already a ToolError
     if (this.isToolError(error)) {
       return {
         ...error,
         context: { ...error.context, ...context },
-        timestamp
-      }
+        timestamp,
+      };
     }
 
     // Standard Error object
@@ -166,8 +175,8 @@ export class StandardErrorHandler {
         context,
         originalError: error,
         timestamp,
-        retryable: this.isRetryable(error)
-      }
+        retryable: this.isRetryable(error),
+      };
     }
 
     // Unknown error type
@@ -177,87 +186,102 @@ export class StandardErrorHandler {
       severity: 'medium',
       context,
       timestamp,
-      retryable: false
-    }
+      retryable: false,
+    };
   }
 
   /**
    * Type guard for ToolError
    */
   private isToolError(error: any): error is ToolError {
-    return error && typeof error === 'object' && 
-           'code' in error && 'message' in error && 'severity' in error
+    return (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      'message' in error &&
+      'severity' in error
+    );
   }
 
   /**
    * Infer error code from Error object
    */
   private inferErrorCode(error: Error): string {
-    if (error.name) return error.name.toUpperCase()
-    if (error.message.includes('validation')) return 'VALIDATION_ERROR'
-    if (error.message.includes('timeout')) return 'TIMEOUT_ERROR'
-    if (error.message.includes('network')) return 'NETWORK_ERROR'
-    if (error.message.includes('permission')) return 'PERMISSION_ERROR'
-    return 'GENERIC_ERROR'
+    if (error.name) return error.name.toUpperCase();
+    if (error.message.includes('validation')) return 'VALIDATION_ERROR';
+    if (error.message.includes('timeout')) return 'TIMEOUT_ERROR';
+    if (error.message.includes('network')) return 'NETWORK_ERROR';
+    if (error.message.includes('permission')) return 'PERMISSION_ERROR';
+    return 'GENERIC_ERROR';
   }
 
   /**
    * Infer severity from Error object
    */
   private inferSeverity(error: Error): ToolError['severity'] {
-    const message = error.message.toLowerCase()
-    
-    if (message.includes('critical') || message.includes('fatal')) return 'critical'
-    if (message.includes('security') || message.includes('auth')) return 'high'
-    if (message.includes('validation') || message.includes('timeout')) return 'medium'
-    return 'low'
+    const message = error.message.toLowerCase();
+
+    if (message.includes('critical') || message.includes('fatal'))
+      return 'critical';
+    if (message.includes('security') || message.includes('auth')) return 'high';
+    if (message.includes('validation') || message.includes('timeout'))
+      return 'medium';
+    return 'low';
   }
 
   /**
    * Determine if error is retryable
    */
   private isRetryable(error: Error): boolean {
-    const message = error.message.toLowerCase()
-    
+    const message = error.message.toLowerCase();
+
     // Non-retryable errors
-    if (message.includes('validation') || message.includes('auth') || 
-        message.includes('permission') || message.includes('syntax')) {
-      return false
+    if (
+      message.includes('validation') ||
+      message.includes('auth') ||
+      message.includes('permission') ||
+      message.includes('syntax')
+    ) {
+      return false;
     }
-    
+
     // Retryable errors
-    if (message.includes('timeout') || message.includes('network') || 
-        message.includes('temporary') || message.includes('busy')) {
-      return true
+    if (
+      message.includes('timeout') ||
+      message.includes('network') ||
+      message.includes('temporary') ||
+      message.includes('busy')
+    ) {
+      return true;
     }
-    
-    return false
+
+    return false;
   }
 
   /**
    * Sanitize context to remove sensitive information
    */
   private sanitizeContext(context: Record<string, any>): Record<string, any> {
-    const sanitized: Record<string, any> = {}
-    
+    const sanitized: Record<string, any> = {};
+
     for (const [key, value] of Object.entries(context)) {
       // Remove sensitive keys
       if (this.isSensitiveKey(key)) {
-        sanitized[key] = '[REDACTED]'
-        continue
+        sanitized[key] = '[REDACTED]';
+        continue;
       }
-      
+
       // Sanitize values
       if (typeof value === 'string') {
-        sanitized[key] = this.sanitizeString(value)
+        sanitized[key] = this.sanitizeString(value);
       } else if (typeof value === 'object' && value !== null) {
-        sanitized[key] = this.sanitizeContext(value)
+        sanitized[key] = this.sanitizeContext(value);
       } else {
-        sanitized[key] = value
+        sanitized[key] = value;
       }
     }
-    
-    return sanitized
+
+    return sanitized;
   }
 
   /**
@@ -265,20 +289,29 @@ export class StandardErrorHandler {
    */
   private isSensitiveKey(key: string): boolean {
     const sensitiveKeys = [
-      'password', 'token', 'secret', 'key', 'auth', 'credential',
-      'session', 'cookie', 'bearer', 'jwt', 'apikey'
-    ]
-    
-    return sensitiveKeys.some(sensitive => 
+      'password',
+      'token',
+      'secret',
+      'key',
+      'auth',
+      'credential',
+      'session',
+      'cookie',
+      'bearer',
+      'jwt',
+      'apikey',
+    ];
+
+    return sensitiveKeys.some((sensitive) =>
       key.toLowerCase().includes(sensitive)
-    )
+    );
   }
 
   /**
    * Sanitize string to prevent log injection
    */
   private sanitizeString(value: string): string {
-    return value.replace(/[\r\n\t]/g, ' ').substring(0, 1000)
+    return value.replace(/[\r\n\t]/g, ' ').substring(0, 1000);
   }
 
   /**
@@ -296,24 +329,25 @@ export class StandardErrorHandler {
       timestamp: error.timestamp,
       retryable: error.retryable,
       context: error.context,
-      ...(includeStack && error.originalError?.stack && {
-        stack: error.originalError.stack
-      })
-    }
+      ...(includeStack &&
+        error.originalError?.stack && {
+          stack: error.originalError.stack,
+        }),
+    };
 
     switch (logLevel) {
       case 'error':
-        loggingService.error('Tool system error', logData)
-        break
+        loggingService.error('Tool system error', logData);
+        break;
       case 'warn':
-        loggingService.warn('Tool system warning', logData)
-        break
+        loggingService.warn('Tool system warning', logData);
+        break;
       case 'info':
-        loggingService.info('Tool system info', logData)
-        break
+        loggingService.info('Tool system info', logData);
+        break;
       case 'debug':
-        loggingService.debug('Tool system debug', logData)
-        break
+        loggingService.debug('Tool system debug', logData);
+        break;
     }
   }
 
@@ -321,12 +355,12 @@ export class StandardErrorHandler {
    * Delay execution for retry logic
    */
   private delay(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
 // Export singleton instance
-export const standardErrorHandler = StandardErrorHandler.getInstance()
+export const standardErrorHandler = StandardErrorHandler.getInstance();
 
 // Convenience functions for common error handling patterns
 
@@ -337,7 +371,7 @@ export async function handleAsync<T>(
   fn: () => Promise<T>,
   context?: Record<string, any>
 ): Promise<{ success: true; data: T } | { success: false; error: ToolError }> {
-  return standardErrorHandler.wrapExecution(fn, context)
+  return standardErrorHandler.wrapExecution(fn, context);
 }
 
 /**
@@ -347,7 +381,7 @@ export function handleSync<T>(
   fn: () => T,
   context?: Record<string, any>
 ): { success: true; data: T } | { success: false; error: ToolError } {
-  return standardErrorHandler.wrapSyncExecution(fn, context)
+  return standardErrorHandler.wrapSyncExecution(fn, context);
 }
 
 /**
@@ -355,8 +389,11 @@ export function handleSync<T>(
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
-  maxRetries: number = 3,
+  maxRetries = 3,
   context?: Record<string, any>
-): Promise<{ success: true; data: T } | { success: false; error: ToolError; attempts: number }> {
-  return standardErrorHandler.withRetry(fn, maxRetries, context)
+): Promise<
+  | { success: true; data: T }
+  | { success: false; error: ToolError; attempts: number }
+> {
+  return standardErrorHandler.withRetry(fn, maxRetries, context);
 }

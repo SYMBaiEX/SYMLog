@@ -1,85 +1,85 @@
-import { 
-  wrapLanguageModel, 
-  defaultSettingsMiddleware,
-  simulateStreamingMiddleware,
-  extractReasoningMiddleware,
+import { anthropic } from '@ai-sdk/anthropic';
+import { openai } from '@ai-sdk/openai';
+import {
   customProvider,
-  type LanguageModelV2Middleware,
+  defaultSettingsMiddleware,
+  extractReasoningMiddleware,
+  type LanguageModelRequestMetadata,
+  type LanguageModelResponseMetadata,
   type LanguageModelV2,
   type LanguageModelV2CallSettings,
-  type LanguageModelRequestMetadata,
-  type LanguageModelResponseMetadata
-} from 'ai'
-import { openai } from '@ai-sdk/openai'
-import { anthropic } from '@ai-sdk/anthropic'
+  type LanguageModelV2Middleware,
+  simulateStreamingMiddleware,
+  wrapLanguageModel,
+} from 'ai';
 
 /**
  * Logging middleware for debugging and monitoring
  */
 export const loggingMiddleware: LanguageModelV2Middleware = {
   transformParams: async ({ params }) => {
-    console.log('[AI Request]', { 
-      model: params.model, 
+    console.log('[AI Request]', {
+      model: params.model,
       promptTokens: params.prompt?.length,
       temperature: params.temperature,
-      timestamp: new Date().toISOString()
-    })
-    return params
+      timestamp: new Date().toISOString(),
+    });
+    return params;
   },
   wrapGenerate: async ({ doGenerate }) => {
-    const start = Date.now()
+    const start = Date.now();
     try {
-      const result = await doGenerate()
-      console.log('[AI Response]', { 
+      const result = await doGenerate();
+      console.log('[AI Response]', {
         duration: Date.now() - start,
         usage: result.usage,
         finishReason: result.finishReason,
-        timestamp: new Date().toISOString()
-      })
-      return result
+        timestamp: new Date().toISOString(),
+      });
+      return result;
     } catch (error) {
       console.error('[AI Error]', {
         duration: Date.now() - start,
         error: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      })
-      throw error
+        timestamp: new Date().toISOString(),
+      });
+      throw error;
     }
   },
   wrapStream: async ({ doStream }) => {
-    const start = Date.now()
-    let tokenCount = 0
-    
-    const { stream, ...rest } = await doStream()
-    
+    const start = Date.now();
+    let tokenCount = 0;
+
+    const { stream, ...rest } = await doStream();
+
     // Wrap the stream to count tokens
     const wrappedStream = (async function* () {
       try {
         for await (const chunk of stream) {
           if (chunk.type === 'text-delta') {
-            tokenCount++
+            tokenCount++;
           }
-          yield chunk
+          yield chunk;
         }
         console.log('[AI Stream Complete]', {
           duration: Date.now() - start,
           tokenCount,
-          timestamp: new Date().toISOString()
-        })
+          timestamp: new Date().toISOString(),
+        });
       } catch (error) {
         console.error('[AI Stream Error]', {
           duration: Date.now() - start,
           tokenCount,
           error: error instanceof Error ? error.message : 'Unknown error',
-          timestamp: new Date().toISOString()
-        })
-        throw error
+          timestamp: new Date().toISOString(),
+        });
+        throw error;
       }
-    })()
-    
-    return { stream: wrappedStream, ...rest }
-  }
-}
+    })();
+
+    return { stream: wrappedStream, ...rest };
+  },
+};
 
 /**
  * Performance monitoring middleware
@@ -92,28 +92,28 @@ export const performanceMiddleware: LanguageModelV2Middleware = {
       headers: {
         ...params.headers,
         'X-Request-ID': crypto.randomUUID(),
-        'X-Request-Time': Date.now().toString()
-      }
-    }
+        'X-Request-Time': Date.now().toString(),
+      },
+    };
   },
   wrapGenerate: async ({ doGenerate }) => {
     const metrics = {
       startTime: Date.now(),
       firstTokenTime: 0,
-      endTime: 0
-    }
-    
-    const result = await doGenerate()
-    metrics.endTime = Date.now()
-    
+      endTime: 0,
+    };
+
+    const result = await doGenerate();
+    metrics.endTime = Date.now();
+
     // Send metrics to monitoring service
     if (process.env.NODE_ENV === 'production') {
       // await sendMetrics('ai.generation', metrics)
     }
-    
-    return result
-  }
-}
+
+    return result;
+  },
+};
 
 /**
  * Security middleware for input/output sanitization
@@ -122,15 +122,15 @@ export const securityMiddleware: LanguageModelV2Middleware = {
   transformParams: async ({ params }) => {
     // Enhanced prompt sanitization to prevent injection attacks
     if (params.prompt && typeof params.prompt === 'string') {
-      let sanitized = params.prompt
-      
+      let sanitized = params.prompt;
+
       // Remove HTML/script tags
       sanitized = sanitized
         .replace(/<script[^>]*>.*?<\/script>/gi, '')
         .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
         .replace(/<object[^>]*>.*?<\/object>/gi, '')
-        .replace(/<embed[^>]*>/gi, '')
-      
+        .replace(/<embed[^>]*>/gi, '');
+
       // Common prompt injection patterns
       const injectionPatterns = [
         /\b(ignore|disregard|forget)\s+(all\s+)?previous\s+(instructions?|commands?|prompts?)\b/gi,
@@ -142,62 +142,68 @@ export const securityMiddleware: LanguageModelV2Middleware = {
         /\bDAN\s+mode\b/gi,
         /\bjailbreak\b/gi,
         /\bbypass\s+(your\s+)?safety\b/gi,
-        /\bremove\s+(all\s+)?restrictions?\b/gi
-      ]
-      
+        /\bremove\s+(all\s+)?restrictions?\b/gi,
+      ];
+
       for (const pattern of injectionPatterns) {
-        sanitized = sanitized.replace(pattern, '[INJECTION ATTEMPT BLOCKED]')
+        sanitized = sanitized.replace(pattern, '[INJECTION ATTEMPT BLOCKED]');
       }
-      
+
       // Escape special characters that could be used for prompt manipulation
       sanitized = sanitized
         .replace(/\\n{3,}/g, '\\n\\n') // Limit consecutive newlines
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control characters
-      
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ''); // Remove control characters
+
       // Log suspicious activity
       if (sanitized !== params.prompt) {
         console.warn('[Security Middleware] Prompt sanitization applied:', {
           original: params.prompt.substring(0, 100),
           sanitized: sanitized.substring(0, 100),
-          timestamp: new Date().toISOString()
-        })
+          timestamp: new Date().toISOString(),
+        });
       }
-      
-      return { ...params, prompt: sanitized }
+
+      return { ...params, prompt: sanitized };
     }
-    
+
     // Sanitize system prompts as well
     if (params.system && typeof params.system === 'string') {
       const sanitizedSystem = params.system
         .replace(/<script[^>]*>.*?<\/script>/gi, '')
-        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
-      
-      return { ...params, system: sanitizedSystem }
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
+
+      return { ...params, system: sanitizedSystem };
     }
-    
-    return params
+
+    return params;
   },
   wrapGenerate: async ({ doGenerate, params }) => {
     try {
-      const result = await doGenerate()
-      
+      const result = await doGenerate();
+
       // Optional: Sanitize output as well
       if (result.text && typeof result.text === 'string') {
         // Remove any potential sensitive data patterns
         result.text = result.text
-          .replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g, '[EMAIL REDACTED]')
-          .replace(/\b(?:\+?1[-.]?)?\(?[0-9]{3}\)?[-.]?[0-9]{3}[-.]?[0-9]{4}\b/g, '[PHONE REDACTED]')
-          .replace(/\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b/g, '[SSN REDACTED]')
+          .replace(
+            /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+            '[EMAIL REDACTED]'
+          )
+          .replace(
+            /\b(?:\+?1[-.]?)?\(?[0-9]{3}\)?[-.]?[0-9]{3}[-.]?[0-9]{4}\b/g,
+            '[PHONE REDACTED]'
+          )
+          .replace(/\b[0-9]{3}-[0-9]{2}-[0-9]{4}\b/g, '[SSN REDACTED]');
       }
-      
-      return result
+
+      return result;
     } catch (error) {
       // Log security-related errors
-      console.error('[Security Middleware] Generation failed:', error)
-      throw error
+      console.error('[Security Middleware] Generation failed:', error);
+      throw error;
     }
-  }
-}
+  },
+};
 
 /**
  * Caching middleware for response caching
@@ -213,26 +219,26 @@ export function createCachingMiddleware(
         model: params.model,
         prompt: params.prompt,
         temperature: params.temperature,
-        maxTokens: params.maxTokens
-      })
-      
+        maxTokens: params.maxTokens,
+      });
+
       // Check cache
-      const cached = cache.get(cacheKey)
+      const cached = cache.get(cacheKey);
       if (cached && Date.now() - cached.timestamp < ttl) {
-        console.log('[Cache Hit]', { cacheKey: cacheKey.substring(0, 50) })
-        return cached.result
+        console.log('[Cache Hit]', { cacheKey: cacheKey.substring(0, 50) });
+        return cached.result;
       }
-      
+
       // Generate and cache
-      const result = await doGenerate()
+      const result = await doGenerate();
       cache.set(cacheKey, {
         result,
-        timestamp: Date.now()
-      })
-      
-      return result
-    }
-  }
+        timestamp: Date.now(),
+      });
+
+      return result;
+    },
+  };
 }
 
 /**
@@ -248,20 +254,20 @@ export const createEnhancedProvider = () => {
           loggingMiddleware,
           performanceMiddleware,
           defaultSettingsMiddleware({
-            settings: { 
-              temperature: 0.3, 
+            settings: {
+              temperature: 0.3,
               maxOutputTokens: 4096,
-              topP: 0.9
-            }
+              topP: 0.9,
+            },
           }),
-          extractReasoningMiddleware({ 
+          extractReasoningMiddleware({
             tagName: 'think',
             startWithReasoning: true,
-            separator: '\n---\n'
-          })
-        ]
+            separator: '\n---\n',
+          }),
+        ],
       }),
-      
+
       // Fast model with streaming simulation
       'fast-streaming': wrapLanguageModel({
         model: openai('gpt-4o-mini'),
@@ -269,14 +275,14 @@ export const createEnhancedProvider = () => {
           loggingMiddleware,
           simulateStreamingMiddleware(),
           defaultSettingsMiddleware({
-            settings: { 
-              temperature: 0.7, 
-              maxOutputTokens: 2048 
-            }
-          })
-        ]
+            settings: {
+              temperature: 0.7,
+              maxOutputTokens: 2048,
+            },
+          }),
+        ],
       }),
-      
+
       // Cost-optimized model with caching
       'budget-optimized': wrapLanguageModel({
         model: anthropic('claude-3-haiku-20240307'),
@@ -284,14 +290,14 @@ export const createEnhancedProvider = () => {
           loggingMiddleware,
           createCachingMiddleware(),
           defaultSettingsMiddleware({
-            settings: { 
-              temperature: 0.7, 
-              maxOutputTokens: 2048 
-            }
-          })
-        ]
+            settings: {
+              temperature: 0.7,
+              maxOutputTokens: 2048,
+            },
+          }),
+        ],
       }),
-      
+
       // Secure model with input sanitization
       'secure-chat': wrapLanguageModel({
         model: openai('gpt-4'),
@@ -301,12 +307,12 @@ export const createEnhancedProvider = () => {
           defaultSettingsMiddleware({
             settings: {
               temperature: 0.5,
-              maxOutputTokens: 2048
-            }
-          })
-        ]
+              maxOutputTokens: 2048,
+            },
+          }),
+        ],
       }),
-      
+
       // Code specialist with low temperature
       'code-specialist': wrapLanguageModel({
         model: openai('gpt-4'),
@@ -316,12 +322,12 @@ export const createEnhancedProvider = () => {
             settings: {
               temperature: 0.1,
               maxOutputTokens: 8192,
-              stopSequences: ['```end', '// END']
-            }
-          })
-        ]
+              stopSequences: ['```end', '// END'],
+            },
+          }),
+        ],
       }),
-      
+
       // Creative writer with high temperature
       'creative-writer': wrapLanguageModel({
         model: anthropic('claude-3-opus-20240229'),
@@ -333,12 +339,12 @@ export const createEnhancedProvider = () => {
               maxOutputTokens: 4096,
               topP: 0.95,
               frequencyPenalty: 0.5,
-              presencePenalty: 0.5
-            }
-          })
-        ]
+              presencePenalty: 0.5,
+            },
+          }),
+        ],
       }),
-      
+
       // Blockchain expert with domain knowledge
       'blockchain-expert': wrapLanguageModel({
         model: openai('gpt-4'),
@@ -348,8 +354,8 @@ export const createEnhancedProvider = () => {
           defaultSettingsMiddleware({
             settings: {
               temperature: 0.3,
-              maxOutputTokens: 4096
-            }
+              maxOutputTokens: 4096,
+            },
           }),
           // Custom middleware for blockchain context
           {
@@ -361,21 +367,21 @@ You are a blockchain and Web3 expert with deep knowledge of:
 - Smart contracts and DeFi protocols
 - Wallet integration and security
 - Token standards and NFTs
-`
+`;
               return {
                 ...params,
-                system: params.system 
+                system: params.system
                   ? `${params.system}\n\n${blockchainContext}`
-                  : blockchainContext
-              }
-            }
-          }
-        ]
-      })
+                  : blockchainContext,
+              };
+            },
+          },
+        ],
+      }),
     },
-    fallbackProvider: openai
-  })
-}
+    fallbackProvider: openai,
+  });
+};
 
 /**
  * Compose multiple middleware into one
@@ -385,108 +391,117 @@ export function composeMiddleware(
 ): LanguageModelV2Middleware {
   return {
     transformParams: async (options) => {
-      let params = options.params
+      let params = options.params;
       for (const middleware of middlewares) {
         if (middleware.transformParams) {
-          params = await middleware.transformParams({ ...options, params })
+          params = await middleware.transformParams({ ...options, params });
         }
       }
-      return params
+      return params;
     },
     wrapGenerate: async (options) => {
-      let doGenerate = options.doGenerate
-      
+      let doGenerate = options.doGenerate;
+
       // Apply middleware in reverse order (last one is innermost)
       for (const middleware of [...middlewares].reverse()) {
         if (middleware.wrapGenerate) {
-          const currentDoGenerate = doGenerate
-          doGenerate = () => middleware.wrapGenerate!({ 
-            ...options, 
-            doGenerate: currentDoGenerate 
-          })
+          const currentDoGenerate = doGenerate;
+          doGenerate = () =>
+            middleware.wrapGenerate!({
+              ...options,
+              doGenerate: currentDoGenerate,
+            });
         }
       }
-      
-      return doGenerate()
+
+      return doGenerate();
     },
     wrapStream: async (options) => {
-      let doStream = options.doStream
-      
+      let doStream = options.doStream;
+
       // Apply middleware in reverse order
       for (const middleware of [...middlewares].reverse()) {
         if (middleware.wrapStream) {
-          const currentDoStream = doStream
-          doStream = () => middleware.wrapStream!({ 
-            ...options, 
-            doStream: currentDoStream 
-          })
+          const currentDoStream = doStream;
+          doStream = () =>
+            middleware.wrapStream!({
+              ...options,
+              doStream: currentDoStream,
+            });
         }
       }
-      
-      return doStream()
-    }
-  }
+
+      return doStream();
+    },
+  };
 }
 
 /**
  * Create a rate limiting middleware
  */
 export function createRateLimitMiddleware(
-  maxRequests: number = 10,
-  windowMs: number = 60000 // 1 minute
+  maxRequests = 10,
+  windowMs = 60_000 // 1 minute
 ): LanguageModelV2Middleware {
-  const requests = new Map<string, number[]>()
-  
+  const requests = new Map<string, number[]>();
+
   return {
     transformParams: async ({ params }) => {
-      const key = params.userId || 'anonymous'
-      const now = Date.now()
-      const userRequests = requests.get(key) || []
-      
+      const key = params.userId || 'anonymous';
+      const now = Date.now();
+      const userRequests = requests.get(key) || [];
+
       // Remove old requests outside the window
-      const validRequests = userRequests.filter(time => now - time < windowMs)
-      
+      const validRequests = userRequests.filter(
+        (time) => now - time < windowMs
+      );
+
       if (validRequests.length >= maxRequests) {
-        throw new Error(`Rate limit exceeded: ${maxRequests} requests per ${windowMs}ms`)
+        throw new Error(
+          `Rate limit exceeded: ${maxRequests} requests per ${windowMs}ms`
+        );
       }
-      
-      validRequests.push(now)
-      requests.set(key, validRequests)
-      
-      return params
-    }
-  }
+
+      validRequests.push(now);
+      requests.set(key, validRequests);
+
+      return params;
+    },
+  };
 }
 
 /**
  * Create a retry middleware with exponential backoff
  */
 export function createRetryMiddleware(
-  maxRetries: number = 3,
-  initialDelay: number = 1000
+  maxRetries = 3,
+  initialDelay = 1000
 ): LanguageModelV2Middleware {
   return {
     wrapGenerate: async ({ doGenerate }) => {
-      let lastError: Error | undefined
-      
+      let lastError: Error | undefined;
+
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
-          return await doGenerate()
+          return await doGenerate();
         } catch (error) {
-          lastError = error as Error
-          console.warn(`[Retry Middleware] Attempt ${attempt + 1} failed:`, error)
-          
+          lastError = error as Error;
+          console.warn(
+            `[Retry Middleware] Attempt ${attempt + 1} failed:`,
+            error
+          );
+
           if (attempt < maxRetries) {
-            const delay = initialDelay * Math.pow(2, attempt)
-            await new Promise(resolve => setTimeout(resolve, delay))
+            const delay = initialDelay * 2 ** attempt;
+            await new Promise((resolve) => setTimeout(resolve, delay));
           }
         }
       }
-      
-      throw lastError || new Error('All retry attempts failed')
-    }
-  }
+
+      throw lastError || new Error('All retry attempts failed');
+    },
+  };
 }
 
 // Export the enhanced provider instance
-export const enhancedProvider = createEnhancedProvider()
+export const enhancedProvider = createEnhancedProvider();

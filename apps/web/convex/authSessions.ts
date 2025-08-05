@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES, TIME_CONSTANTS, DB_OPERATIONS } from "./constants";
+import { v } from 'convex/values';
+import { mutation, query } from './_generated/server';
+import { DB_OPERATIONS, EXPIRY_TIMES, TIME_CONSTANTS } from './constants';
 
 // Auth sessions have a short expiry (5 minutes) for security,
 // but cleanup runs daily to avoid excessive database operations.
@@ -16,49 +16,49 @@ export const storeAuthCode = mutation({
   handler: async (ctx, args) => {
     // Validate inputs
     if (!args.authCode || args.authCode.trim().length === 0) {
-      throw new Error("Auth code is required")
+      throw new Error('Auth code is required');
     }
     if (!args.userId || args.userId.trim().length === 0) {
-      throw new Error("User ID is required")
+      throw new Error('User ID is required');
     }
-    if (!args.userEmail || !args.userEmail.includes('@')) {
-      throw new Error("Valid email is required")
+    if (!(args.userEmail && args.userEmail.includes('@'))) {
+      throw new Error('Valid email is required');
     }
     if (!args.walletAddress || args.walletAddress.trim().length === 0) {
-      throw new Error("Wallet address is required")
+      throw new Error('Wallet address is required');
     }
     const now = Date.now();
     const expiresAt = now + EXPIRY_TIMES.AUTH_CODE;
 
     // Check if auth code already exists
     const existing = await ctx.db
-      .query("authSessions")
-      .withIndex("by_auth_code", (q) => q.eq("authCode", args.authCode))
+      .query('authSessions')
+      .withIndex('by_auth_code', (q) => q.eq('authCode', args.authCode))
       .first();
 
     if (existing) {
       // Update existing record - log this for security monitoring
-      console.log("Auth code update detected", {
+      console.log('Auth code update detected', {
         previousUserId: existing.userId,
         newUserId: args.userId,
         timestamp: now,
       });
-      
+
       await ctx.db.patch(existing._id, {
         userId: args.userId,
         userEmail: args.userEmail,
         walletAddress: args.walletAddress,
         expiresAt,
-        status: "pending",
+        status: 'pending',
       });
     } else {
       // Create new record
-      await ctx.db.insert("authSessions", {
+      await ctx.db.insert('authSessions', {
         authCode: args.authCode,
         userId: args.userId,
         userEmail: args.userEmail,
         walletAddress: args.walletAddress,
-        status: "pending",
+        status: 'pending',
         createdAt: now,
         expiresAt,
       });
@@ -74,8 +74,8 @@ export const getAuthSession = query({
   },
   handler: async (ctx, args) => {
     const session = await ctx.db
-      .query("authSessions")
-      .withIndex("by_auth_code", (q) => q.eq("authCode", args.authCode))
+      .query('authSessions')
+      .withIndex('by_auth_code', (q) => q.eq('authCode', args.authCode))
       .first();
 
     if (!session) {
@@ -83,7 +83,7 @@ export const getAuthSession = query({
     }
 
     const now = Date.now();
-    
+
     // Check if expired
     if (session.expiresAt < now) {
       return null;
@@ -107,33 +107,33 @@ export const markAuthCodeUsed = mutation({
   handler: async (ctx, args) => {
     // Validate input
     if (!args.authCode || args.authCode.trim().length === 0) {
-      throw new Error("Auth code is required")
+      throw new Error('Auth code is required');
     }
     const session = await ctx.db
-      .query("authSessions")
-      .withIndex("by_auth_code", (q) => q.eq("authCode", args.authCode))
+      .query('authSessions')
+      .withIndex('by_auth_code', (q) => q.eq('authCode', args.authCode))
       .first();
 
     if (!session) {
-      return { success: false, reason: "session_not_found" };
+      return { success: false, reason: 'session_not_found' };
     }
 
     const now = Date.now();
 
     // Check if expired
     if (session.expiresAt < now) {
-      await ctx.db.patch(session._id, { status: "expired" });
-      return { success: false, reason: "session_expired" };
+      await ctx.db.patch(session._id, { status: 'expired' });
+      return { success: false, reason: 'session_expired' };
     }
 
     // Check if already used
-    if (session.status === "completed") {
-      return { success: false, reason: "session_already_used" };
+    if (session.status === 'completed') {
+      return { success: false, reason: 'session_already_used' };
     }
 
     // Mark as used
     await ctx.db.patch(session._id, {
-      status: "completed",
+      status: 'completed',
       usedAt: now,
     });
 
@@ -152,11 +152,11 @@ export const cleanupExpiredAuthSessions = mutation({
     let hasMoreExpired = true;
     while (hasMoreExpired) {
       const expired = await ctx.db
-        .query("authSessions")
-        .filter((q) => 
+        .query('authSessions')
+        .filter((q) =>
           q.and(
-            q.lt(q.field("expiresAt"), cutoffTime),
-            q.neq(q.field("status"), "completed")
+            q.lt(q.field('expiresAt'), cutoffTime),
+            q.neq(q.field('status'), 'completed')
           )
         )
         .take(DB_OPERATIONS.BATCH_SIZE);
@@ -181,11 +181,11 @@ export const cleanupExpiredAuthSessions = mutation({
     let hasMoreCompleted = true;
     while (hasMoreCompleted) {
       const oldCompleted = await ctx.db
-        .query("authSessions")
-        .filter((q) => 
+        .query('authSessions')
+        .filter((q) =>
           q.and(
-            q.eq(q.field("status"), "completed"),
-            q.lt(q.field("createdAt"), oneDayAgo)
+            q.eq(q.field('status'), 'completed'),
+            q.lt(q.field('createdAt'), oneDayAgo)
           )
         )
         .take(DB_OPERATIONS.BATCH_SIZE);

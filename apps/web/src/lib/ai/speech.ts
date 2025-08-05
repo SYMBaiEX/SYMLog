@@ -1,59 +1,59 @@
-import { openai } from '@ai-sdk/openai'
+import { openai } from '@ai-sdk/openai';
 
 // Constants for speech generation
 // Speech generation constants with named values
-const DEFAULT_VOICE = 'nova'
-const DEFAULT_SPEED = 1.0
-const DEFAULT_MODEL = 'tts-1'
-const MAX_TEXT_LENGTH = 4096
-const MIN_SPEED = 0.25
-const MAX_SPEED = 4.0
-const MAX_CHUNK_SIZE = 1000
-const MAX_BATCH_SIZE = 10
-const WORDS_PER_MINUTE_BASE = 150
-const SENTENCE_SPLIT_BOUNDARY = 200 // Characters to look back for sentence boundary
-const WORD_SPLIT_BOUNDARY = 50 // Characters to look back for word boundary
-const MOCK_AUDIO_SIZE = 1024 // Placeholder audio buffer size
-const MAX_CONCURRENT_GENERATIONS = 3
+const DEFAULT_VOICE = 'nova';
+const DEFAULT_SPEED = 1.0;
+const DEFAULT_MODEL = 'tts-1';
+const MAX_TEXT_LENGTH = 4096;
+const MIN_SPEED = 0.25;
+const MAX_SPEED = 4.0;
+const MAX_CHUNK_SIZE = 1000;
+const MAX_BATCH_SIZE = 10;
+const WORDS_PER_MINUTE_BASE = 150;
+const SENTENCE_SPLIT_BOUNDARY = 200; // Characters to look back for sentence boundary
+const WORD_SPLIT_BOUNDARY = 50; // Characters to look back for word boundary
+const MOCK_AUDIO_SIZE = 1024; // Placeholder audio buffer size
+const MAX_CONCURRENT_GENERATIONS = 3;
 
 // Available voices from OpenAI TTS
-export type TTSVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer'
+export type TTSVoice = 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer';
 
 // Available TTS models
-export type TTSModel = 'tts-1' | 'tts-1-hd'
+export type TTSModel = 'tts-1' | 'tts-1-hd';
 
 // Speech generation options
 export interface SpeechOptions {
   /** Voice to use for speech generation */
-  voice?: TTSVoice
+  voice?: TTSVoice;
   /** Speech speed (0.25x to 4.0x) */
-  speed?: number
+  speed?: number;
   /** TTS model to use */
-  model?: TTSModel
+  model?: TTSModel;
   /** Audio format (currently only supports mp3) */
-  format?: 'mp3'
+  format?: 'mp3';
 }
 
 // Speech generation result
 export interface SpeechResult {
   /** Generated audio data as ArrayBuffer */
-  audio: ArrayBuffer
+  audio: ArrayBuffer;
   /** Audio format */
-  format: string
+  format: string;
   /** Duration estimate in seconds */
-  estimatedDuration?: number
+  estimatedDuration?: number;
   /** Text that was converted */
-  originalText: string
+  originalText: string;
   /** Voice used */
-  voice: TTSVoice
+  voice: TTSVoice;
   /** Model used */
-  model: TTSModel
+  model: TTSModel;
   /** Speed used */
-  speed: number
+  speed: number;
   /** Success indicator */
-  success: boolean
+  success: boolean;
   /** Error message if generation failed */
-  error?: string
+  error?: string;
 }
 
 // Voice characteristics for UI display
@@ -63,8 +63,8 @@ export const VOICE_CHARACTERISTICS = {
   fable: { gender: 'male', description: 'Warm and engaging' },
   onyx: { gender: 'male', description: 'Deep and authoritative' },
   nova: { gender: 'female', description: 'Friendly and conversational' },
-  shimmer: { gender: 'female', description: 'Bright and expressive' }
-} as const
+  shimmer: { gender: 'female', description: 'Bright and expressive' },
+} as const;
 
 /**
  * Validate speech generation parameters
@@ -74,25 +74,37 @@ export const VOICE_CHARACTERISTICS = {
  */
 function validateSpeechParams(text: string, options: SpeechOptions): void {
   if (!text || typeof text !== 'string') {
-    throw new Error('Text is required and must be a string')
+    throw new Error('Text is required and must be a string');
   }
 
   if (text.length > MAX_TEXT_LENGTH) {
-    throw new Error(`Text too long. Maximum length is ${MAX_TEXT_LENGTH} characters`)
+    throw new Error(
+      `Text too long. Maximum length is ${MAX_TEXT_LENGTH} characters`
+    );
   }
 
-  if (options.speed && (options.speed < MIN_SPEED || options.speed > MAX_SPEED)) {
-    throw new Error(`Speed must be between ${MIN_SPEED} and ${MAX_SPEED}`)
+  if (
+    options.speed &&
+    (options.speed < MIN_SPEED || options.speed > MAX_SPEED)
+  ) {
+    throw new Error(`Speed must be between ${MIN_SPEED} and ${MAX_SPEED}`);
   }
 
-  const validVoices: TTSVoice[] = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer']
+  const validVoices: TTSVoice[] = [
+    'alloy',
+    'echo',
+    'fable',
+    'onyx',
+    'nova',
+    'shimmer',
+  ];
   if (options.voice && !validVoices.includes(options.voice)) {
-    throw new Error(`Invalid voice. Must be one of: ${validVoices.join(', ')}`)
+    throw new Error(`Invalid voice. Must be one of: ${validVoices.join(', ')}`);
   }
 
-  const validModels: TTSModel[] = ['tts-1', 'tts-1-hd']
+  const validModels: TTSModel[] = ['tts-1', 'tts-1-hd'];
   if (options.model && !validModels.includes(options.model)) {
-    throw new Error(`Invalid model. Must be one of: ${validModels.join(', ')}`)
+    throw new Error(`Invalid model. Must be one of: ${validModels.join(', ')}`);
   }
 }
 
@@ -103,22 +115,24 @@ function validateSpeechParams(text: string, options: SpeechOptions): void {
  */
 function sanitizeTextForSpeech(text: string): string {
   if (!text || typeof text !== 'string') {
-    throw new Error('Text must be a non-empty string')
+    throw new Error('Text must be a non-empty string');
   }
-  
+
   let sanitized = text
     .replace(/<[^>]*>/g, '') // Remove HTML tags
     .replace(/[^\w\s.,!?;:"'-]/g, '') // Remove special characters except punctuation
     .replace(/\b(eval|function|script|javascript|vbscript)\b/gi, '') // Remove injection keywords
-    .trim()
-  
+    .trim();
+
   // Warn about truncation
   if (sanitized.length > MAX_TEXT_LENGTH) {
-    console.warn(`Text truncated from ${sanitized.length} to ${MAX_TEXT_LENGTH} characters`)
-    sanitized = sanitized.substring(0, MAX_TEXT_LENGTH)
+    console.warn(
+      `Text truncated from ${sanitized.length} to ${MAX_TEXT_LENGTH} characters`
+    );
+    sanitized = sanitized.substring(0, MAX_TEXT_LENGTH);
   }
-  
-  return sanitized
+
+  return sanitized;
 }
 
 /**
@@ -128,32 +142,38 @@ function sanitizeTextForSpeech(text: string): string {
  * @param voice Voice type for more accurate estimation
  * @returns Estimated duration in seconds
  */
-function estimateAudioDuration(text: string, speed: number, voice: TTSVoice = DEFAULT_VOICE): number {
+function estimateAudioDuration(
+  text: string,
+  speed: number,
+  voice: TTSVoice = DEFAULT_VOICE
+): number {
   // Voice-specific adjustments (some voices speak faster/slower)
-  const voiceSpeedAdjustment = {
-    'alloy': 1.0,
-    'echo': 0.95,   // Slightly slower, more articulate
-    'fable': 1.05,  // Slightly faster, more engaging
-    'onyx': 0.9,    // Deeper voice, typically slower
-    'nova': 1.0,    // Baseline
-    'shimmer': 1.1  // Brighter, typically faster
-  }[voice] || 1.0
-  
+  const voiceSpeedAdjustment =
+    {
+      alloy: 1.0,
+      echo: 0.95, // Slightly slower, more articulate
+      fable: 1.05, // Slightly faster, more engaging
+      onyx: 0.9, // Deeper voice, typically slower
+      nova: 1.0, // Baseline
+      shimmer: 1.1, // Brighter, typically faster
+    }[voice] || 1.0;
+
   // Adjust base rate for voice characteristics
-  const adjustedWordsPerMinute = WORDS_PER_MINUTE_BASE * speed * voiceSpeedAdjustment
-  
+  const adjustedWordsPerMinute =
+    WORDS_PER_MINUTE_BASE * speed * voiceSpeedAdjustment;
+
   // More sophisticated word counting that handles punctuation
   const wordCount = text
     .replace(/[.!?]+/g, ' ') // Replace punctuation with spaces for pauses
     .split(/\s+/)
-    .filter(word => word.length > 0).length
-  
+    .filter((word) => word.length > 0).length;
+
   // Add pause time for punctuation (approximate)
-  const punctuationCount = (text.match(/[.!?]+/g) || []).length
-  const pauseTime = punctuationCount * 0.5 // 0.5 seconds per major punctuation
-  
-  const baseDuration = (wordCount / adjustedWordsPerMinute) * 60
-  return Math.ceil(baseDuration + pauseTime)
+  const punctuationCount = (text.match(/[.!?]+/g) || []).length;
+  const pauseTime = punctuationCount * 0.5; // 0.5 seconds per major punctuation
+
+  const baseDuration = (wordCount / adjustedWordsPerMinute) * 60;
+  return Math.ceil(baseDuration + pauseTime);
 }
 
 /**
@@ -169,9 +189,9 @@ export async function generateSpeechFromText(
   abortSignal?: AbortSignal
 ): Promise<SpeechResult> {
   // Set defaults
-  const voice = options.voice || DEFAULT_VOICE
-  const speed = options.speed || DEFAULT_SPEED
-  const model = options.model || DEFAULT_MODEL
+  const voice = options.voice || DEFAULT_VOICE;
+  const speed = options.speed || DEFAULT_SPEED;
+  const model = options.model || DEFAULT_MODEL;
 
   // Check for abort signal early
   if (abortSignal?.aborted) {
@@ -179,35 +199,35 @@ export async function generateSpeechFromText(
       new Error('Speech generation was aborted'),
       'speech generation',
       { originalText: text, voice, model, speed }
-    )
+    );
   }
 
   // Validate parameters
-  validateSpeechParams(text, { voice, speed, model })
+  validateSpeechParams(text, { voice, speed, model });
 
   // Sanitize text
-  const sanitizedText = sanitizeTextForSpeech(text)
-  
+  const sanitizedText = sanitizeTextForSpeech(text);
+
   if (!sanitizedText) {
     return handleSpeechGenerationError(
       new Error('No valid text remaining after sanitization'),
       'text sanitization',
       { originalText: text, voice, model, speed }
-    )
+    );
   }
 
   try {
     // Check abort signal before expensive operation
     if (abortSignal?.aborted) {
-      throw new Error('Speech generation was aborted during processing')
+      throw new Error('Speech generation was aborted during processing');
     }
-    
+
     // Note: This is a placeholder for the actual AI SDK 5.0 speech generation
     // The AI SDK 5.0 would have an experimental_generateSpeech function
     // For now, we'll simulate the expected interface
-    
-    const speechModel = openai.speech(model)
-    
+
+    const speechModel = openai.speech(model);
+
     // This would be the actual implementation with AI SDK 5.0:
     // const result = await experimental_generateSpeech({
     //   model: speechModel,
@@ -218,9 +238,9 @@ export async function generateSpeechFromText(
     // })
 
     // Simulated response structure with realistic size estimation
-    const estimatedSize = Math.max(MOCK_AUDIO_SIZE, sanitizedText.length * 2) // Rough estimate
-    const mockAudioData = new ArrayBuffer(estimatedSize)
-    
+    const estimatedSize = Math.max(MOCK_AUDIO_SIZE, sanitizedText.length * 2); // Rough estimate
+    const mockAudioData = new ArrayBuffer(estimatedSize);
+
     return {
       audio: mockAudioData,
       format: 'mp3',
@@ -229,15 +249,15 @@ export async function generateSpeechFromText(
       voice,
       model,
       speed,
-      success: true
-    }
+      success: true,
+    };
   } catch (error) {
     return handleSpeechGenerationError(error, 'speech generation', {
       originalText: text,
       voice,
       model,
-      speed
-    })
+      speed,
+    });
   }
 }
 
@@ -252,19 +272,25 @@ export async function* streamSpeechGeneration(
   options: SpeechOptions = {}
 ): AsyncGenerator<ArrayBuffer, void, unknown> {
   // Enhanced chunking with better sentence handling
-  const chunks = chunkTextForSpeech(text, MAX_CHUNK_SIZE)
-  
+  const chunks = chunkTextForSpeech(text, MAX_CHUNK_SIZE);
+
   for (const chunk of chunks) {
     try {
-      const result = await generateSpeechFromText(chunk, options)
+      const result = await generateSpeechFromText(chunk, options);
       if (result.success) {
-        yield result.audio
+        yield result.audio;
       } else {
-        console.error(`Failed to generate speech for chunk: ${chunk.substring(0, 50)}...`, result.error)
+        console.error(
+          `Failed to generate speech for chunk: ${chunk.substring(0, 50)}...`,
+          result.error
+        );
         // Continue with next chunk instead of throwing
       }
     } catch (error) {
-      console.error(`Error generating speech for chunk: ${chunk.substring(0, 50)}...`, error)
+      console.error(
+        `Error generating speech for chunk: ${chunk.substring(0, 50)}...`,
+        error
+      );
       // Continue with next chunk instead of throwing
     }
   }
@@ -276,8 +302,8 @@ export async function* streamSpeechGeneration(
  * @returns Object URL for audio playback
  */
 export function createAudioURL(speechResult: SpeechResult): string {
-  const blob = new Blob([speechResult.audio], { type: 'audio/mpeg' })
-  return URL.createObjectURL(blob)
+  const blob = new Blob([speechResult.audio], { type: 'audio/mpeg' });
+  return URL.createObjectURL(blob);
 }
 
 /**
@@ -285,15 +311,18 @@ export function createAudioURL(speechResult: SpeechResult): string {
  * @param speechResult Result from speech generation
  * @param filename Optional filename
  */
-export function downloadAudio(speechResult: SpeechResult, filename?: string): void {
-  const url = createAudioURL(speechResult)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename || `speech-${Date.now()}.mp3`
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+export function downloadAudio(
+  speechResult: SpeechResult,
+  filename?: string
+): void {
+  const url = createAudioURL(speechResult);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename || `speech-${Date.now()}.mp3`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 /**
@@ -309,62 +338,72 @@ export async function generateSpeechBatch(
   concurrency: number = MAX_CONCURRENT_GENERATIONS
 ): Promise<SpeechResult[]> {
   if (!texts || texts.length === 0) {
-    throw new Error('Texts array cannot be empty')
+    throw new Error('Texts array cannot be empty');
   }
 
   if (texts.length > MAX_BATCH_SIZE) {
-    throw new Error(`Maximum ${MAX_BATCH_SIZE} texts per batch`)
+    throw new Error(`Maximum ${MAX_BATCH_SIZE} texts per batch`);
   }
-  
+
   if (concurrency < 1 || concurrency > MAX_CONCURRENT_GENERATIONS) {
-    throw new Error(`Concurrency must be between 1 and ${MAX_CONCURRENT_GENERATIONS}`)
+    throw new Error(
+      `Concurrency must be between 1 and ${MAX_CONCURRENT_GENERATIONS}`
+    );
   }
 
   // Use streaming approach for large batches to prevent memory exhaustion
   if (texts.length > 5) {
-    return generateSpeechBatchStreaming(texts, options, concurrency)
+    return generateSpeechBatchStreaming(texts, options, concurrency);
   }
 
-  const results: SpeechResult[] = []
-  
+  const results: SpeechResult[] = [];
+
   // Process in controlled batches to prevent memory exhaustion
   for (let i = 0; i < texts.length; i += concurrency) {
-    const batch = texts.slice(i, i + concurrency)
-    
+    const batch = texts.slice(i, i + concurrency);
+
     const batchPromises = batch.map(async (text, index) => {
       try {
-        const result = await generateSpeechFromText(text, options)
-        
+        const result = await generateSpeechFromText(text, options);
+
         // Log failed generations without exposing sensitive text
         if (!result.success) {
-          console.error(`Failed to generate speech for text ${i + index + 1}/${texts.length} [${text.length} chars]`, { 
-            error: result.error,
-            batchIndex: i + index
-          })
+          console.error(
+            `Failed to generate speech for text ${i + index + 1}/${texts.length} [${text.length} chars]`,
+            {
+              error: result.error,
+              batchIndex: i + index,
+            }
+          );
         }
-        
-        return result
+
+        return result;
       } catch (error) {
         // Return error result instead of throwing to prevent batch failure
         return handleSpeechGenerationError(error, 'batch speech generation', {
           originalText: text,
           voice: options.voice || DEFAULT_VOICE,
           model: options.model || DEFAULT_MODEL,
-          speed: options.speed || DEFAULT_SPEED
-        })
+          speed: options.speed || DEFAULT_SPEED,
+        });
       }
-    })
-    
-    const batchResults = await Promise.all(batchPromises)
-    results.push(...batchResults)
-    
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    results.push(...batchResults);
+
     // Force garbage collection hint between batches for memory management
-    if (typeof process !== 'undefined' && process.versions?.node && global.gc && i + concurrency < texts.length) {
-      global.gc()
+    if (
+      typeof process !== 'undefined' &&
+      process.versions?.node &&
+      global.gc &&
+      i + concurrency < texts.length
+    ) {
+      global.gc();
     }
   }
-  
-  return results
+
+  return results;
 }
 
 /**
@@ -379,77 +418,89 @@ async function generateSpeechBatchStreaming(
   options: SpeechOptions = {},
   concurrency: number = MAX_CONCURRENT_GENERATIONS
 ): Promise<SpeechResult[]> {
-  const results: SpeechResult[] = new Array(texts.length)
-  const semaphore = new SpeechSemaphore(concurrency)
-  
+  const results: SpeechResult[] = new Array(texts.length);
+  const semaphore = new SpeechSemaphore(concurrency);
+
   // Process all texts with controlled concurrency and memory management
   const promises = texts.map(async (text, index) => {
-    await semaphore.acquire()
-    
+    await semaphore.acquire();
+
     try {
-      const result = await generateSpeechFromText(text, options)
-      
+      const result = await generateSpeechFromText(text, options);
+
       if (!result.success) {
-        console.error(`Failed to generate speech for text ${index + 1}/${texts.length} [${text.length} chars]`, { 
-          error: result.error,
-          batchIndex: index
-        })
+        console.error(
+          `Failed to generate speech for text ${index + 1}/${texts.length} [${text.length} chars]`,
+          {
+            error: result.error,
+            batchIndex: index,
+          }
+        );
       }
-      
-      results[index] = result
-      return result
+
+      results[index] = result;
+      return result;
     } catch (error) {
-      const errorResult = handleSpeechGenerationError(error, 'streaming batch speech generation', {
-        originalText: text,
-        voice: options.voice || DEFAULT_VOICE,
-        model: options.model || DEFAULT_MODEL,
-        speed: options.speed || DEFAULT_SPEED
-      })
-      
-      results[index] = errorResult
-      return errorResult
+      const errorResult = handleSpeechGenerationError(
+        error,
+        'streaming batch speech generation',
+        {
+          originalText: text,
+          voice: options.voice || DEFAULT_VOICE,
+          model: options.model || DEFAULT_MODEL,
+          speed: options.speed || DEFAULT_SPEED,
+        }
+      );
+
+      results[index] = errorResult;
+      return errorResult;
     } finally {
-      semaphore.release()
-      
+      semaphore.release();
+
       // Periodic garbage collection hint for long-running operations
-      if (index % 10 === 0 && typeof process !== 'undefined' && process.versions?.node && global.gc) {
-        global.gc()
+      if (
+        index % 10 === 0 &&
+        typeof process !== 'undefined' &&
+        process.versions?.node &&
+        global.gc
+      ) {
+        global.gc();
       }
     }
-  })
-  
-  await Promise.all(promises)
-  return results
+  });
+
+  await Promise.all(promises);
+  return results;
 }
 
 /**
  * Semaphore for controlling concurrent operations to prevent resource exhaustion
  */
 class SpeechSemaphore {
-  private permits: number
-  private waiting: Array<() => void> = []
+  private permits: number;
+  private waiting: Array<() => void> = [];
 
   constructor(permits: number) {
-    this.permits = permits
+    this.permits = permits;
   }
 
   async acquire(): Promise<void> {
     return new Promise((resolve) => {
       if (this.permits > 0) {
-        this.permits--
-        resolve()
+        this.permits--;
+        resolve();
       } else {
-        this.waiting.push(resolve)
+        this.waiting.push(resolve);
       }
-    })
+    });
   }
 
   release(): void {
-    this.permits++
+    this.permits++;
     if (this.waiting.length > 0) {
-      const resolve = this.waiting.shift()!
-      this.permits--
-      resolve()
+      const resolve = this.waiting.shift()!;
+      this.permits--;
+      resolve();
     }
   }
 }
@@ -461,24 +512,24 @@ class SpeechSemaphore {
 export function getAvailableVoices() {
   return Object.entries(VOICE_CHARACTERISTICS).map(([voice, info]) => ({
     voice: voice as TTSVoice,
-    ...info
-  }))
+    ...info,
+  }));
 }
 
 /**
  * Speech generation service class for managing multiple operations
  */
 export class SpeechService {
-  private static instance: SpeechService
-  private activeGenerations = new Map<string, AbortController>()
+  private static instance: SpeechService;
+  private activeGenerations = new Map<string, AbortController>();
 
   private constructor() {}
 
   static getInstance(): SpeechService {
     if (!SpeechService.instance) {
-      SpeechService.instance = new SpeechService()
+      SpeechService.instance = new SpeechService();
     }
-    return SpeechService.instance
+    return SpeechService.instance;
   }
 
   /**
@@ -496,17 +547,21 @@ export class SpeechService {
     // Prevent rapid successive requests with same ID
     if (this.activeGenerations.has(id)) {
       // Cancel existing and wait a moment to prevent race conditions
-      this.cancel(id)
-      await new Promise(resolve => setTimeout(resolve, 10))
+      this.cancel(id);
+      await new Promise((resolve) => setTimeout(resolve, 10));
     }
 
-    const abortController = new AbortController()
-    this.activeGenerations.set(id, abortController)
+    const abortController = new AbortController();
+    this.activeGenerations.set(id, abortController);
 
     try {
       // Pass abort signal to the generation function
-      const result = await generateSpeechFromText(text, options, abortController.signal)
-      
+      const result = await generateSpeechFromText(
+        text,
+        options,
+        abortController.signal
+      );
+
       // Double-check if we were cancelled during generation
       if (abortController.signal.aborted) {
         return {
@@ -518,11 +573,11 @@ export class SpeechService {
           model: options.model || DEFAULT_MODEL,
           speed: options.speed || DEFAULT_SPEED,
           success: false,
-          error: 'Generation was cancelled'
-        }
+          error: 'Generation was cancelled',
+        };
       }
-      
-      return result
+
+      return result;
     } catch (error) {
       // If aborted, don't treat it as an error
       if (abortController.signal.aborted) {
@@ -535,18 +590,22 @@ export class SpeechService {
           model: options.model || DEFAULT_MODEL,
           speed: options.speed || DEFAULT_SPEED,
           success: false,
-          error: 'Generation was cancelled'
-        }
+          error: 'Generation was cancelled',
+        };
       }
-      
-      return handleSpeechGenerationError(error, 'speech generation with cancellation', {
-        originalText: text,
-        voice: options.voice || DEFAULT_VOICE,
-        model: options.model || DEFAULT_MODEL,
-        speed: options.speed || DEFAULT_SPEED
-      })
+
+      return handleSpeechGenerationError(
+        error,
+        'speech generation with cancellation',
+        {
+          originalText: text,
+          voice: options.voice || DEFAULT_VOICE,
+          model: options.model || DEFAULT_MODEL,
+          speed: options.speed || DEFAULT_SPEED,
+        }
+      );
     } finally {
-      this.activeGenerations.delete(id)
+      this.activeGenerations.delete(id);
     }
   }
 
@@ -555,10 +614,10 @@ export class SpeechService {
    * @param id Generation ID to cancel
    */
   cancel(id: string): void {
-    const controller = this.activeGenerations.get(id)
+    const controller = this.activeGenerations.get(id);
     if (controller) {
-      controller.abort()
-      this.activeGenerations.delete(id)
+      controller.abort();
+      this.activeGenerations.delete(id);
     }
   }
 
@@ -567,9 +626,9 @@ export class SpeechService {
    */
   cancelAll(): void {
     for (const [id, controller] of this.activeGenerations) {
-      controller.abort()
+      controller.abort();
     }
-    this.activeGenerations.clear()
+    this.activeGenerations.clear();
   }
 
   /**
@@ -577,28 +636,32 @@ export class SpeechService {
    * @returns Array of active generation IDs
    */
   getActiveGenerations(): string[] {
-    return Array.from(this.activeGenerations.keys())
+    return Array.from(this.activeGenerations.keys());
   }
 }
 
 // Centralized error handling for speech generation
-function handleSpeechGenerationError(error: unknown, operation: string, context: {
-  originalText: string
-  voice: TTSVoice
-  model: TTSModel
-  speed: number
-}): SpeechResult {
-  const errorId = `SPEECH_ERR_${Date.now()}`
-  
+function handleSpeechGenerationError(
+  error: unknown,
+  operation: string,
+  context: {
+    originalText: string;
+    voice: TTSVoice;
+    model: TTSModel;
+    speed: number;
+  }
+): SpeechResult {
+  const errorId = `SPEECH_ERR_${Date.now()}`;
+
   // Log error with ID for debugging
   console.error(`[${errorId}] Error during ${operation}`, {
     error: error instanceof Error ? error.message : 'Unknown error',
     textLength: context.originalText.length,
     voice: context.voice,
     model: context.model,
-    speed: context.speed
-  })
-  
+    speed: context.speed,
+  });
+
   return {
     audio: new ArrayBuffer(0),
     format: 'mp3',
@@ -608,69 +671,84 @@ function handleSpeechGenerationError(error: unknown, operation: string, context:
     model: context.model,
     speed: context.speed,
     success: false,
-    error: `${operation} failed`
-  }
+    error: `${operation} failed`,
+  };
 }
 
 // Enhanced text chunking utility with sophisticated boundary detection
-function chunkTextForSpeech(text: string, maxChunkSize: number = MAX_CHUNK_SIZE): string[] {
+function chunkTextForSpeech(
+  text: string,
+  maxChunkSize: number = MAX_CHUNK_SIZE
+): string[] {
   if (text.length <= maxChunkSize) {
-    return [text]
+    return [text];
   }
-  
-  const chunks: string[] = []
-  let remaining = text
-  
+
+  const chunks: string[] = [];
+  let remaining = text;
+
   while (remaining.length > 0) {
     if (remaining.length <= maxChunkSize) {
-      chunks.push(remaining.trim())
-      break
+      chunks.push(remaining.trim());
+      break;
     }
-    
+
     // Find the best split point
-    const splitPoint = findOptimalSplitPoint(remaining, maxChunkSize)
-    
-    const chunk = remaining.substring(0, splitPoint).trim()
+    const splitPoint = findOptimalSplitPoint(remaining, maxChunkSize);
+
+    const chunk = remaining.substring(0, splitPoint).trim();
     if (chunk.length > 0) {
-      chunks.push(chunk)
+      chunks.push(chunk);
     }
-    
-    remaining = remaining.substring(splitPoint).trim()
+
+    remaining = remaining.substring(splitPoint).trim();
   }
-  
-  return chunks.filter(chunk => chunk.length > 0)
+
+  return chunks.filter((chunk) => chunk.length > 0);
 }
 
 // Find optimal split point considering sentence and word boundaries
 function findOptimalSplitPoint(text: string, maxSize: number): number {
   if (text.length <= maxSize) {
-    return text.length
+    return text.length;
   }
-  
+
   // Try to find sentence boundary first
-  for (let i = maxSize - 1; i >= Math.max(0, maxSize - SENTENCE_SPLIT_BOUNDARY); i--) {
+  for (
+    let i = maxSize - 1;
+    i >= Math.max(0, maxSize - SENTENCE_SPLIT_BOUNDARY);
+    i--
+  ) {
     if (/[.!?]\s/.test(text.substring(i, i + 2))) {
-      return i + 1
+      return i + 1;
     }
   }
-  
+
   // Try to find word boundary
-  for (let i = maxSize - 1; i >= Math.max(0, maxSize - WORD_SPLIT_BOUNDARY); i--) {
+  for (
+    let i = maxSize - 1;
+    i >= Math.max(0, maxSize - WORD_SPLIT_BOUNDARY);
+    i--
+  ) {
     if (/\s/.test(text[i])) {
-      return i
+      return i;
     }
   }
-  
+
   // If no good boundary found, try clause boundaries (commas, semicolons)
-  for (let i = maxSize - 1; i >= Math.max(0, maxSize - WORD_SPLIT_BOUNDARY); i--) {
+  for (
+    let i = maxSize - 1;
+    i >= Math.max(0, maxSize - WORD_SPLIT_BOUNDARY);
+    i--
+  ) {
     if (/[,;]\s/.test(text.substring(i, i + 2))) {
-      return i + 1
+      return i + 1;
     }
   }
-  
+
   // Last resort: hard split at maxSize
-  return maxSize
+  return maxSize;
 }
 
 // Export the singleton instance
-export const speechService = SpeechService.getInstance()
+export const speechService = SpeechService.getInstance();

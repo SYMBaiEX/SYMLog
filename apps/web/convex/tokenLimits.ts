@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES } from "./constants";
+import { v } from 'convex/values';
+import { mutation, query } from './_generated/server';
+import { EXPIRY_TIMES } from './constants';
 
 interface TokenReservation {
   reserved: boolean;
@@ -28,9 +28,9 @@ export const reserveTokens = mutation({
 
     // Get all token usage and reservations for today
     const usageRecords = await ctx.db
-      .query("tokenUsage")
-      .withIndex("by_user_and_date", (q) =>
-        q.eq("userId", args.userId).gte("timestamp", dayStart)
+      .query('tokenUsage')
+      .withIndex('by_user_and_date', (q) =>
+        q.eq('userId', args.userId).gte('timestamp', dayStart)
       )
       .collect();
 
@@ -39,9 +39,9 @@ export const reserveTokens = mutation({
     let totalReserved = 0;
 
     for (const record of usageRecords) {
-      if (record.status === "completed") {
+      if (record.status === 'completed') {
         totalUsage += record.actualTokens;
-      } else if (record.status === "reserved" && record.expiresAt > now) {
+      } else if (record.status === 'reserved' && record.expiresAt > now) {
         // Only count non-expired reservations
         totalReserved += record.estimatedTokens;
       }
@@ -53,12 +53,12 @@ export const reserveTokens = mutation({
 
     if (canReserve) {
       // Create a reservation
-      const reservationId = await ctx.db.insert("tokenUsage", {
+      const reservationId = await ctx.db.insert('tokenUsage', {
         userId: args.userId,
         timestamp: now,
         estimatedTokens: args.estimatedTokens,
         actualTokens: 0,
-        status: "reserved",
+        status: 'reserved',
         expiresAt: now + EXPIRY_TIMES.TOKEN_RESERVATION, // 5 minutes
       });
 
@@ -67,7 +67,7 @@ export const reserveTokens = mutation({
         currentUsage: currentTotal,
         limit: args.maxDailyTokens,
         remaining: remaining - args.estimatedTokens,
-        reservationId: reservationId,
+        reservationId,
       };
     }
 
@@ -85,24 +85,24 @@ export const reserveTokens = mutation({
  */
 export const completeTokenReservation = mutation({
   args: {
-    reservationId: v.id("tokenUsage"),
+    reservationId: v.id('tokenUsage'),
     actualTokens: v.number(),
   },
   handler: async (ctx, args) => {
     const reservation = await ctx.db.get(args.reservationId);
-    
+
     if (!reservation) {
-      throw new Error("Reservation not found");
+      throw new Error('Reservation not found');
     }
 
-    if (reservation.status !== "reserved") {
-      throw new Error("Reservation already completed or cancelled");
+    if (reservation.status !== 'reserved') {
+      throw new Error('Reservation already completed or cancelled');
     }
 
     // Update the reservation with actual usage
     await ctx.db.patch(args.reservationId, {
       actualTokens: args.actualTokens,
-      status: "completed",
+      status: 'completed',
       completedAt: Date.now(),
     });
 
@@ -115,17 +115,17 @@ export const completeTokenReservation = mutation({
  */
 export const cancelTokenReservation = mutation({
   args: {
-    reservationId: v.id("tokenUsage"),
+    reservationId: v.id('tokenUsage'),
   },
   handler: async (ctx, args) => {
     const reservation = await ctx.db.get(args.reservationId);
-    
-    if (!reservation || reservation.status !== "reserved") {
+
+    if (!reservation || reservation.status !== 'reserved') {
       return { success: false };
     }
 
     await ctx.db.patch(args.reservationId, {
-      status: "cancelled",
+      status: 'cancelled',
       cancelledAt: Date.now(),
     });
 
@@ -147,9 +147,9 @@ export const getTokenUsage = query({
     const dayStart = startOfDay.getTime();
 
     const usageRecords = await ctx.db
-      .query("tokenUsage")
-      .withIndex("by_user_and_date", (q) =>
-        q.eq("userId", args.userId).gte("timestamp", dayStart)
+      .query('tokenUsage')
+      .withIndex('by_user_and_date', (q) =>
+        q.eq('userId', args.userId).gte('timestamp', dayStart)
       )
       .collect();
 
@@ -158,10 +158,10 @@ export const getTokenUsage = query({
     let completedRequests = 0;
 
     for (const record of usageRecords) {
-      if (record.status === "completed") {
+      if (record.status === 'completed') {
         totalUsage += record.actualTokens;
         completedRequests++;
-      } else if (record.status === "reserved" && record.expiresAt > now) {
+      } else if (record.status === 'reserved' && record.expiresAt > now) {
         totalReserved += record.estimatedTokens;
       }
     }
@@ -186,18 +186,18 @@ export const cleanupExpiredReservations = mutation({
 
     // Find expired reservations
     const expired = await ctx.db
-      .query("tokenUsage")
-      .withIndex("by_status_and_expiry", (q) =>
-        q.eq("status", "reserved").lte("expiresAt", now)
+      .query('tokenUsage')
+      .withIndex('by_status_and_expiry', (q) =>
+        q.eq('status', 'reserved').lte('expiresAt', now)
       )
       .take(100);
 
     // Cancel them
     for (const reservation of expired) {
       await ctx.db.patch(reservation._id, {
-        status: "cancelled",
+        status: 'cancelled',
         cancelledAt: now,
-        cancellationReason: "expired",
+        cancellationReason: 'expired',
       });
       cancelledCount++;
     }

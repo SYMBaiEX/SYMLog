@@ -1,32 +1,32 @@
-"use client"
+'use client';
 
-import * as React from "react"
-import { useRouter } from "next/navigation"
 import {
-  ChevronDown,
-  FileText,
+  Activity,
+  Bell,
   BookOpen,
+  ChevronDown,
+  Database,
+  FileCode,
+  FileText,
   FlaskConical,
-  Sparkles,
-  TrendingUp,
-  Users,
+  GitBranch,
+  Globe,
   HelpCircle,
+  LogOut,
   MessageSquare,
+  Package,
+  Palette,
   Settings,
   Shield,
-  Database,
-  Globe,
+  Sparkles,
   Terminal,
-  Palette,
-  Bell,
+  TrendingUp,
   User,
-  LogOut,
-  Activity,
-  FileCode,
-  GitBranch,
-  Package,
-  Zap
-} from "lucide-react"
+  Users,
+  Zap,
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import * as React from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,113 +37,113 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { GlassButton } from "@/components/ui/glass-button"
-import { cn } from "@/lib/utils"
+} from '@/components/ui/dropdown-menu';
+import { GlassButton } from '@/components/ui/glass-button';
+import { cn } from '@/lib/utils';
 
 interface NavigationDropdownProps {
-  className?: string
+  className?: string;
 }
 
 export function NavigationDropdown({ className }: NavigationDropdownProps) {
-  const router = useRouter()
+  const router = useRouter();
 
   const productItems = [
     {
-      label: "Platform Overview",
+      label: 'Platform Overview',
       icon: Sparkles,
-      description: "Learn about our AI-powered platform",
-      href: "/platform"
+      description: 'Learn about our AI-powered platform',
+      href: '/platform',
     },
     {
-      label: "Features",
+      label: 'Features',
       icon: Zap,
-      description: "Explore all platform capabilities",
-      href: "/features"
+      description: 'Explore all platform capabilities',
+      href: '/features',
     },
     {
-      label: "API Documentation",
+      label: 'API Documentation',
       icon: FileCode,
-      description: "Developer guides and references",
-      href: "/docs/api"
+      description: 'Developer guides and references',
+      href: '/docs/api',
     },
     {
-      label: "Integrations",
+      label: 'Integrations',
       icon: Package,
-      description: "Connect with your favorite tools",
-      href: "/integrations"
+      description: 'Connect with your favorite tools',
+      href: '/integrations',
     },
-  ]
+  ];
 
   const resourceItems = [
     {
-      label: "Documentation",
+      label: 'Documentation',
       icon: BookOpen,
-      description: "Comprehensive guides and tutorials",
-      href: "/docs"
+      description: 'Comprehensive guides and tutorials',
+      href: '/docs',
     },
     {
-      label: "Research Papers",
+      label: 'Research Papers',
       icon: FlaskConical,
-      description: "Latest AI research and findings",
-      href: "/research"
+      description: 'Latest AI research and findings',
+      href: '/research',
     },
     {
-      label: "Blog",
+      label: 'Blog',
       icon: FileText,
-      description: "News, updates, and insights",
-      href: "/blog"
+      description: 'News, updates, and insights',
+      href: '/blog',
     },
     {
-      label: "Community",
+      label: 'Community',
       icon: Users,
-      description: "Join our developer community",
-      href: "/community"
+      description: 'Join our developer community',
+      href: '/community',
     },
     {
-      label: "Status",
+      label: 'Status',
       icon: Activity,
-      description: "System status and uptime",
-      href: "/status"
+      description: 'System status and uptime',
+      href: '/status',
     },
-  ]
+  ];
 
   const developerItems = [
     {
-      label: "Getting Started",
+      label: 'Getting Started',
       icon: GitBranch,
-      description: "Quick start guide for developers",
-      href: "/docs/getting-started"
+      description: 'Quick start guide for developers',
+      href: '/docs/getting-started',
     },
     {
-      label: "API Explorer",
+      label: 'API Explorer',
       icon: Globe,
-      description: "Interactive API testing",
-      href: "/api-explorer"
+      description: 'Interactive API testing',
+      href: '/api-explorer',
     },
     {
-      label: "SDKs & Libraries",
+      label: 'SDKs & Libraries',
       icon: Package,
-      description: "Client libraries for all platforms",
-      href: "/sdks"
+      description: 'Client libraries for all platforms',
+      href: '/sdks',
     },
     {
-      label: "Developer Console",
+      label: 'Developer Console',
       icon: Terminal,
-      description: "Manage your applications",
-      href: "/console"
+      description: 'Manage your applications',
+      href: '/console',
     },
-  ]
+  ];
 
   return (
-    <div className={cn("flex items-center space-x-1", className)}>
+    <div className={cn('flex items-center space-x-1', className)}>
       {/* Products Dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <GlassButton
-            variant="ghost"
+            className="h-9 px-3 font-medium text-sm"
             size="sm"
-            className="h-9 px-3 text-sm font-medium"
+            variant="ghost"
           >
             Products
             <ChevronDown className="ml-1 h-3 w-3" />
@@ -154,15 +154,15 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
           <DropdownMenuSeparator />
           {productItems.map((item) => (
             <DropdownMenuItem
-              key={item.href}
               className="cursor-pointer"
+              key={item.href}
               onClick={() => router.push(item.href)}
             >
               <div className="flex items-start gap-3">
-                <item.icon className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <item.icon className="mt-0.5 h-4 w-4 text-muted-foreground" />
                 <div className="space-y-0.5">
-                  <div className="text-sm font-medium">{item.label}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="font-medium text-sm">{item.label}</div>
+                  <div className="text-muted-foreground text-xs">
                     {item.description}
                   </div>
                 </div>
@@ -176,9 +176,9 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <GlassButton
-            variant="ghost"
+            className="h-9 px-3 font-medium text-sm"
             size="sm"
-            className="h-9 px-3 text-sm font-medium"
+            variant="ghost"
           >
             Resources
             <ChevronDown className="ml-1 h-3 w-3" />
@@ -189,15 +189,15 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
           <DropdownMenuSeparator />
           {resourceItems.map((item) => (
             <DropdownMenuItem
-              key={item.href}
               className="cursor-pointer"
+              key={item.href}
               onClick={() => router.push(item.href)}
             >
               <div className="flex items-start gap-3">
-                <item.icon className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <item.icon className="mt-0.5 h-4 w-4 text-muted-foreground" />
                 <div className="space-y-0.5">
-                  <div className="text-sm font-medium">{item.label}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="font-medium text-sm">{item.label}</div>
+                  <div className="text-muted-foreground text-xs">
                     {item.description}
                   </div>
                 </div>
@@ -207,7 +207,7 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer"
-            onClick={() => router.push("/support")}
+            onClick={() => router.push('/support')}
           >
             <MessageSquare className="mr-2 h-4 w-4" />
             Contact Support
@@ -219,9 +219,9 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <GlassButton
-            variant="ghost"
+            className="h-9 px-3 font-medium text-sm"
             size="sm"
-            className="h-9 px-3 text-sm font-medium"
+            variant="ghost"
           >
             Developers
             <ChevronDown className="ml-1 h-3 w-3" />
@@ -232,15 +232,15 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
           <DropdownMenuSeparator />
           {developerItems.map((item) => (
             <DropdownMenuItem
-              key={item.href}
               className="cursor-pointer"
+              key={item.href}
               onClick={() => router.push(item.href)}
             >
               <div className="flex items-start gap-3">
-                <item.icon className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                <item.icon className="mt-0.5 h-4 w-4 text-muted-foreground" />
                 <div className="space-y-0.5">
-                  <div className="text-sm font-medium">{item.label}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="font-medium text-sm">{item.label}</div>
+                  <div className="text-muted-foreground text-xs">
                     {item.description}
                   </div>
                 </div>
@@ -250,7 +250,7 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
           <DropdownMenuSeparator />
           <DropdownMenuItem
             className="cursor-pointer"
-            onClick={() => window.open("https://github.com/symlog", "_blank")}
+            onClick={() => window.open('https://github.com/symlog', '_blank')}
           >
             <GitBranch className="mr-2 h-4 w-4" />
             GitHub Repository
@@ -258,5 +258,5 @@ export function NavigationDropdown({ className }: NavigationDropdownProps) {
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-  )
+  );
 }

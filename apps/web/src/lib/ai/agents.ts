@@ -1,59 +1,59 @@
-import { generateText, streamText } from 'ai'
-import { getAIModel } from './providers'
-import { artifactTools } from './tools/artifact-tools'
+import { generateText, streamText } from 'ai';
+import { getAIModel } from './providers';
+import { artifactTools } from './tools/artifact-tools';
 
 // Constants for agent configuration
-const DEFAULT_MAX_STEPS = 10
-const DEFAULT_TEMPERATURE = 0.7
-const DEFAULT_MAX_TOKENS = 4096
-const MAX_PROMPT_LENGTH = 10000
-const DEPENDENCY_CHECK_TIMEOUT = 5000 // 5 seconds
-const MAX_WORKFLOW_STEPS = 50
-const MAX_CONCURRENCY = 3 // Maximum concurrent operations to prevent resource exhaustion
+const DEFAULT_MAX_STEPS = 10;
+const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_MAX_TOKENS = 4096;
+const MAX_PROMPT_LENGTH = 10_000;
+const DEPENDENCY_CHECK_TIMEOUT = 5000; // 5 seconds
+const MAX_WORKFLOW_STEPS = 50;
+const MAX_CONCURRENCY = 3; // Maximum concurrent operations to prevent resource exhaustion
 
 // Agent configuration interface
 export interface AgentConfig {
   /** Model to use for the agent */
-  model?: string
+  model?: string;
   /** System prompt for the agent */
-  system: string
+  system: string;
   /** Tools available to the agent */
-  tools?: Record<string, any>
+  tools?: Record<string, any>;
   /** Maximum number of steps to execute */
-  maxSteps?: number
+  maxSteps?: number;
   /** Temperature for generation */
-  temperature?: number
+  temperature?: number;
   /** Maximum tokens per response */
-  maxTokens?: number
+  maxTokens?: number;
   /** Agent name for logging */
-  name?: string
+  name?: string;
 }
 
 // Agent step interface
 export interface AgentStep {
-  stepNumber: number
-  stepType: string
-  input: string
-  output: string
-  toolCalls?: any[]
-  toolResults?: any[]
-  reasoning?: string
-  timestamp: Date
+  stepNumber: number;
+  stepType: string;
+  input: string;
+  output: string;
+  toolCalls?: any[];
+  toolResults?: any[];
+  reasoning?: string;
+  timestamp: Date;
 }
 
 // Agent result interface
 export interface AgentResult {
-  result: string
-  steps: AgentStep[]
-  totalSteps: number
-  finishReason: string
+  result: string;
+  steps: AgentStep[];
+  totalSteps: number;
+  finishReason: string;
   usage: {
-    promptTokens: number
-    completionTokens: number
-    totalTokens: number
-  }
-  success: boolean
-  error?: string
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  success: boolean;
+  error?: string;
 }
 
 /**
@@ -61,9 +61,9 @@ export interface AgentResult {
  * Implements AI SDK 5.0 Agent patterns for agentic conversations
  */
 export class SYMLogAgent {
-  private config: Required<AgentConfig>
-  private steps: AgentStep[] = []
-  private currentStep = 0
+  private config: Required<AgentConfig>;
+  private steps: AgentStep[] = [];
+  private currentStep = 0;
 
   constructor(config: AgentConfig) {
     this.config = {
@@ -73,8 +73,8 @@ export class SYMLogAgent {
       maxSteps: config.maxSteps || DEFAULT_MAX_STEPS,
       temperature: config.temperature || DEFAULT_TEMPERATURE,
       maxTokens: config.maxTokens || DEFAULT_MAX_TOKENS,
-      name: config.name || 'SYMLogAgent'
-    }
+      name: config.name || 'SYMLogAgent',
+    };
   }
 
   /**
@@ -83,8 +83,8 @@ export class SYMLogAgent {
    * @returns Promise resolving to agent result
    */
   async execute(prompt: string): Promise<AgentResult> {
-    this.reset() // Clear previous state
-    let currentInput = prompt
+    this.reset(); // Clear previous state
+    let currentInput = prompt;
 
     try {
       const result = await generateText({
@@ -94,12 +94,18 @@ export class SYMLogAgent {
         tools: this.config.tools,
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
-        onStepFinish: ({ step, stepType, toolCalls, toolResults, finishReason }) => {
-          this.currentStep++
-          
+        onStepFinish: ({
+          step,
+          stepType,
+          toolCalls,
+          toolResults,
+          finishReason,
+        }) => {
+          this.currentStep++;
+
           // Update current input for next step tracking
-          const stepInput = step?.text || currentInput
-          
+          const stepInput = step?.text || currentInput;
+
           const agentStep: AgentStep = {
             stepNumber: this.currentStep,
             stepType: stepType || 'text',
@@ -108,27 +114,31 @@ export class SYMLogAgent {
             toolCalls,
             toolResults,
             reasoning: step?.reasoning,
-            timestamp: new Date()
-          }
-          
-          this.steps.push(agentStep)
-          
+            timestamp: new Date(),
+          };
+
+          this.steps.push(agentStep);
+
           // Update current input for next iteration
           if (stepInput !== currentInput) {
-            currentInput = stepInput
+            currentInput = stepInput;
           }
-          
+
           // Check if we should stop
           if (this.currentStep >= this.config.maxSteps) {
-            return { stop: true }
+            return { stop: true };
           }
-          
+
           // Check if we have a completion condition or step is null
-          if (!step || finishReason === 'stop' || this.isWorkflowComplete(agentStep)) {
-            return { stop: true }
+          if (
+            !step ||
+            finishReason === 'stop' ||
+            this.isWorkflowComplete(agentStep)
+          ) {
+            return { stop: true };
           }
-        }
-      })
+        },
+      });
 
       const agentResult = {
         result: result.text,
@@ -138,15 +148,15 @@ export class SYMLogAgent {
         usage: {
           promptTokens: result.usage?.promptTokens || 0,
           completionTokens: result.usage?.completionTokens || 0,
-          totalTokens: result.usage?.totalTokens || 0
+          totalTokens: result.usage?.totalTokens || 0,
         },
-        success: true
-      }
-      
+        success: true,
+      };
+
       // Auto-cleanup after successful execution
-      this.reset()
-      
-      return agentResult
+      this.reset();
+
+      return agentResult;
     } catch (error) {
       const errorResult = {
         result: '',
@@ -155,13 +165,13 @@ export class SYMLogAgent {
         finishReason: 'error',
         usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error'
-      }
-      
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+
       // Auto-cleanup after error
-      this.reset()
-      
-      return errorResult
+      this.reset();
+
+      return errorResult;
     }
   }
 
@@ -171,8 +181,8 @@ export class SYMLogAgent {
    * @returns Streaming text result
    */
   stream(prompt: string) {
-    this.reset() // Clear previous state
-    let currentInput = prompt
+    this.reset(); // Clear previous state
+    let currentInput = prompt;
 
     return streamText({
       model: getAIModel(this.config.model),
@@ -181,12 +191,18 @@ export class SYMLogAgent {
       tools: this.config.tools,
       temperature: this.config.temperature,
       maxTokens: this.config.maxTokens,
-      onStepFinish: ({ step, stepType, toolCalls, toolResults, finishReason }) => {
-        this.currentStep++
-        
+      onStepFinish: ({
+        step,
+        stepType,
+        toolCalls,
+        toolResults,
+        finishReason,
+      }) => {
+        this.currentStep++;
+
         // Update current input for step tracking
-        const stepInput = step?.text || currentInput
-        
+        const stepInput = step?.text || currentInput;
+
         const agentStep: AgentStep = {
           stepNumber: this.currentStep,
           stepType: stepType || 'text',
@@ -195,26 +211,30 @@ export class SYMLogAgent {
           toolCalls,
           toolResults,
           reasoning: step?.reasoning,
-          timestamp: new Date()
-        }
-        
-        this.steps.push(agentStep)
-        
+          timestamp: new Date(),
+        };
+
+        this.steps.push(agentStep);
+
         // Update current input for next iteration
         if (stepInput !== currentInput) {
-          currentInput = stepInput
+          currentInput = stepInput;
         }
-        
+
         // Check stop conditions
         if (this.currentStep >= this.config.maxSteps) {
-          return { stop: true }
+          return { stop: true };
         }
-        
-        if (!step || finishReason === 'stop' || this.isWorkflowComplete(agentStep)) {
-          return { stop: true }
+
+        if (
+          !step ||
+          finishReason === 'stop' ||
+          this.isWorkflowComplete(agentStep)
+        ) {
+          return { stop: true };
         }
-      }
-    })
+      },
+    });
   }
 
   /**
@@ -222,7 +242,7 @@ export class SYMLogAgent {
    * @returns Array of agent steps
    */
   getSteps(): AgentStep[] {
-    return [...this.steps]
+    return [...this.steps];
   }
 
   /**
@@ -230,15 +250,15 @@ export class SYMLogAgent {
    * @returns Current step number
    */
   getCurrentStep(): number {
-    return this.currentStep
+    return this.currentStep;
   }
 
   /**
    * Reset the agent state
    */
   reset(): void {
-    this.steps = []
-    this.currentStep = 0
+    this.steps = [];
+    this.currentStep = 0;
   }
 
   /**
@@ -248,11 +268,12 @@ export class SYMLogAgent {
    */
   private isWorkflowComplete(step: AgentStep): boolean {
     // Check if any tool results indicate completion
-    return step.toolResults?.some(result => 
-      result.type === 'complete' || 
-      result.status === 'completed' ||
-      result.done === true
-    ) || false
+    return step.toolResults?.some(
+      (result) =>
+        result.type === 'complete' ||
+        result.status === 'completed' ||
+        result.done === true
+    );
   }
 
   /**
@@ -262,47 +283,49 @@ export class SYMLogAgent {
    */
   private sanitizePrompt(prompt: string): string {
     if (!prompt || typeof prompt !== 'string') {
-      throw new Error('Prompt must be a non-empty string')
+      throw new Error('Prompt must be a non-empty string');
     }
-    
+
     let sanitized = prompt
       .replace(/<[^>]*>/g, '') // Remove HTML tags
       .replace(/[{}]/g, '') // Remove curly braces
       .replace(/\b(eval|function|script|javascript|vbscript)\b/gi, '') // Remove injection keywords
-      .trim()
-    
+      .trim();
+
     // Smart truncation for better context preservation
     if (sanitized.length > MAX_PROMPT_LENGTH) {
       // Try to find sentence boundary
-      const sentences = sanitized.split(/[.!?]+/)
-      let truncated = ''
-      
+      const sentences = sanitized.split(/[.!?]+/);
+      let truncated = '';
+
       for (const sentence of sentences) {
         if (truncated.length + sentence.length < MAX_PROMPT_LENGTH - 50) {
-          truncated += sentence + '. '
+          truncated += sentence + '. ';
         } else {
-          break
+          break;
         }
       }
-      
+
       if (truncated.length < MAX_PROMPT_LENGTH / 2) {
         // If sentence-based truncation is too aggressive, use word boundary
-        const words = sanitized.split(' ')
-        truncated = ''
+        const words = sanitized.split(' ');
+        truncated = '';
         for (const word of words) {
           if (truncated.length + word.length < MAX_PROMPT_LENGTH - 10) {
-            truncated += word + ' '
+            truncated += word + ' ';
           } else {
-            break
+            break;
           }
         }
       }
-      
-      console.warn(`Agent prompt truncated from ${sanitized.length} to ${truncated.length} characters`)
-      sanitized = truncated.trim()
+
+      console.warn(
+        `Agent prompt truncated from ${sanitized.length} to ${truncated.length} characters`
+      );
+      sanitized = truncated.trim();
     }
-    
-    return sanitized
+
+    return sanitized;
   }
 }
 
@@ -326,8 +349,8 @@ Your capabilities:
 Always think step by step and explain your reasoning at each stage.`,
       maxSteps: options.maxSteps || 8,
       temperature: options.temperature || 0.3,
-      tools: artifactTools
-    })
+      tools: artifactTools,
+    });
   }
 }
 
@@ -351,8 +374,8 @@ Your workflow:
 Always follow best practices, use proper typing, and include comprehensive error handling.`,
       maxSteps: options.maxSteps || 12,
       temperature: options.temperature || 0.2,
-      tools: artifactTools
-    })
+      tools: artifactTools,
+    });
   }
 }
 
@@ -376,8 +399,8 @@ Your approach:
 Be thorough, objective, and provide evidence-based conclusions.`,
       maxSteps: options.maxSteps || 10,
       temperature: options.temperature || 0.4,
-      tools: artifactTools
-    })
+      tools: artifactTools,
+    });
   }
 }
 
@@ -402,8 +425,8 @@ Your methodology:
 Focus on creating practical, executable plans with clear success criteria.`,
       maxSteps: options.maxSteps || 8,
       temperature: options.temperature || 0.5,
-      tools: artifactTools
-    })
+      tools: artifactTools,
+    });
   }
 }
 
@@ -418,33 +441,33 @@ Focus on creating practical, executable plans with clear success criteria.`,
 export function createAgent(
   taskType: 'research' | 'code' | 'analysis' | 'planning' | 'custom',
   options: {
-    system?: string
-    maxSteps?: number
-    temperature?: number
-    tools?: Record<string, any>
+    system?: string;
+    maxSteps?: number;
+    temperature?: number;
+    tools?: Record<string, any>;
   } = {}
 ): SYMLogAgent {
   switch (taskType) {
     case 'research':
-      return new ResearchAgent(options)
+      return new ResearchAgent(options);
     case 'code':
-      return new CodeAgent(options)
+      return new CodeAgent(options);
     case 'analysis':
-      return new AnalysisAgent(options)
+      return new AnalysisAgent(options);
     case 'planning':
-      return new PlanningAgent(options)
+      return new PlanningAgent(options);
     case 'custom':
       if (!options.system) {
-        throw new Error('Custom agent requires system prompt')
+        throw new Error('Custom agent requires system prompt');
       }
       return new SYMLogAgent({
         system: options.system,
         maxSteps: options.maxSteps,
         temperature: options.temperature,
-        tools: options.tools
-      })
+        tools: options.tools,
+      });
     default:
-      throw new Error(`Unknown agent type: ${taskType}`)
+      throw new Error(`Unknown agent type: ${taskType}`);
   }
 }
 
@@ -456,8 +479,8 @@ class WorkflowExecutionError extends Error {
     public readonly stepIndex?: number,
     public readonly cause?: Error
   ) {
-    super(message)
-    this.name = 'WorkflowExecutionError'
+    super(message);
+    this.name = 'WorkflowExecutionError';
   }
 }
 
@@ -471,8 +494,8 @@ class DependencyError extends WorkflowExecutionError {
       `Dependencies not met for agent ${agentName}: missing [${missingDependencies.join(', ')}]`,
       agentName,
       stepIndex
-    )
-    this.name = 'DependencyError'
+    );
+    this.name = 'DependencyError';
   }
 }
 
@@ -480,16 +503,16 @@ class DependencyError extends WorkflowExecutionError {
  * Enhanced agent workflow coordinator for complex multi-agent tasks
  */
 export class AgentWorkflow {
-  private agents: Map<string, SYMLogAgent> = new Map()
+  private agents: Map<string, SYMLogAgent> = new Map();
   private workflowSteps: Array<{
-    id: string
-    agentName: string
-    input: string
-    dependencies: string[]
-    priority?: number
-  }> = []
-  private executionOrder: string[] = []
-  private readonly maxConcurrency: number = MAX_CONCURRENCY
+    id: string;
+    agentName: string;
+    input: string;
+    dependencies: string[];
+    priority?: number;
+  }> = [];
+  private executionOrder: string[] = [];
+  private readonly maxConcurrency: number = MAX_CONCURRENCY;
 
   /**
    * Add an agent to the workflow
@@ -498,9 +521,9 @@ export class AgentWorkflow {
    */
   addAgent(name: string, agent: SYMLogAgent): void {
     if (this.agents.has(name)) {
-      console.warn(`Agent ${name} already exists, replacing existing agent`)
+      console.warn(`Agent ${name} already exists, replacing existing agent`);
     }
-    this.agents.set(name, agent)
+    this.agents.set(name, agent);
   }
 
   /**
@@ -511,35 +534,43 @@ export class AgentWorkflow {
    * @param priority Optional priority for parallel execution
    */
   addStep(
-    agentName: string, 
-    input: string, 
-    dependencies: string[] = [], 
-    priority: number = 0
+    agentName: string,
+    input: string,
+    dependencies: string[] = [],
+    priority = 0
   ): string {
     if (this.workflowSteps.length >= MAX_WORKFLOW_STEPS) {
-      throw new Error(`Maximum workflow steps (${MAX_WORKFLOW_STEPS}) exceeded`)
+      throw new Error(
+        `Maximum workflow steps (${MAX_WORKFLOW_STEPS}) exceeded`
+      );
     }
-    
-    const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`
-    
+
+    const stepId = `step_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+
     // Validate dependencies exist
-    const invalidDeps = dependencies.filter(dep => 
-      !this.workflowSteps.some(step => step.agentName === dep) && !this.agents.has(dep)
-    )
-    
+    const invalidDeps = dependencies.filter(
+      (dep) =>
+        !(
+          this.workflowSteps.some((step) => step.agentName === dep) ||
+          this.agents.has(dep)
+        )
+    );
+
     if (invalidDeps.length > 0) {
-      console.warn(`Some dependencies may not exist: [${invalidDeps.join(', ')}]`)
+      console.warn(
+        `Some dependencies may not exist: [${invalidDeps.join(', ')}]`
+      );
     }
-    
-    this.workflowSteps.push({ 
+
+    this.workflowSteps.push({
       id: stepId,
-      agentName, 
-      input: this.sanitizeWorkflowInput(input), 
+      agentName,
+      input: this.sanitizeWorkflowInput(input),
       dependencies,
-      priority 
-    })
-    
-    return stepId
+      priority,
+    });
+
+    return stepId;
   }
 
   /**
@@ -547,72 +578,76 @@ export class AgentWorkflow {
    * @returns Promise resolving to workflow results
    */
   async execute(): Promise<Map<string, AgentResult>> {
-    const results = new Map<string, AgentResult>()
-    const completed = new Set<string>()
-    const inProgress = new Set<string>()
-    
+    const results = new Map<string, AgentResult>();
+    const completed = new Set<string>();
+    const inProgress = new Set<string>();
+
     // Build execution order considering dependencies and priorities
-    this.buildExecutionOrder()
-    
+    this.buildExecutionOrder();
+
     // Group steps by dependency level for potential parallel execution
-    const dependencyLevels = this.groupStepsByDependencyLevel()
-    
+    const dependencyLevels = this.groupStepsByDependencyLevel();
+
     for (let level = 0; level < dependencyLevels.length; level++) {
-      const levelSteps = dependencyLevels[level]
-      
+      const levelSteps = dependencyLevels[level];
+
       // Execute independent steps with controlled concurrency
-      const levelResults = await this.executeConcurrently(levelSteps, async (step, stepIndex) => {
-        try {
-          // Double-check dependencies
-          const missingDeps = step.dependencies.filter(dep => !completed.has(dep))
-          if (missingDeps.length > 0) {
-            throw new DependencyError(step.agentName, missingDeps, stepIndex)
-          }
+      const levelResults = await this.executeConcurrently(
+        levelSteps,
+        async (step, stepIndex) => {
+          try {
+            // Double-check dependencies
+            const missingDeps = step.dependencies.filter(
+              (dep) => !completed.has(dep)
+            );
+            if (missingDeps.length > 0) {
+              throw new DependencyError(step.agentName, missingDeps, stepIndex);
+            }
 
-          const agent = this.agents.get(step.agentName)
-          if (!agent) {
+            const agent = this.agents.get(step.agentName);
+            if (!agent) {
+              throw new WorkflowExecutionError(
+                `Agent ${step.agentName} not found`,
+                step.agentName,
+                stepIndex
+              );
+            }
+
+            inProgress.add(step.agentName);
+
+            // Build contextual input with data sensitivity handling
+            const contextualInput = this.buildContextualInput(step, results);
+
+            const result = await agent.execute(contextualInput);
+
+            inProgress.delete(step.agentName);
+            completed.add(step.agentName);
+
+            return { stepName: step.agentName, result };
+          } catch (error) {
+            inProgress.delete(step.agentName);
+
+            if (error instanceof WorkflowExecutionError) {
+              throw error;
+            }
+
             throw new WorkflowExecutionError(
-              `Agent ${step.agentName} not found`,
+              `Execution failed for agent ${step.agentName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
               step.agentName,
-              stepIndex
-            )
+              stepIndex,
+              error instanceof Error ? error : undefined
+            );
           }
-
-          inProgress.add(step.agentName)
-          
-          // Build contextual input with data sensitivity handling
-          const contextualInput = this.buildContextualInput(step, results)
-          
-          const result = await agent.execute(contextualInput)
-          
-          inProgress.delete(step.agentName)
-          completed.add(step.agentName)
-          
-          return { stepName: step.agentName, result }
-          
-        } catch (error) {
-          inProgress.delete(step.agentName)
-          
-          if (error instanceof WorkflowExecutionError) {
-            throw error
-          }
-          
-          throw new WorkflowExecutionError(
-            `Execution failed for agent ${step.agentName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            step.agentName,
-            stepIndex,
-            error instanceof Error ? error : undefined
-          )
         }
-      })
-      
+      );
+
       // Store results
       for (const { stepName, result } of levelResults) {
-        results.set(stepName, result)
+        results.set(stepName, result);
       }
     }
 
-    return results
+    return results;
   }
 
   /**
@@ -625,199 +660,210 @@ export class AgentWorkflow {
     items: T[],
     processor: (item: T, index: number) => Promise<R>
   ): Promise<R[]> {
-    const results: R[] = new Array(items.length)
-    
+    const results: R[] = new Array(items.length);
+
     // Process items in batches with controlled concurrency
     for (let i = 0; i < items.length; i += this.maxConcurrency) {
-      const batch = items.slice(i, i + this.maxConcurrency)
+      const batch = items.slice(i, i + this.maxConcurrency);
       const batchPromises = batch.map(async (item, batchIndex) => {
-        const actualIndex = i + batchIndex
+        const actualIndex = i + batchIndex;
         try {
-          const result = await processor(item, actualIndex)
-          results[actualIndex] = result
-          return result
+          const result = await processor(item, actualIndex);
+          results[actualIndex] = result;
+          return result;
         } catch (error) {
           // Re-throw to maintain error handling in calling code
-          throw error
+          throw error;
         }
-      })
-      
+      });
+
       // Wait for this batch to complete before starting the next
-      await Promise.all(batchPromises)
+      await Promise.all(batchPromises);
     }
-    
-    return results
+
+    return results;
   }
-  
+
   /**
    * Build execution order considering dependencies
    */
   private buildExecutionOrder(): void {
     // Simple topological sort for dependency resolution
-    const visited = new Set<string>()
-    const visiting = new Set<string>()
-    this.executionOrder = []
-    
+    const visited = new Set<string>();
+    const visiting = new Set<string>();
+    this.executionOrder = [];
+
     const visit = (stepId: string) => {
       if (visiting.has(stepId)) {
-        throw new Error(`Circular dependency detected involving step ${stepId}`)
+        throw new Error(
+          `Circular dependency detected involving step ${stepId}`
+        );
       }
-      
+
       if (visited.has(stepId)) {
-        return
+        return;
       }
-      
-      visiting.add(stepId)
-      
-      const step = this.workflowSteps.find(s => s.id === stepId)
+
+      visiting.add(stepId);
+
+      const step = this.workflowSteps.find((s) => s.id === stepId);
       if (step) {
         for (const dep of step.dependencies) {
-          const depStep = this.workflowSteps.find(s => s.agentName === dep)
+          const depStep = this.workflowSteps.find((s) => s.agentName === dep);
           if (depStep) {
-            visit(depStep.id)
+            visit(depStep.id);
           }
         }
       }
-      
-      visiting.delete(stepId)
-      visited.add(stepId)
-      this.executionOrder.push(stepId)
-    }
-    
+
+      visiting.delete(stepId);
+      visited.add(stepId);
+      this.executionOrder.push(stepId);
+    };
+
     for (const step of this.workflowSteps) {
-      visit(step.id)
+      visit(step.id);
     }
   }
-  
+
   /**
    * Group steps by dependency level for parallel execution
    */
-  private groupStepsByDependencyLevel(): Array<Array<typeof this.workflowSteps[number]>> {
-    const levels: Array<Array<typeof this.workflowSteps[number]>> = []
-    const processedSteps = new Set<string>()
-    
+  private groupStepsByDependencyLevel(): Array<
+    Array<(typeof this.workflowSteps)[number]>
+  > {
+    const levels: Array<Array<(typeof this.workflowSteps)[number]>> = [];
+    const processedSteps = new Set<string>();
+
     while (processedSteps.size < this.workflowSteps.length) {
-      const currentLevel: Array<typeof this.workflowSteps[number]> = []
-      
+      const currentLevel: Array<(typeof this.workflowSteps)[number]> = [];
+
       for (const step of this.workflowSteps) {
-        if (processedSteps.has(step.id)) continue
-        
+        if (processedSteps.has(step.id)) continue;
+
         // Check if all dependencies are already processed
-        const depsProcessed = step.dependencies.every(dep => 
-          processedSteps.has(dep) || 
-          this.workflowSteps.some(s => s.agentName === dep && processedSteps.has(s.id))
-        )
-        
+        const depsProcessed = step.dependencies.every(
+          (dep) =>
+            processedSteps.has(dep) ||
+            this.workflowSteps.some(
+              (s) => s.agentName === dep && processedSteps.has(s.id)
+            )
+        );
+
         if (depsProcessed || step.dependencies.length === 0) {
-          currentLevel.push(step)
-          processedSteps.add(step.id)
+          currentLevel.push(step);
+          processedSteps.add(step.id);
         }
       }
-      
+
       if (currentLevel.length === 0) {
-        throw new Error('Circular dependency detected in workflow')
+        throw new Error('Circular dependency detected in workflow');
       }
-      
+
       // Sort by priority within level
-      currentLevel.sort((a, b) => (b.priority || 0) - (a.priority || 0))
-      levels.push(currentLevel)
+      currentLevel.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+      levels.push(currentLevel);
     }
-    
-    return levels
+
+    return levels;
   }
-  
+
   /**
    * Sanitize workflow input to prevent data leakage
    */
   private sanitizeWorkflowInput(input: string): string {
     if (!input || typeof input !== 'string') {
-      return ''
+      return '';
     }
-    
+
     // Remove potential sensitive patterns
     return input
       .replace(/\b(?:password|secret|key|token)\s*[:=]\s*\S+/gi, '[REDACTED]')
       .replace(/<[^>]*>/g, '') // Remove HTML
-      .trim()
+      .trim();
   }
-  
+
   /**
    * Build contextual input with data sensitivity handling
    */
   private buildContextualInput(
-    step: typeof this.workflowSteps[number], 
+    step: (typeof this.workflowSteps)[number],
     results: Map<string, AgentResult>
   ): string {
-    let contextualInput = step.input
-    
+    let contextualInput = step.input;
+
     for (const dep of step.dependencies) {
-      const depResult = results.get(dep)
+      const depResult = results.get(dep);
       if (depResult && depResult.success) {
         // Limit context size to prevent overwhelming the agent
-        const contextSnippet = depResult.result.length > 1000 
-          ? depResult.result.substring(0, 1000) + '... [truncated]'
-          : depResult.result
-          
-        contextualInput += `\n\n--- Context from ${dep} ---\n${contextSnippet}`
+        const contextSnippet =
+          depResult.result.length > 1000
+            ? depResult.result.substring(0, 1000) + '... [truncated]'
+            : depResult.result;
+
+        contextualInput += `\n\n--- Context from ${dep} ---\n${contextSnippet}`;
       }
     }
-    
-    return contextualInput
+
+    return contextualInput;
   }
-  
+
   /**
    * Get workflow statistics
    */
   getWorkflowStats(): {
-    totalSteps: number
-    totalAgents: number
-    maxDependencyDepth: number
-    hasCircularDependencies: boolean
+    totalSteps: number;
+    totalAgents: number;
+    maxDependencyDepth: number;
+    hasCircularDependencies: boolean;
   } {
     try {
-      this.buildExecutionOrder()
-      
+      this.buildExecutionOrder();
+
       return {
         totalSteps: this.workflowSteps.length,
         totalAgents: this.agents.size,
         maxDependencyDepth: this.calculateMaxDependencyDepth(),
-        hasCircularDependencies: false
-      }
+        hasCircularDependencies: false,
+      };
     } catch (error) {
       return {
         totalSteps: this.workflowSteps.length,
         totalAgents: this.agents.size,
         maxDependencyDepth: -1,
-        hasCircularDependencies: true
-      }
+        hasCircularDependencies: true,
+      };
     }
   }
-  
+
   private calculateMaxDependencyDepth(): number {
-    let maxDepth = 0
-    
-    const calculateDepth = (stepId: string, visited: Set<string> = new Set()): number => {
-      if (visited.has(stepId)) return 0
-      visited.add(stepId)
-      
-      const step = this.workflowSteps.find(s => s.id === stepId)
-      if (!step || step.dependencies.length === 0) return 0
-      
-      const depDepths = step.dependencies.map(dep => {
-        const depStep = this.workflowSteps.find(s => s.agentName === dep)
-        return depStep ? calculateDepth(depStep.id, new Set(visited)) : 0
-      })
-      
-      return Math.max(...depDepths) + 1
-    }
-    
+    let maxDepth = 0;
+
+    const calculateDepth = (
+      stepId: string,
+      visited: Set<string> = new Set()
+    ): number => {
+      if (visited.has(stepId)) return 0;
+      visited.add(stepId);
+
+      const step = this.workflowSteps.find((s) => s.id === stepId);
+      if (!step || step.dependencies.length === 0) return 0;
+
+      const depDepths = step.dependencies.map((dep) => {
+        const depStep = this.workflowSteps.find((s) => s.agentName === dep);
+        return depStep ? calculateDepth(depStep.id, new Set(visited)) : 0;
+      });
+
+      return Math.max(...depDepths) + 1;
+    };
+
     for (const step of this.workflowSteps) {
-      maxDepth = Math.max(maxDepth, calculateDepth(step.id))
+      maxDepth = Math.max(maxDepth, calculateDepth(step.id));
     }
-    
-    return maxDepth
+
+    return maxDepth;
   }
 }
 
 // Export custom error types
-export { WorkflowExecutionError, DependencyError }
+export { WorkflowExecutionError, DependencyError };
