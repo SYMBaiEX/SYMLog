@@ -8,6 +8,11 @@ import {
   type TextStreamPart,
   type ToolSet,
   tool,
+  stepCountIs,
+  type StopCondition,
+  type PrepareStepResult,
+  type ModelMessage,
+  Output,
 } from 'ai';
 import type { z } from 'zod';
 import { getAIModel } from './providers';
@@ -479,6 +484,41 @@ const customSpanProcessor = {
     );
   },
 };
+
+// Message part types for enhanced message handling
+export interface MessagePart {
+  type: 'text' | 'tool-call' | 'tool-result' | 'step-start' | 'reasoning' | 'file' | 'image';
+  content?: string;
+  text?: string;
+  toolCallId?: string;
+  toolName?: string;
+  input?: any;
+  output?: any;
+  state?: 'input-available' | 'output-available' | 'output-error';
+  errorText?: string;
+  mediaType?: string;
+  data?: string | Uint8Array;
+}
+
+// Enhanced message with parts structure
+export interface EnhancedMessage {
+  role: 'user' | 'assistant' | 'system' | 'tool';
+  content?: string;
+  parts?: MessagePart[];
+}
+
+// Prepare step options
+export interface PrepareStepOptions {
+  stepNumber: number;
+  steps: any[];
+  messages: ModelMessage[];
+  model: LanguageModel;
+}
+
+// Prepare step callback type
+export type PrepareStepCallback = (
+  options: PrepareStepOptions
+) => Promise<PrepareStepResult<any>> | PrepareStepResult<any>;
 
 /**
  * Experimental AI features and edge case handling
@@ -1130,6 +1170,310 @@ export class ExperimentalAI {
       },
     });
   }
+
+  /**
+   * Generate with step continuation support (replaces experimental_continueSteps)
+   */
+  async generateWithStepContinuation(
+    prompt: string,
+    options?: {
+      model?: string;
+      maxSteps?: number;
+      stopWhen?: StopCondition<any> | StopCondition<any>[];
+      prepareStep?: PrepareStepCallback;
+      tools?: Record<string, any>;
+      onStepFinish?: (result: any) => void | Promise<void>;
+    }
+  ) {
+    const maxSteps = options?.maxSteps || 5;
+    const stopConditions = options?.stopWhen || stepCountIs(maxSteps);
+    
+    return await generateText({
+      model: getAIModel(options?.model),
+      prompt,
+      tools: options?.tools || enhancedArtifactTools,
+      stopWhen: stopConditions,
+      prepareStep: options?.prepareStep,
+      onStepFinish: options?.onStepFinish,
+    });
+  }
+
+  /**
+   * Enhanced message handling with parts structure
+   */
+  transformToEnhancedMessages(messages: ModelMessage[]): EnhancedMessage[] {
+    return messages.map((message) => {
+      const enhanced: EnhancedMessage = {
+        role: message.role,
+      };
+
+      // Handle different message content types
+      if (typeof message.content === 'string') {
+        enhanced.content = message.content;
+        enhanced.parts = [{ type: 'text', text: message.content }];
+      } else if (Array.isArray(message.content)) {
+        enhanced.parts = message.content.map((part: any) => {
+          if (part.type === 'text') {
+            return { type: 'text', text: part.text };
+          } else if (part.type === 'image') {
+            return {
+              type: 'image',
+              data: part.image,
+              mediaType: 'image/png',
+            };
+          } else if (part.type === 'tool-call') {
+            return {
+              type: 'tool-call',
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              input: part.input,
+            };
+          } else if (part.type === 'tool-result') {
+            return {
+              type: 'tool-result',
+              toolCallId: part.toolCallId,
+              toolName: part.toolName,
+              output: part.output,
+            };
+          }
+          return part;
+        });
+      }
+
+      return enhanced;
+    });
+  }
+
+  /**
+   * Generate with structured output support (experimental_output)
+   */
+  async generateWithStructuredOutput<T>(
+    prompt: string,
+    options?: {
+      model?: string;
+      outputType: 'text' | 'object';
+      schema?: z.ZodSchema<T>;
+      onPartialOutput?: (partial: Partial<T>) => void;
+    }
+  ) {
+    if (options?.outputType === 'object' && options.schema) {
+      // Use experimental_output for structured generation
+      const output = Output.object({
+        schema: options.schema,
+      });
+
+      return await generateText({
+        model: getAIModel(options?.model),
+        prompt,
+        experimental_output: output,
+      });
+    } else {
+      // Text output
+      const output = Output.text();
+
+      return await generateText({
+        model: getAIModel(options?.model),
+        prompt,
+        experimental_output: output,
+      });
+    }
+  }
+
+  /**
+   * Stream with structured output and partial output stream
+   */
+  async streamWithStructuredOutput<T>(
+    prompt: string,
+    options?: {
+      model?: string;
+      outputType: 'text' | 'object';
+      schema?: z.ZodSchema<T>;
+      onPartialOutput?: (partial: Partial<T>) => void;
+    }
+  ) {
+    let output: any;
+
+    if (options?.outputType === 'object' && options.schema) {
+      output = Output.object({
+        schema: options.schema,
+      });
+    } else {
+      output = Output.text();
+    }
+
+    const stream = await streamText({
+      model: getAIModel(options?.model),
+      prompt,
+      experimental_output: output,
+    });
+
+    // Handle partial output stream if available
+    if ('experimental_partialOutputStream' in stream && options?.onPartialOutput) {
+      (async () => {
+        for await (const partialOutput of stream.experimental_partialOutputStream) {
+          options.onPartialOutput(partialOutput);
+        }
+      })();
+    }
+
+    return stream;
+  }
+
+  /**
+   * Generate with dynamic tool control using activeTools
+   */
+  async generateWithDynamicTools(
+    prompt: string,
+    options?: {
+      model?: string;
+      tools?: Record<string, any>;
+      initialActiveTools?: string[];
+      prepareStep?: (options: PrepareStepOptions) => {
+        activeTools?: string[];
+        toolChoice?: any;
+        model?: LanguageModel;
+        system?: string;
+      } | Promise<{
+        activeTools?: string[];
+        toolChoice?: any;
+        model?: LanguageModel;
+        system?: string;
+      }>;
+      maxSteps?: number;
+    }
+  ) {
+    const tools = options?.tools || enhancedArtifactTools;
+    const activeTools = options?.initialActiveTools || Object.keys(tools);
+
+    return await generateText({
+      model: getAIModel(options?.model),
+      prompt,
+      tools,
+      activeTools,
+      stopWhen: stepCountIs(options?.maxSteps || 5),
+      prepareStep: options?.prepareStep || (({ stepNumber }) => {
+        // Dynamic tool activation based on step
+        if (stepNumber === 0) {
+          return { activeTools: activeTools.slice(0, 2) };
+        } else if (stepNumber === 1) {
+          return { activeTools: activeTools.slice(2, 4) };
+        }
+        return { activeTools };
+      }),
+    });
+  }
+
+  /**
+   * Message management utilities
+   */
+  compressMessageHistory(
+    messages: ModelMessage[],
+    options?: {
+      maxMessages?: number;
+      preserveSystemMessages?: boolean;
+      preserveToolMessages?: boolean;
+      summarize?: boolean;
+    }
+  ): ModelMessage[] {
+    const maxMessages = options?.maxMessages || 10;
+    let compressed: ModelMessage[] = [];
+
+    // Always preserve system messages if requested
+    if (options?.preserveSystemMessages) {
+      compressed = messages.filter((m) => m.role === 'system');
+    }
+
+    // Get recent messages
+    const recentMessages = messages.slice(-maxMessages);
+
+    // Preserve tool messages if requested
+    if (options?.preserveToolMessages) {
+      const toolMessages = recentMessages.filter((m) => m.role === 'tool');
+      compressed.push(...toolMessages);
+    }
+
+    // Add remaining messages
+    const remaining = maxMessages - compressed.length;
+    if (remaining > 0) {
+      const nonSpecialMessages = recentMessages.filter(
+        (m) => m.role !== 'system' && m.role !== 'tool'
+      );
+      compressed.push(...nonSpecialMessages.slice(-remaining));
+    }
+
+    // Sort by original order
+    compressed.sort((a, b) => {
+      const indexA = messages.indexOf(a);
+      const indexB = messages.indexOf(b);
+      return indexA - indexB;
+    });
+
+    return compressed;
+  }
+
+  /**
+   * Generate with message parts manipulation
+   */
+  async generateWithMessageParts(
+    messages: EnhancedMessage[],
+    options?: {
+      model?: string;
+      tools?: Record<string, any>;
+      maxSteps?: number;
+      onMessagePart?: (part: MessagePart) => void;
+    }
+  ) {
+    // Convert enhanced messages to standard format
+    const standardMessages: ModelMessage[] = messages.map((msg) => {
+      if (msg.parts && msg.parts.length > 0) {
+        return {
+          role: msg.role,
+          content: msg.parts,
+        };
+      }
+      return {
+        role: msg.role,
+        content: msg.content || '',
+      };
+    });
+
+    return await generateText({
+      model: getAIModel(options?.model),
+      messages: standardMessages,
+      tools: options?.tools,
+      stopWhen: stepCountIs(options?.maxSteps || 5),
+      onStepFinish: ({ steps }) => {
+        // Process message parts from steps
+        const lastStep = steps[steps.length - 1];
+        if (lastStep && options?.onMessagePart) {
+          // Extract and process parts
+          if (lastStep.text) {
+            options.onMessagePart({ type: 'text', text: lastStep.text });
+          }
+          if (lastStep.toolCalls) {
+            lastStep.toolCalls.forEach((call: any) => {
+              options.onMessagePart({
+                type: 'tool-call',
+                toolCallId: call.id,
+                toolName: call.toolName,
+                input: call.input,
+              });
+            });
+          }
+          if (lastStep.toolResults) {
+            lastStep.toolResults.forEach((result: any) => {
+              options.onMessagePart({
+                type: 'tool-result',
+                toolCallId: result.toolCallId,
+                toolName: result.toolName,
+                output: result.output,
+              });
+            });
+          }
+        }
+      },
+    });
+  }
   /**
    * Generate with provider metadata collection
    */
@@ -1372,16 +1716,9 @@ export const transformPresets = {
   ],
 };
 
-// Export experimental utilities
+// Export experimental utilities and types
 export {
   customSpanProcessor,
-  // Transform creators
-  createCompressionTransform,
-  createMetricsTransform,
-  createDebugTransform,
-  createFilterTransform,
-  // Provider metadata
-  ProviderMetricsCollector,
   globalMetricsCollector,
   // Types
   type ExperimentalAI,
@@ -1393,4 +1730,9 @@ export {
   type DebugEvent,
   type ProviderMetricsData,
   type ProviderMetricsCollectorConfig,
+  // New experimental types
+  type MessagePart,
+  type EnhancedMessage,
+  type PrepareStepOptions,
+  type PrepareStepCallback,
 };
