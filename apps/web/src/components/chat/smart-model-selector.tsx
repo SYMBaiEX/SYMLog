@@ -123,10 +123,19 @@ export function SmartModelSelector({
     const optimalModel = suggestions.recommended[0]?.id || 'gpt-4.1-nano';
 
     // Get alternative models for comparison
-    const minimalSuggestions = modelOrchestrator.getModelSuggestions({ ...analysis, budget: 'minimal' });
-    const premiumSuggestions = modelOrchestrator.getModelSuggestions({ ...analysis, budget: 'premium' });
-    const balancedSuggestions = modelOrchestrator.getModelSuggestions({ ...analysis, budget: 'balanced' });
-    
+    const minimalSuggestions = modelOrchestrator.getModelSuggestions({
+      ...analysis,
+      budget: 'minimal',
+    });
+    const premiumSuggestions = modelOrchestrator.getModelSuggestions({
+      ...analysis,
+      budget: 'premium',
+    });
+    const balancedSuggestions = modelOrchestrator.getModelSuggestions({
+      ...analysis,
+      budget: 'balanced',
+    });
+
     const alternatives = [
       minimalSuggestions.recommended[0]?.id,
       premiumSuggestions.recommended[0]?.id,
@@ -178,7 +187,10 @@ export function SmartModelSelector({
     const performance = modelOrchestrator.getModelPerformance(model);
 
     return {
-      cost: typeof cost === 'object' && cost !== null && 'total' in cost ? (cost as any).total : 0,
+      cost:
+        typeof cost === 'object' && cost !== null && 'total' in cost
+          ? (cost as any).total
+          : 0,
       latency: performance?.averageLatency || 0,
       success: performance?.successRate || 0,
     };
@@ -293,7 +305,8 @@ function calculateConfidence(message: string, taskType: ModelRole): number {
       /\\b(analyze|explain|solve|complex|mathematical|theory|logic|proof)\\b/gi,
     embedding: /\\b(search|find|similar|semantic|vector|recommendation)\\b/gi,
     conversation: /\\b(help|tell|what|how|can|please|thank)\\b/gi,
-    research: /\\b(research|investigate|study|comprehensive|detailed|analysis)\\b/gi,
+    research:
+      /\\b(research|investigate|study|comprehensive|detailed|analysis)\\b/gi,
     function: /\\b(tool|execute|run|perform|action|operation)\\b/gi,
   };
 

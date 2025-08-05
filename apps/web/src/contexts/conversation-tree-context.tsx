@@ -173,12 +173,10 @@ export function ConversationTreeProvider({
       const tree = treeManager.getTree();
 
       // Set up event listener for tree changes
-      const unsubscribe = treeManager.subscribe(
-        (change: TreeStateChange) => {
-          const navigationState = treeManager.getNavigationState();
-          dispatch({ type: 'UPDATE_NAVIGATION', payload: { navigationState } });
-        }
-      );
+      const unsubscribe = treeManager.subscribe((change: TreeStateChange) => {
+        const navigationState = treeManager.getNavigationState();
+        dispatch({ type: 'UPDATE_NAVIGATION', payload: { navigationState } });
+      });
 
       dispatch({
         type: 'INITIALIZE_TREE',
@@ -241,7 +239,9 @@ export function ConversationTreeProvider({
   const createBranch = useCallback(
     (fromNodeId: string, branchName?: string): string => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      const metadata: Partial<BranchMetadata> = branchName ? { name: branchName } : {};
+      const metadata: Partial<BranchMetadata> = branchName
+        ? { name: branchName }
+        : {};
       return state.treeManager.createBranch(fromNodeId, metadata);
     },
     [state.treeManager]
@@ -251,7 +251,7 @@ export function ConversationTreeProvider({
     (branchId: string): void => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
       // Switch to branch by switching to the branch's leaf node
-      const branch = state.currentTree?.branches.find(b => b.id === branchId);
+      const branch = state.currentTree?.branches.find((b) => b.id === branchId);
       if (branch) {
         state.treeManager.switchToNode(branch.leafNodeId);
       }
@@ -344,7 +344,9 @@ export function ConversationTreeProvider({
   const createBranchFromMessage = useCallback(
     (nodeId: string, branchName?: string): string => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      const metadata: Partial<BranchMetadata> = branchName ? { name: branchName } : {};
+      const metadata: Partial<BranchMetadata> = branchName
+        ? { name: branchName }
+        : {};
       return state.treeManager.createBranch(nodeId, metadata);
     },
     [state.treeManager]

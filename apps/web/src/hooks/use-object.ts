@@ -187,7 +187,8 @@ export function useProgressiveObject<T extends Record<string, any>>(
   const [currentFieldIndex, setCurrentFieldIndex] = useState(0);
   const [isComplete, setIsComplete] = useState(false);
 
-  const fields = options?.fields || Object.keys((schema as any)._def?.shape || {});
+  const fields =
+    options?.fields || Object.keys((schema as any)._def?.shape || {});
   const currentField = fields[currentFieldIndex];
 
   // Note: Progressive field generation requires a different approach in AI SDK v5
@@ -199,15 +200,17 @@ export function useProgressiveObject<T extends Record<string, any>>(
       // For now, we'll generate the entire object and extract the current field
       // In a production app, you'd want to implement proper field-by-field generation
       // using separate useObject instances or a different pattern
-      
+
       try {
         const fieldSchema = (schema as any)._def?.shape?.[currentField];
         if (!fieldSchema) return;
 
         // This is a simplified approach - in practice, you'd need a more sophisticated
         // field-by-field generation system
-        console.warn('Progressive object generation needs to be implemented with proper patterns for AI SDK v5');
-        
+        console.warn(
+          'Progressive object generation needs to be implemented with proper patterns for AI SDK v5'
+        );
+
         // Move to next field for now
         if (currentFieldIndex < fields.length - 1) {
           setCurrentFieldIndex((prev) => prev + 1);
@@ -292,9 +295,12 @@ function generateSchemaHints(schema: z.ZodSchema<any>): string {
 
       for (const [key, value] of Object.entries(shape)) {
         const fieldSchema = value as z.ZodSchema<any>;
-        const type = ('_def' in fieldSchema && (fieldSchema as any)._def.typeName) 
-          ? (fieldSchema as any)._def.typeName.replace('Zod', '').toLowerCase()
-          : 'unknown';
+        const type =
+          '_def' in fieldSchema && (fieldSchema as any)._def.typeName
+            ? (fieldSchema as any)._def.typeName
+                .replace('Zod', '')
+                .toLowerCase()
+            : 'unknown';
         const isOptional = fieldSchema.isOptional();
 
         hints.push(
@@ -303,7 +309,9 @@ function generateSchemaHints(schema: z.ZodSchema<any>): string {
 
         // Add enum values if present
         if ('_def' in fieldSchema && (fieldSchema as any)._def.values) {
-          hints.push(`  Values: ${(fieldSchema as any)._def.values.join(', ')}`);
+          hints.push(
+            `  Values: ${(fieldSchema as any)._def.values.join(', ')}`
+          );
         }
       }
 

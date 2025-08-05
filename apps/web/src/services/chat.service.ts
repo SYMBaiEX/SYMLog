@@ -235,7 +235,8 @@ export class ChatService {
             selectedModel,
             taskType: modelConfig.role,
             latency,
-            estimatedCost: typeof cost === 'object' && cost !== null ? cost.total : 0,
+            estimatedCost:
+              typeof cost === 'object' && cost !== null ? cost.total : 0,
           });
 
           logSecurityEvent({
@@ -249,7 +250,10 @@ export class ChatService {
               totalTokens: usage?.totalTokens ?? 0,
               promptTokens: (usage as any).promptTokens ?? 0,
               completionTokens: (usage as any).completionTokens ?? 0,
-              estimatedCost: typeof cost === 'object' && cost !== null && 'total' in cost ? (cost as any).total : 0,
+              estimatedCost:
+                typeof cost === 'object' && cost !== null && 'total' in cost
+                  ? (cost as any).total
+                  : 0,
               latency,
               finishReason,
             },

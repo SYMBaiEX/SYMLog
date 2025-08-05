@@ -140,7 +140,12 @@ export class StructuredMemoizer {
     const resultKey =
       options?.customKey ||
       this.generateResultKey({
-        model: typeof model === 'string' ? model : (model as any).modelId || (model as any).specificationVersion || 'unknown',
+        model:
+          typeof model === 'string'
+            ? model
+            : (model as any).modelId ||
+              (model as any).specificationVersion ||
+              'unknown',
         prompt,
         schemaKey,
         temperature: options?.temperature,
@@ -184,11 +189,11 @@ export class StructuredMemoizer {
         prompt,
         schema: optimizedSchema,
       };
-      
+
       if (options?.temperature !== undefined) {
         generateParams.temperature = options.temperature;
       }
-      
+
       const result = await generateObject(generateParams);
 
       const computationTime = Date.now() - startTime;
@@ -229,7 +234,12 @@ export class StructuredMemoizer {
     const resultKey =
       options?.customKey ||
       this.generateResultKey({
-        model: typeof model === 'string' ? model : (model as any).modelId || (model as any).specificationVersion || 'unknown',
+        model:
+          typeof model === 'string'
+            ? model
+            : (model as any).modelId ||
+              (model as any).specificationVersion ||
+              'unknown',
         prompt,
         schemaKey: this.generateSchemaKey(schema),
         temperature: options?.temperature,
@@ -259,11 +269,11 @@ export class StructuredMemoizer {
         prompt,
         schema,
       };
-      
+
       if (options?.temperature !== undefined) {
         streamParams.temperature = options.temperature;
       }
-      
+
       const stream = await streamObject(streamParams);
 
       // Create caching stream
@@ -295,7 +305,7 @@ export class StructuredMemoizer {
       schema: z.ZodSchema<T>;
       options?: {
         temperature?: number;
-          dependencies?: string[];
+        dependencies?: string[];
         customKey?: string;
       };
     }>

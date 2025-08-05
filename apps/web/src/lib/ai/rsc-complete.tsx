@@ -117,7 +117,7 @@ export async function streamingChat(
 ) {
   'use server';
 
-  const aiState = getMutableAIState<AIState>();
+  const aiState = getMutableAIState();
   const streamableUI = createStreamableUI();
 
   // Add user message to state
@@ -170,37 +170,57 @@ export async function streamingChat(
     const result = await streamUI({
       model: getAIModel(),
       messages: aiState.get().messages,
-      prepareStep: prepareStepFunction,
       text: ({ content, done }: { content: string; done: boolean }) => {
         if (done) {
-          // Final message
-          streamableUI.done(<ChatMessage content={content} role="assistant" />);
-          
           // Update AI state
           aiState.update((state: AIState) => ({
             ...state,
-            messages: [...state.messages, { role: 'assistant', content }]
+            messages: [...state.messages, { role: 'assistant', content }],
           }));
-        } else {
-          // Streaming message
-          streamableUI.update(<ChatMessage content={content} streaming role="assistant" />);
+
+          // Final message
+          const finalUI = <ChatMessage content={content} role="assistant" />;
+          streamableUI.done(finalUI);
+          return finalUI;
         }
+        // Streaming message
+        const streamingUI = (
+          <ChatMessage content={content} role="assistant" streaming />
+        );
+        streamableUI.update(streamingUI);
+        return streamingUI;
       },
       tools: {
         createArtifact: {
           description: 'Create an interactive artifact',
-          parameters: z.object({
+          inputSchema: z.object({
             type: z.enum(['code', 'document', 'chart', 'data']),
             title: z.string(),
             content: z.any(),
-            language: z.string().optional()
+            language: z.string().optional(),
           }),
-          async *generate({ type, title, content, language }: { type: string; title: string; content: any; language?: string }) {
+          async *generate({
+            type,
+            title,
+            content,
+            language,
+          }: {
+            type: string;
+            title: string;
+            content: any;
+            language?: string;
+          }) {
             // Show creation progress
             streamableUI.update(
               <div>
-                <ChatMessage content={`Creating ${type}: ${title}...`} role="assistant" />
-                <StreamingIndicator message="Generating artifact..." progress={50} />
+                <ChatMessage
+                  content={`Creating ${type}: ${title}...`}
+                  role="assistant"
+                />
+                <StreamingIndicator
+                  message="Generating artifact..."
+                  progress={50}
+                />
               </div>
             );
 
@@ -213,13 +233,13 @@ export async function streamingChat(
               type,
               content,
               createdAt: Date.now(),
-              metadata: { title, language }
+              metadata: { title, language },
             };
 
             // Update AI state
             aiState.update((state: AIState) => ({
               ...state,
-              artifacts: [...state.artifacts, artifact]
+              artifacts: [...state.artifacts, artifact],
             }));
 
             yield <StreamingIndicator message="Finalizing artifact..." />;
@@ -227,39 +247,76 @@ export async function streamingChat(
             // Show the artifact
             streamableUI.done(
               <div>
-                <ChatMessage content={`Created ${type}: ${title}`} role="assistant" />
-                <ArtifactViewer 
-                  type={type} 
+                <ChatMessage
+                  content={`Created ${type}: ${title}`}
+                  role="assistant"
+                />
+                <ArtifactViewer
                   content={content}
                   editable
                   onEdit={(newContent) => {
                     // Handle artifact editing
                     aiState.update((state: AIState) => ({
                       ...state,
-                      artifacts: state.artifacts.map((a: AIState['artifacts'][0]) => 
-                        a.id === artifactId ? { ...a, content: newContent } : a
-                      )
-                    }))
+                      artifacts: state.artifacts.map(
+                        (a: AIState['artifacts'][0]) =>
+                          a.id === artifactId
+                            ? { ...a, content: newContent }
+                            : a
+                      ),
+                    }));
                   }}
+                  type={type}
                 />
               </div>
             );
 
-            return { created: true, artifactId };
-          }
+            const finalResult = (
+              <div>
+                <ChatMessage
+                  content={`Created ${type}: ${title}`}
+                  role="assistant"
+                />
+                <ArtifactViewer
+                  content={content}
+                  editable
+                  onEdit={(newContent) => {
+                    aiState.update((state: AIState) => ({
+                      ...state,
+                      artifacts: state.artifacts.map(
+                        (a: AIState['artifacts'][0]) =>
+                          a.id === artifactId
+                            ? { ...a, content: newContent }
+                            : a
+                      ),
+                    }));
+                  }}
+                  type={type}
+                />
+              </div>
+            );
+
+            return finalResult;
+          },
         },
         runWorkflow: {
           description: 'Execute a multi-step workflow',
-          parameters: z.object({
-            steps: z.array(z.object({
-              name: z.string(),
-              action: z.string(),
-              params: z.any().optional()
-            }))
+          inputSchema: z.object({
+            steps: z.array(
+              z.object({
+                name: z.string(),
+                action: z.string(),
+                params: z.any().optional(),
+              })
+            ),
           }),
-          generate: async function* ({ steps }: { steps: Array<{ name: string; action: string; params?: any }> }) {
+          async *generate({
+            steps,
+          }: {
+            steps: Array<{ name: string; action: string; params?: any }>;
+          }) {
             const workflowUI = createStreamableUI();
-            
+
             // Show workflow UI
             streamableUI.update(
               <div>
@@ -276,72 +333,112 @@ export async function streamingChat(
                 workflow: [
                   ...state.workflow.slice(0, index),
                   { step: step.name, status: 'pending' },
-                  ...state.workflow.slice(index + 1)
-                ]
-              }))
+                  ...state.workflow.slice(index + 1),
+                ],
+              }));
 
               // Show step UI
               workflowUI.update(
                 <div>
-                  {steps.map((s: { name: string; action: string; params?: any }, i: number) => (
-                    <WorkflowStep
-                      key={i}
-                      step={s.name}
-                      status={i === index ? 'running' : i < index ? 'completed' : 'pending'}
-                    />
-                  ))}
+                  {steps.map(
+                    (
+                      s: { name: string; action: string; params?: any },
+                      i: number
+                    ) => (
+                      <WorkflowStep
+                        key={i}
+                        status={
+                          i === index
+                            ? 'running'
+                            : i < index
+                              ? 'completed'
+                              : 'pending'
+                        }
+                        step={s.name}
+                      />
+                    )
+                  )}
                 </div>
               );
 
-              yield <StreamingIndicator message={`Executing step: ${step.name}`} />; 
+              yield (
+                <StreamingIndicator message={`Executing step: ${step.name}`} />
+              );
 
               // Simulate step execution
-              await new Promise(resolve => setTimeout(resolve, 1000));
+              await new Promise((resolve) => setTimeout(resolve, 1000));
 
               // Update step as completed
               aiState.update((state: AIState) => ({
                 ...state,
-                workflow: state.workflow.map((w: AIState['workflow'][0], i: number) => 
-                  i === index ? { ...w, status: 'completed', result: `Step ${index + 1} completed` } : w
-                )
+                workflow: state.workflow.map(
+                  (w: AIState['workflow'][0], i: number) =>
+                    i === index
+                      ? {
+                          ...w,
+                          status: 'completed',
+                          result: `Step ${index + 1} completed`,
+                        }
+                      : w
+                ),
               }));
 
-              yield <StreamingIndicator message={`Completed step: ${step.name}`} />;
+              yield (
+                <StreamingIndicator message={`Completed step: ${step.name}`} />
+              );
             }
 
             // Final workflow UI
             workflowUI.done(
               <div>
-                {steps.map((s: { name: string; action: string; params?: any }, i: number) => (
-                  <WorkflowStep
-                    key={i}
-                    step={s.name}
-                    status="completed"
-                    result={aiState.get().workflow[i]?.result}
-                  />
-                ))}
+                {steps.map(
+                  (
+                    s: { name: string; action: string; params?: any },
+                    i: number
+                  ) => (
+                    <WorkflowStep
+                      key={i}
+                      result={aiState.get().workflow[i]?.result}
+                      status="completed"
+                      step={s.name}
+                    />
+                  )
+                )}
               </div>
             );
 
             streamableUI.done(
               <div>
-                <ChatMessage content="Workflow completed successfully!" role="assistant" />
+                <ChatMessage
+                  content="Workflow completed successfully!"
+                  role="assistant"
+                />
                 {workflowUI.value}
               </div>
             );
 
-            return { completed: true, steps: steps.length };
-          }
-        }
-      }
+            const workflowResult = (
+              <div>
+                <ChatMessage
+                  content="Workflow completed successfully!"
+                  role="assistant"
+                />
+                {workflowUI.value}
+              </div>
+            );
+
+            return workflowResult;
+          },
+        },
+      },
     });
 
     return streamableUI.value;
   } catch (error) {
     streamableUI.done(
-      <ChatMessage 
-        content={`Error: ${error instanceof Error ? error.message : 'Unknown error'}`} 
-        role="assistant" 
+      <ChatMessage
+        content={`Error: ${error instanceof Error ? error.message : 'Unknown error'}`}
+        role="assistant"
       />
     );
     throw error;
@@ -354,7 +451,7 @@ export async function streamingChat(
 export async function streamingWorkflow(workflowName: string, steps: any[]) {
   'use server';
 
-  const aiState = getMutableAIState<AIState>();
+  const aiState = getMutableAIState();
   const progressStream = createStreamableValue<number>();
   const statusStream = createStreamableValue<string>();
   const resultsStream = createStreamableValue<any[]>();
@@ -362,10 +459,12 @@ export async function streamingWorkflow(workflowName: string, steps: any[]) {
   // Initialize workflow in state
   aiState.update((state: AIState) => ({
     ...state,
-    workflow: steps.map((step: { name: string; action: string; params?: any }) => ({
-      step: step.name,
-      status: 'pending' as const
-    }))
+    workflow: steps.map(
+      (step: { name: string; action: string; params?: any }) => ({
+        step: step.name,
+        status: 'pending' as const,
+      })
+    ),
   }));
 
   // Execute workflow
@@ -374,21 +473,21 @@ export async function streamingWorkflow(workflowName: string, steps: any[]) {
 
     for (const [index, step] of steps.entries()) {
       const progress = ((index + 1) / steps.length) * 100;
-      
+
       progressStream.update(progress);
       statusStream.update(`Executing: ${step.name}`);
 
       // Update step status
       aiState.update((state: AIState) => ({
         ...state,
-        workflow: state.workflow.map((w: AIState['workflow'][0], i: number) => 
+        workflow: state.workflow.map((w: AIState['workflow'][0], i: number) =>
           i === index ? { ...w, status: 'pending' } : w
-        )
+        ),
       }));
 
       try {
         // Execute step (simulation)
-        const result = await new Promise(resolve => 
+        const result = await new Promise((resolve) =>
           setTimeout(() => resolve(`Result of ${step.name}`), 1000)
         );
 
@@ -398,22 +497,24 @@ export async function streamingWorkflow(workflowName: string, steps: any[]) {
         // Update step as completed
         aiState.update((state: AIState) => ({
           ...state,
-          workflow: state.workflow.map((w: AIState['workflow'][0], i: number) => 
-            i === index ? { ...w, status: 'completed', result } : w
-          )
+          workflow: state.workflow.map(
+            (w: AIState['workflow'][0], i: number) =>
+              i === index ? { ...w, status: 'completed', result } : w
+          ),
         }));
       } catch (error) {
-        results.push({ 
-          step: step.name, 
+        results.push({
+          step: step.name,
           error: error instanceof Error ? error.message : 'Unknown error',
-          success: false 
+          success: false,
         });
-        
+
         aiState.update((state: AIState) => ({
           ...state,
-          workflow: state.workflow.map((w: AIState['workflow'][0], i: number) => 
-            i === index ? { ...w, status: 'failed' } : w
-          )
+          workflow: state.workflow.map(
+            (w: AIState['workflow'][0], i: number) =>
+              i === index ? { ...w, status: 'failed' } : w
+          ),
         }));
       }
     }
@@ -430,7 +531,7 @@ export async function streamingWorkflow(workflowName: string, steps: any[]) {
   return {
     progress: progressStream.value,
     status: statusStream.value,
-    results: resultsStream.value
+    results: resultsStream.value,
   };
 }
 
@@ -443,7 +544,7 @@ export async function generateArtifact(
 ) {
   'use server';
 
-  const aiState = getMutableAIState<AIState>();
+  const aiState = getMutableAIState();
   const artifactStream = createStreamableUI();
   const metadataStream = createStreamableValue<any>();
 
@@ -458,24 +559,34 @@ export async function generateArtifact(
       model: getAIModel(),
       prompt: `Generate a ${type} artifact based on: ${requirements}`,
       text: ({ content, done }: { content: string; done: boolean }) => {
-        if (!done) {
-          artifactStream.update(
-            <StreamingIndicator 
-              message={`Generating ${type}...`} 
-              progress={50} 
-            />
+        if (done) {
+          return (
+            <StreamingIndicator message={`Generated ${type}`} progress={100} />
           );
         }
+        const progressUI = (
+          <StreamingIndicator message={`Generating ${type}...`} progress={50} />
+        );
+        artifactStream.update(progressUI);
+        return progressUI;
       },
       tools: {
         createSpecificArtifact: {
           description: `Create ${type} artifact`,
-          parameters: z.object({
+          inputSchema: z.object({
             title: z.string(),
             content: z.any(),
-            metadata: z.any().optional()
+            metadata: z.any().optional(),
           }),
-          generate: async function* ({ title, content, metadata }: { title: string; content: any; metadata?: any }) {
+          async *generate({
+            title,
+            content,
+            metadata,
+          }: {
+            title: string;
+            content: any;
+            metadata?: any;
+          }) {
             yield <StreamingIndicator message="Generating artifact..." />;
 
             const artifactId = `artifact_${Date.now()}`;
@@ -484,13 +595,13 @@ export async function generateArtifact(
               type,
               content,
               createdAt: Date.now(),
-              metadata: { ...metadata, title }
+              metadata: { ...metadata, title },
             };
 
             // Update AI state
             aiState.update((state: AIState) => ({
               ...state,
-              artifacts: [...state.artifacts, artifact]
+              artifacts: [...state.artifacts, artifact],
             }));
 
             // Update metadata stream
@@ -498,28 +609,31 @@ export async function generateArtifact(
 
             // Show final artifact
             artifactStream.done(
-              <ArtifactViewer
-                type={type}
-                content={content}
-                editable
-              />
+              <ArtifactViewer content={content} editable type={type} />
             );
 
             metadataStream.done();
 
-            return { artifactId, created: true };
-          }
-        }
-      }
+            const artifactResult = (
+              <ArtifactViewer content={content} editable type={type} />
+            );
+
+            return artifactResult;
+          },
+        },
+      },
     });
 
     return {
       ui: artifactStream.value,
-      metadata: metadataStream.value
+      metadata: metadataStream.value,
     };
   } catch (error) {
     artifactStream.done(
-      <div>Error generating artifact: {error instanceof Error ? error.message : 'Unknown error'}</div>
+      <div>
+        Error generating artifact:{' '}
+        {error instanceof Error ? error.message : 'Unknown error'}
+      </div>
     );
     metadataStream.error(error as Error);
     throw error;
@@ -533,22 +647,22 @@ export const AIProvider = createAI<AIState, UIState>({
   actions: {
     streamingChat,
     streamingWorkflow,
-    generateArtifact
+    generateArtifact,
   },
   initialAIState: {
     messages: [],
     artifacts: [],
     workflow: [],
     context: {
-      sessionId: crypto.randomUUID()
-    }
+      sessionId: crypto.randomUUID(),
+    },
   },
   initialUIState: {
-    messages: []
+    messages: [],
   },
   onSetAIState: async ({ state, done }: { state: AIState; done: boolean }) => {
     'use server';
-    
+
     // Save state to database when done
     if (done) {
       // await saveAIState(state)
@@ -557,31 +671,35 @@ export const AIProvider = createAI<AIState, UIState>({
   },
   onGetUIState: async () => {
     'use server';
-    
-    const aiState = getAIState<AIState>();
-    
+
+    const aiState = getAIState();
+
     // Convert AI state to UI state
     const uiState: UIState = {
       messages: aiState.messages.map((message: CoreMessage, index: number) => ({
         id: `msg_${index}`,
         role: message.role as 'user' | 'assistant',
-        content: <ChatMessage content={message.content as string} role={message.role as any} />,
-        timestamp: Date.now()
-      }))
+        content: (
+          <ChatMessage
+            content={message.content as string}
+            role={message.role as any}
+          />
+        ),
+        timestamp: Date.now(),
+      })),
     };
-    
+
     return uiState;
-  }
+  },
 });
 
 // Helper functions for state management
 export function useAIState() {
-  return getAIState<AIState>();
+  return getAIState();
 }
 
 export function useMutableAIState() {
-  return getMutableAIState<AIState>();
+  return getMutableAIState();
 }
 
-// Export types
-export type { AIState, UIState }
+// Types are already exported in their interface declarations above

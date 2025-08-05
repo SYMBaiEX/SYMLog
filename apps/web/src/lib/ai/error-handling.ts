@@ -12,7 +12,9 @@ import {
 
 // Define TooManyEmbeddingValuesForCallError locally since it's not exported from 'ai'
 class TooManyEmbeddingValuesForCallError extends Error {
-  static isInstance(error: unknown): error is TooManyEmbeddingValuesForCallError {
+  static isInstance(
+    error: unknown
+  ): error is TooManyEmbeddingValuesForCallError {
     return error instanceof TooManyEmbeddingValuesForCallError;
   }
 }

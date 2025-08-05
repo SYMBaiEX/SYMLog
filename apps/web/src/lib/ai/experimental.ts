@@ -2,17 +2,17 @@ import {
   generateObject,
   generateText,
   type LanguageModel,
+  type ModelMessage,
+  Output,
+  type PrepareStepResult,
+  type StopCondition,
   type StreamTextTransform,
   smoothStream,
+  stepCountIs,
   streamText,
   type TextStreamPart,
   type ToolSet,
   tool,
-  stepCountIs,
-  type StopCondition,
-  type PrepareStepResult,
-  type ModelMessage,
-  Output,
 } from 'ai';
 
 // Define complete StreamChunk discriminated union for strict type safety
@@ -56,27 +56,41 @@ export interface ErrorChunk {
   experimental_providerMetadata?: Record<string, any>;
 }
 
-export type StreamChunk = TextDeltaChunk | ToolCallChunk | FinishChunk | ErrorChunk;
+export type StreamChunk =
+  | TextDeltaChunk
+  | ToolCallChunk
+  | FinishChunk
+  | ErrorChunk;
 
 // Type guards for stream chunk processing
-export function isTextDeltaChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is TextDeltaChunk {
+export function isTextDeltaChunk(
+  chunk: StreamChunk | TextStreamPart<any>
+): chunk is TextDeltaChunk {
   return chunk.type === 'text-delta' && 'textDelta' in chunk;
 }
 
-export function isToolCallChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is ToolCallChunk {
+export function isToolCallChunk(
+  chunk: StreamChunk | TextStreamPart<any>
+): chunk is ToolCallChunk {
   return chunk.type === 'tool-call' && 'toolCallId' in chunk;
 }
 
-export function isFinishChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is FinishChunk {
+export function isFinishChunk(
+  chunk: StreamChunk | TextStreamPart<any>
+): chunk is FinishChunk {
   return chunk.type === 'finish' && 'finishReason' in chunk;
 }
 
-export function isErrorChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is ErrorChunk {
+export function isErrorChunk(
+  chunk: StreamChunk | TextStreamPart<any>
+): chunk is ErrorChunk {
   return chunk.type === 'error' && 'error' in chunk;
 }
 
 // Safe text extraction from chunks
-export function extractTextFromChunk(chunk: StreamChunk | TextStreamPart<any>): string {
+export function extractTextFromChunk(
+  chunk: StreamChunk | TextStreamPart<any>
+): string {
   if (isTextDeltaChunk(chunk)) {
     return chunk.textDelta;
   }
@@ -87,20 +101,26 @@ export function extractTextFromChunk(chunk: StreamChunk | TextStreamPart<any>): 
 }
 
 // Safe metadata extraction from chunks
-export function extractMetadataFromChunk(chunk: StreamChunk | TextStreamPart<any>): Record<string, any> {
+export function extractMetadataFromChunk(
+  chunk: StreamChunk | TextStreamPart<any>
+): Record<string, any> {
   const metadata: Record<string, any> = {};
-  
+
   if ('providerMetadata' in chunk && chunk.providerMetadata) {
     Object.assign(metadata, chunk.providerMetadata);
   }
-  
-  if ('experimental_providerMetadata' in chunk && chunk.experimental_providerMetadata) {
+
+  if (
+    'experimental_providerMetadata' in chunk &&
+    chunk.experimental_providerMetadata
+  ) {
     Object.assign(metadata, chunk.experimental_providerMetadata);
   }
-  
+
   return metadata;
 }
-import { z } from 'zod';
+
+import type { z } from 'zod';
 import { getAIModel } from './providers';
 import { aiTelemetry } from './telemetry';
 import { enhancedArtifactTools } from './tools/enhanced-tools';
@@ -428,7 +448,10 @@ export function createFilterTransform<TOOLS extends ToolSet>(
           }
         }
 
-        if (processedChunk.type === 'text-delta' && !extractTextFromChunk(processedChunk)) {
+        if (
+          processedChunk.type === 'text-delta' &&
+          !extractTextFromChunk(processedChunk)
+        ) {
           return; // Skip empty chunks
         }
 
@@ -565,7 +588,14 @@ const customSpanProcessor = {
 
 // Message part types for enhanced message handling
 export interface MessagePart {
-  type: 'text' | 'tool-call' | 'tool-result' | 'step-start' | 'reasoning' | 'file' | 'image';
+  type:
+    | 'text'
+    | 'tool-call'
+    | 'tool-result'
+    | 'step-start'
+    | 'reasoning'
+    | 'file'
+    | 'image';
   content?: string;
   text?: string;
   toolCallId?: string;
@@ -1209,7 +1239,7 @@ export class ExperimentalAI {
   ) {
     const maxSteps = options?.maxSteps || 5;
     const stopConditions = options?.stopWhen || stepCountIs(maxSteps);
-    
+
     return await generateText({
       model: getAIModel(options?.model),
       prompt,
@@ -1237,20 +1267,23 @@ export class ExperimentalAI {
         enhanced.parts = message.content.map((part: any) => {
           if (part.type === 'text') {
             return { type: 'text', text: part.text };
-          } else if (part.type === 'image') {
+          }
+          if (part.type === 'image') {
             return {
               type: 'image',
               data: part.image,
               mediaType: 'image/png',
             };
-          } else if (part.type === 'tool-call') {
+          }
+          if (part.type === 'tool-call') {
             return {
               type: 'tool-call',
               toolCallId: part.toolCallId,
               toolName: part.toolName,
               input: part.input,
             };
-          } else if (part.type === 'tool-result') {
+          }
+          if (part.type === 'tool-result') {
             return {
               type: 'tool-result',
               toolCallId: part.toolCallId,
@@ -1289,16 +1322,15 @@ export class ExperimentalAI {
         prompt,
         experimental_output: output,
       });
-    } else {
-      // Text output
-      const output = Output.text();
-
-      return await generateText({
-        model: getAIModel(options?.model),
-        prompt,
-        experimental_output: output,
-      });
     }
+    // Text output
+    const output = Output.text();
+
+    return await generateText({
+      model: getAIModel(options?.model),
+      prompt,
+      experimental_output: output,
+    });
   }
 
   /**
@@ -1330,7 +1362,10 @@ export class ExperimentalAI {
     });
 
     // Handle partial output stream if available
-    if ('experimental_partialOutputStream' in stream && options?.onPartialOutput) {
+    if (
+      'experimental_partialOutputStream' in stream &&
+      options?.onPartialOutput
+    ) {
       (async () => {
         for await (const partialOutput of stream.experimental_partialOutputStream!) {
           options.onPartialOutput!(partialOutput);
@@ -1350,17 +1385,19 @@ export class ExperimentalAI {
       model?: string;
       tools?: Record<string, any>;
       initialActiveTools?: string[];
-      prepareStep?: (options: PrepareStepOptions) => {
-        activeTools?: string[];
-        toolChoice?: any;
-        model?: LanguageModel;
-        system?: string;
-      } | Promise<{
-        activeTools?: string[];
-        toolChoice?: any;
-        model?: LanguageModel;
-        system?: string;
-      }>;
+      prepareStep?: (options: PrepareStepOptions) =>
+        | {
+            activeTools?: string[];
+            toolChoice?: any;
+            model?: LanguageModel;
+            system?: string;
+          }
+        | Promise<{
+            activeTools?: string[];
+            toolChoice?: any;
+            model?: LanguageModel;
+            system?: string;
+          }>;
       maxSteps?: number;
     }
   ) {
@@ -1373,15 +1410,18 @@ export class ExperimentalAI {
       tools,
       activeTools: activeTools as any,
       stopWhen: stepCountIs(options?.maxSteps ?? 5),
-      prepareStep: options?.prepareStep as any ?? (({ stepNumber }) => {
-        // Dynamic tool activation based on step
-        if (stepNumber === 0) {
-          return { activeTools: activeTools.slice(0, 2) };
-        } else if (stepNumber === 1) {
-          return { activeTools: activeTools.slice(2, 4) };
-        }
-        return { activeTools };
-      }),
+      prepareStep:
+        (options?.prepareStep as any) ??
+        (({ stepNumber }) => {
+          // Dynamic tool activation based on step
+          if (stepNumber === 0) {
+            return { activeTools: activeTools.slice(0, 2) };
+          }
+          if (stepNumber === 1) {
+            return { activeTools: activeTools.slice(2, 4) };
+          }
+          return { activeTools };
+        }),
     });
   }
 
@@ -1544,15 +1584,21 @@ export class ExperimentalAI {
           tokenUsage: {
             prompt: result.usage?.inputTokens ?? 0,
             completion: result.usage?.outputTokens ?? 0,
-            total: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0),
+            total:
+              (result.usage?.inputTokens ?? 0) +
+              (result.usage?.outputTokens ?? 0),
           },
           quality: qualityMetrics,
           performance: {
             throughput:
-              ((result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0)) / (responseTime / 1000),
+              ((result.usage?.inputTokens ?? 0) +
+                (result.usage?.outputTokens ?? 0)) /
+              (responseTime / 1000),
             latency: responseTime,
             efficiency:
-              qualityMetrics.coherenceScore / ((result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0) || 1),
+              qualityMetrics.coherenceScore /
+              ((result.usage?.inputTokens ?? 0) +
+                (result.usage?.outputTokens ?? 0) || 1),
           },
         };
 
@@ -1562,7 +1608,10 @@ export class ExperimentalAI {
       return {
         ...result,
         experimental_providerMetadata: {
-          ...(('experimental_providerMetadata' in result && result.experimental_providerMetadata) ? result.experimental_providerMetadata as Record<string, any> : {}),
+          ...('experimental_providerMetadata' in result &&
+          result.experimental_providerMetadata
+            ? (result.experimental_providerMetadata as Record<string, any>)
+            : {}),
           metricsCollected: options?.collectMetrics ?? false,
           responseTime: performance.now() - startTime,
         },
@@ -1739,6 +1788,4 @@ export const transformPresets = {
 };
 
 // Export experimental utilities and types
-export {
-  customSpanProcessor,
-};
+export { customSpanProcessor };

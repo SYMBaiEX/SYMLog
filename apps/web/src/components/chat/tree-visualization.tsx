@@ -119,7 +119,8 @@ function TreeVisualizationComponent({
       const branch =
         branchMap.get(
           branches.find(
-            (b) => b.leafNodeId === node.id || (b as any).nodeIds?.includes(node.id)
+            (b) =>
+              b.leafNodeId === node.id || (b as any).nodeIds?.includes(node.id)
           )?.id || ''
         ) || branches[0];
 

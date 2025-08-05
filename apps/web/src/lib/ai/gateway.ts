@@ -11,12 +11,12 @@ export type AnthropicModelId = `anthropic:${string}`;
 export type SupportedModelId = OpenAIModelId | AnthropicModelId;
 
 // Model ID registry for type safety
-export type KnownOpenAIModels = 
+export type KnownOpenAIModels =
   | 'openai:gpt-4o-mini'
   | 'openai:gpt-4.1-nano'
   | 'openai:gpt-4.1-2025-04-14';
 
-export type KnownAnthropicModels = 
+export type KnownAnthropicModels =
   | 'anthropic:claude-3-haiku-20240307'
   | 'anthropic:claude-3-5-sonnet-20241022'
   | 'anthropic:claude-3-7-sonnet-20250219'
@@ -34,6 +34,7 @@ export interface GatewayRequestMetadata extends LanguageModelRequestMetadata {
 
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { distributedTracing } from '../telemetry/distributed-tracing';
+import { v2ErrorHandler } from './error-handling';
 import { LoadBalancer, type LoadBalancingStrategy } from './load-balancing';
 import {
   type DiscoveredProvider,
@@ -43,7 +44,6 @@ import {
 } from './provider-discovery';
 import { ProviderMetricsService } from './provider-metrics';
 import { registry } from './providers';
-import { v2ErrorHandler } from './error-handling';
 
 // Create a logger wrapper
 const loggingService = {
@@ -229,7 +229,7 @@ export class AIGateway {
             id: 'gpt-4.1-2025-04-14',
             name: 'GPT-4.1 Code',
             capabilities: ['code', 'analysis'],
-            costPerToken: 0.000_1,
+            costPerToken: 0.0001,
             maxTokens: 128_000,
             contextWindow: 128_000,
             supportedTasks: ['code'],
@@ -283,7 +283,7 @@ export class AIGateway {
             id: 'claude-3-opus-20240229',
             name: 'Claude 3 Opus',
             capabilities: ['chat', 'code', 'analysis', 'creative', 'reasoning'],
-            costPerToken: 0.000_3,
+            costPerToken: 0.0003,
             maxTokens: 200_000,
             contextWindow: 200_000,
             supportedTasks: ['creative', 'reasoning'],
@@ -551,16 +551,19 @@ export class AIGateway {
       );
 
       // Set up event listeners for discovered providers
-      this.discoveryService.on('provider:discovered', (provider: DiscoveredProvider) => {
-        if (this.config.autoRegisterDiscoveredProviders) {
-          this.registerDiscoveredProvider(provider);
+      this.discoveryService.on(
+        'provider:discovered',
+        (provider: DiscoveredProvider) => {
+          if (this.config.autoRegisterDiscoveredProviders) {
+            this.registerDiscoveredProvider(provider);
+          }
+          loggingService.info('Provider discovered', {
+            providerId: provider.id,
+            models: provider.models.length,
+            capabilities: provider.capabilities,
+          });
         }
-        loggingService.info('Provider discovered', {
-          providerId: provider.id,
-          models: provider.models.length,
-          capabilities: provider.capabilities,
-        });
-      });
+      );
 
       this.discoveryService.on(
         'provider:health:changed',
@@ -577,19 +580,25 @@ export class AIGateway {
         }
       );
 
-      this.discoveryService.on('provider:unavailable', (providerId: string, reason: string) => {
-        loggingService.warn('Provider became unavailable', {
-          providerId,
-          reason,
-        });
-      });
+      this.discoveryService.on(
+        'provider:unavailable',
+        (providerId: string, reason: string) => {
+          loggingService.warn('Provider became unavailable', {
+            providerId,
+            reason,
+          });
+        }
+      );
 
-      this.discoveryService.on('discovery:error', (error: Error, providerId?: string) => {
-        loggingService.error('Provider discovery error', {
-          providerId,
-          error: error.message,
-        });
-      });
+      this.discoveryService.on(
+        'discovery:error',
+        (error: Error, providerId?: string) => {
+          loggingService.error('Provider discovery error', {
+            providerId,
+            error: error.message,
+          });
+        }
+      );
     } catch (error) {
       loggingService.error('Failed to initialize provider discovery', error);
     }
@@ -629,7 +638,12 @@ export class AIGateway {
           name: discovered.name,
           models: discovered.models,
           health: discovered.health,
-          capabilities: discovered.capabilities,
+          capabilities: Object.keys(discovered.capabilities.features).filter(
+            (key) =>
+              discovered.capabilities.features[
+                key as keyof typeof discovered.capabilities.features
+              ]
+          ),
           costTier: discovered.costTier,
         };
         allProviders.push(providerInfo);
@@ -755,7 +769,8 @@ export class AIGateway {
     );
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
+    const modelId =
+      `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -778,7 +793,8 @@ export class AIGateway {
     });
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
+    const modelId =
+      `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -799,7 +815,8 @@ export class AIGateway {
     );
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
+    const modelId =
+      `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -822,7 +839,8 @@ export class AIGateway {
     });
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
+    const modelId =
+      `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,

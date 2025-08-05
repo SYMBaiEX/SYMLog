@@ -20,7 +20,10 @@ export function logBundlePerformance(componentName: string, startTime: number) {
 export function preloadCriticalChunks(route: string) {
   if (typeof window === 'undefined') return;
 
-  const criticalChunks: Record<string, (() => Promise<any>)[] | (() => (() => Promise<any>)[])> = {
+  const criticalChunks: Record<
+    string,
+    (() => Promise<any>)[] | (() => (() => Promise<any>)[])
+  > = {
     '/chat': [
       () => import('@/components/chat/tree-visualization'),
       () => import('@/components/chat/chat-settings-modal'),
@@ -34,7 +37,9 @@ export function preloadCriticalChunks(route: string) {
   if (chunksFactory) {
     // Preload with a small delay to not block initial render
     setTimeout(() => {
-      const chunks = Array.isArray(chunksFactory) ? chunksFactory : chunksFactory();
+      const chunks = Array.isArray(chunksFactory)
+        ? chunksFactory
+        : chunksFactory();
       chunks.forEach((chunk: () => Promise<any>) => {
         chunk().catch(() => {
           // Silent fail for preloading
@@ -132,7 +137,8 @@ export function trackBundleVitals() {
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
       if (entry.entryType === 'first-input') {
-        const processingStart = (entry as any).processingStart ?? entry.startTime;
+        const processingStart =
+          (entry as any).processingStart ?? entry.startTime;
         const fid = processingStart - entry.startTime;
         if (process.env.NODE_ENV === 'development') {
           console.log(`📏 First Input Delay: ${fid.toFixed(2)}ms`);

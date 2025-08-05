@@ -67,7 +67,7 @@ interface WorkflowExecutionResponse {
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
   let toolName: string | undefined;
-  
+
   try {
     const body = await request.json();
     const validation = executeToolRequestSchema.safeParse(body);
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   let executionId: string | null = null;
-  
+
   try {
     const { searchParams } = new URL(request.url);
     executionId = searchParams.get('executionId');

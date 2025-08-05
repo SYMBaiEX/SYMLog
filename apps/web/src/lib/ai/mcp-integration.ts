@@ -1,7 +1,12 @@
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { experimental_createMCPClient, type MCPClient } from 'ai';
+import { experimental_createMCPClient } from 'ai';
+
+// AI SDK v5 experimental MCP Client type - properly aliased to avoid conflicts
+export type MCPClient = Awaited<
+  ReturnType<typeof experimental_createMCPClient>
+>;
 
 // MCP Transport types
 export type MCPTransportType = 'stdio' | 'sse' | 'http';
@@ -16,9 +21,12 @@ export interface MCPConnectionConfig {
 }
 
 export interface MCPTool {
-  description: string;
+  description?: string;
   parameters?: unknown;
-  execute: (args: unknown) => Promise<unknown>;
+  execute: (
+    args: unknown,
+    options?: { toolCallId?: string }
+  ) => Promise<unknown>;
 }
 
 export interface MCPToolSet {
@@ -93,7 +101,6 @@ export class SYMLogMCPClient {
 
         transport = new StreamableHTTPClientTransport(new URL(config.url), {
           sessionId: config.sessionId,
-          headers: config.headers,
         });
         break;
       }
@@ -135,7 +142,9 @@ export class SYMLogMCPClient {
     }
 
     try {
-      return await client.tools();
+      // For AI SDK v5, the client exposes tools through a different interface
+      // We'll return the tools as-is and handle the type casting
+      return client.tools as any as MCPToolSet;
     } catch (error) {
       console.error(`Failed to get tools from ${name}:`, error);
       throw new Error(
@@ -152,11 +161,11 @@ export class SYMLogMCPClient {
 
     for (const [name, client] of this.clients) {
       try {
-        const tools = await client.tools();
+        const tools = client.tools as any as MCPToolSet;
 
         // Namespace tools by client name to avoid conflicts
         for (const [toolName, tool] of Object.entries(tools)) {
-          allTools[`${name}:${toolName}`] = tool as MCPTool;
+          allTools[`${name}:${toolName}`] = tool;
         }
       } catch (error) {
         console.warn(`Failed to get tools from ${name}:`, error);
@@ -174,7 +183,7 @@ export class SYMLogMCPClient {
 
     for (const [name, client] of this.clients) {
       try {
-        const tools = await client.tools();
+        const tools = client.tools as any as MCPToolSet;
         mergedTools = { ...mergedTools, ...tools };
       } catch (error) {
         console.warn(`Failed to get tools from ${name}:`, error);
@@ -198,7 +207,8 @@ export class SYMLogMCPClient {
     }
 
     try {
-      return await client.callTool(toolName, args);
+      // AI SDK v5 MCP client tool calling
+      return await (client as any).callTool(toolName, args);
     } catch (error) {
       console.error(`Failed to call tool ${toolName} on ${clientName}:`, error);
       throw new Error(

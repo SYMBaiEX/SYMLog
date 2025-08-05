@@ -40,13 +40,17 @@ export class TokenReservationService {
     // Add estimate for attachments
     if (attachments && attachments.length > 0) {
       // Rough estimate: each attachment adds ~500 tokens
-      totalChars += attachments.length * 500 * TokenReservationService.CHARS_PER_TOKEN;
+      totalChars +=
+        attachments.length * 500 * TokenReservationService.CHARS_PER_TOKEN;
     }
 
     // Convert to tokens and add minimum response size
-    const promptTokens = Math.ceil(totalChars / TokenReservationService.CHARS_PER_TOKEN);
+    const promptTokens = Math.ceil(
+      totalChars / TokenReservationService.CHARS_PER_TOKEN
+    );
     const estimatedTotal =
-      (promptTokens + TokenReservationService.MIN_RESPONSE_TOKENS) * TokenReservationService.SAFETY_MULTIPLIER;
+      (promptTokens + TokenReservationService.MIN_RESPONSE_TOKENS) *
+      TokenReservationService.SAFETY_MULTIPLIER;
 
     return Math.ceil(estimatedTotal);
   }
@@ -77,14 +81,14 @@ export class TokenReservationService {
       //   estimatedTokens,
       //   maxDailyTokens,
       // });
-      const result = { 
-        success: true, 
-        tokensUsed: 0, 
+      const result = {
+        success: true,
+        tokensUsed: 0,
         remainingTokens: maxDailyTokens,
         reservationId: 'stub-' + Date.now(),
         currentUsage: 0,
         limit: maxDailyTokens,
-        remaining: maxDailyTokens
+        remaining: maxDailyTokens,
       };
 
       if (result.success) {
@@ -171,7 +175,7 @@ export class TokenReservationService {
       return {
         totalUsage: 0,
         totalReserved: 0,
-        completedRequests: 0
+        completedRequests: 0,
       };
     } catch (error) {
       console.error('Failed to get token usage:', error);

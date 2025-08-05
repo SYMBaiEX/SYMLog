@@ -7,6 +7,7 @@ import {
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { config } from '../config';
 import { FallbackChainManager } from './fallback-chain';
+import type { GatewayRequestMetadata, SupportedModelId } from './gateway';
 import {
   AIGateway,
   type ModelRequirements,
@@ -17,7 +18,6 @@ import { IntelligentRoutingEngine } from './intelligent-routing';
 import type { LoadBalancingStrategy } from './load-balancing';
 import { ProviderMetricsService } from './provider-metrics';
 import { getAIModel, registry, systemPrompts } from './providers';
-import type { SupportedModelId, GatewayRequestMetadata } from './gateway';
 
 // Create a logger wrapper
 const loggingService = {
@@ -168,7 +168,10 @@ export class GatewayRegistry {
 
       const requirements: ModelRequirements = {
         task: config.task || 'chat',
-        priority: (config.priority ?? 'balanced') as 'speed' | 'quality' | 'cost',
+        priority: (config.priority ?? 'balanced') as
+          | 'speed'
+          | 'quality'
+          | 'cost',
       };
 
       return this.wrapModelWithGateway(modelSelection, requirements, config);
@@ -262,7 +265,10 @@ export class GatewayRegistry {
     return this.middleware.processRequest(
       {
         task: config.task || 'chat',
-        priority: (config.priority ?? 'balanced') as 'speed' | 'quality' | 'cost',
+        priority: (config.priority ?? 'balanced') as
+          | 'speed'
+          | 'quality'
+          | 'cost',
         capabilities: config.capabilities,
         maxCost: config.maxCost,
         maxLatency: config.maxLatency,
@@ -354,11 +360,23 @@ export class GatewayRegistry {
     return wrapLanguageModel({
       model: baseModel as any,
       middleware: {
-        wrapGenerate: async ({ doGenerate, params }: { doGenerate: any; params: any }) => {
+        wrapGenerate: async ({
+          doGenerate,
+          params,
+        }: {
+          doGenerate: any;
+          params: any;
+        }) => {
           // This would implement the aggregation logic
           return await doGenerate();
         },
-        wrapStream: async ({ doStream, params }: { doStream: any; params: any }) => {
+        wrapStream: async ({
+          doStream,
+          params,
+        }: {
+          doStream: any;
+          params: any;
+        }) => {
           // This would implement the streaming aggregation logic
           return await doStream();
         },
@@ -369,14 +387,26 @@ export class GatewayRegistry {
   private buildFallbackChain(primaryModelId: string): SupportedModelId[] {
     // Build a fallback chain based on model type
     const fallbackChains: Record<string, SupportedModelId[]> = {
-      'openai:fast': ['anthropic:fast', 'openai:premium', 'anthropic:balanced'] as SupportedModelId[],
-      'anthropic:fast': ['openai:fast', 'anthropic:balanced', 'openai:premium'] as SupportedModelId[],
+      'openai:fast': [
+        'anthropic:fast',
+        'openai:premium',
+        'anthropic:balanced',
+      ] as SupportedModelId[],
+      'anthropic:fast': [
+        'openai:fast',
+        'anthropic:balanced',
+        'openai:premium',
+      ] as SupportedModelId[],
       'openai:premium': [
         'anthropic:balanced',
         'openai:fast',
         'anthropic:reasoning',
       ] as SupportedModelId[],
-      'anthropic:balanced': ['openai:premium', 'anthropic:fast', 'openai:fast'] as SupportedModelId[],
+      'anthropic:balanced': [
+        'openai:premium',
+        'anthropic:fast',
+        'openai:fast',
+      ] as SupportedModelId[],
       'openai:code': [
         'anthropic:balanced',
         'openai:premium',
@@ -395,7 +425,8 @@ export class GatewayRegistry {
     };
 
     return (
-      fallbackChains[primaryModelId] || DEFAULT_GATEWAY_CONFIG.fallbackChain as SupportedModelId[]
+      fallbackChains[primaryModelId] ||
+      (DEFAULT_GATEWAY_CONFIG.fallbackChain as SupportedModelId[])
     );
   }
 
@@ -418,15 +449,15 @@ export class GatewayRegistry {
     // Get cost per token for a model
     const costs: Record<string, number> = {
       'openai:fast': 0.000_03,
-      'openai:code': 0.000_1,
+      'openai:code': 0.0001,
       'openai:premium': 0.000_15,
       'anthropic:fast': 0.000_02,
       'anthropic:balanced': 0.000_06,
       'anthropic:reasoning': 0.000_08,
-      'anthropic:creative': 0.000_3,
+      'anthropic:creative': 0.0003,
     };
 
-    return costs[modelId] ?? 0.000_1;
+    return costs[modelId] ?? 0.0001;
   }
 }
 

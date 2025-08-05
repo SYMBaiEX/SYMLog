@@ -1,6 +1,9 @@
 import { z } from 'zod';
+
 // Use console for logging instead of importing @/lib/logger
-const logErrorToConsole = (message: string, data?: any) => console.error(`[ERROR] ${message}`, data);
+const logErrorToConsole = (message: string, data?: any) =>
+  console.error(`[ERROR] ${message}`, data);
+
 import type {
   EnhancedToolResult,
   ToolExecutionContext,
@@ -28,9 +31,21 @@ export interface ToolProgressUpdate {
   readonly estimatedTimeRemaining?: number;
 }
 
+// Mutable version for builder pattern
+interface MutableToolProgressUpdate {
+  executionId: string;
+  toolName: string;
+  stage: ProgressStage;
+  progress: number;
+  message: string;
+  timestamp: number;
+  metadata?: Record<string, any>;
+  estimatedTimeRemaining?: number;
+}
+
 // Type-safe progress update builder
 export class ProgressUpdateBuilder {
-  private update: Partial<ToolProgressUpdate> = {};
+  private update: Partial<MutableToolProgressUpdate> = {};
 
   constructor(executionId: string, toolName: string) {
     this.update.executionId = executionId;
@@ -75,7 +90,17 @@ export class ProgressUpdateBuilder {
       throw new Error('Message is required for progress update');
     }
 
-    return this.update as ToolProgressUpdate;
+    // Create readonly version from mutable builder data
+    return {
+      executionId: this.update.executionId!,
+      toolName: this.update.toolName!,
+      stage: this.update.stage,
+      progress: this.update.progress,
+      message: this.update.message,
+      timestamp: this.update.timestamp!,
+      metadata: this.update.metadata ? { ...this.update.metadata } : undefined,
+      estimatedTimeRemaining: this.update.estimatedTimeRemaining,
+    } as const;
   }
 }
 
@@ -90,9 +115,21 @@ export interface StreamingProgressConfig {
   readonly enableProgressValidation?: boolean;
 }
 
+// Mutable version for config builder
+interface MutableStreamingProgressConfig {
+  enableProgress: boolean;
+  updateInterval: number;
+  progressStages: ProgressStage[];
+  enableTimeEstimation: boolean;
+  enableDetailedLogging: boolean;
+  maxConcurrentTrackings?: number;
+  progressHistoryLimit?: number;
+  enableProgressValidation?: boolean;
+}
+
 // Type-safe config builder
 export class StreamingProgressConfigBuilder {
-  private config: Partial<StreamingProgressConfig> = {};
+  private config: Partial<MutableStreamingProgressConfig> = {};
 
   enableProgress(enable: boolean): this {
     this.config.enableProgress = enable;
@@ -100,7 +137,7 @@ export class StreamingProgressConfigBuilder {
   }
 
   updateInterval(intervalMs: number): this {
-    if (intervalMs < 100 || intervalMs > 10000) {
+    if (intervalMs < 100 || intervalMs > 10_000) {
       throw new Error('Update interval must be between 100ms and 10000ms');
     }
     this.config.updateInterval = intervalMs;
@@ -147,17 +184,23 @@ export class StreamingProgressConfigBuilder {
   }
 
   build(): StreamingProgressConfig {
-    // Set defaults
-    return {
+    // Create readonly version with defaults
+    const builtConfig = {
       enableProgress: this.config.enableProgress ?? true,
       updateInterval: this.config.updateInterval ?? 1000,
-      progressStages: this.config.progressStages ?? ['initializing', 'processing', 'finalizing', 'complete'],
+      progressStages: this.config.progressStages ?? [
+        'initializing',
+        'processing',
+        'finalizing',
+        'complete',
+      ],
       enableTimeEstimation: this.config.enableTimeEstimation ?? true,
       enableDetailedLogging: this.config.enableDetailedLogging ?? false,
       maxConcurrentTrackings: this.config.maxConcurrentTrackings ?? 10,
       progressHistoryLimit: this.config.progressHistoryLimit ?? 100,
       enableProgressValidation: this.config.enableProgressValidation ?? true,
-    };
+    } as const;
+    return builtConfig;
   }
 }
 
@@ -184,9 +227,22 @@ export interface ProgressTracker {
   readonly metadata?: Readonly<Record<string, any>>;
 }
 
+// Mutable version for progress tracker builder
+interface MutableProgressTracker {
+  executionId: string;
+  startTime: number;
+  currentStage: ProgressStage;
+  stageStartTime: number;
+  totalStages: number;
+  completedStages: number;
+  estimatedDuration: number;
+  progressHistory: ToolProgressUpdate[];
+  metadata?: Record<string, any>;
+}
+
 // Type-safe progress tracker builder
 export class ProgressTrackerBuilder {
-  private tracker: Partial<ProgressTracker & { progressHistory: ToolProgressUpdate[] }> = {};
+  private tracker: Partial<MutableProgressTracker> = {};
 
   constructor(executionId: string) {
     this.tracker.executionId = executionId;
@@ -222,7 +278,20 @@ export class ProgressTrackerBuilder {
       throw new Error('Estimated duration must be set before building tracker');
     }
 
-    return this.tracker as ProgressTracker;
+    // Create readonly version from mutable builder data
+    return {
+      executionId: this.tracker.executionId!,
+      startTime: this.tracker.startTime!,
+      currentStage: this.tracker.currentStage,
+      stageStartTime: this.tracker.stageStartTime!,
+      totalStages: this.tracker.totalStages,
+      completedStages: this.tracker.completedStages!,
+      estimatedDuration: this.tracker.estimatedDuration,
+      progressHistory: [...this.tracker.progressHistory!],
+      metadata: this.tracker.metadata
+        ? { ...this.tracker.metadata }
+        : undefined,
+    } as const;
   }
 
   private calculateEstimatedDuration(stages: ProgressStage[]): number {
@@ -253,11 +322,25 @@ export interface ProgressStreamController<TResult = any> {
   metadata?: Readonly<Record<string, any>>;
 }
 
+// Mutable version for controller builder
+interface MutableProgressStreamController<TResult = any> {
+  id: string;
+  createdAt: number;
+  update: (update: ToolProgressUpdate) => void | Promise<void>;
+  complete: (result: TResult) => void | Promise<void>;
+  error: (error: Error) => void | Promise<void>;
+  close: () => void | Promise<void>;
+  isActive: () => boolean;
+  metadata?: Record<string, any>;
+}
+
 // Type-safe controller builder
 export class ProgressStreamControllerBuilder<TResult = any> {
-  private controller: Partial<ProgressStreamController<TResult>> = {};
+  private controller: Partial<MutableProgressStreamController<TResult>> = {};
   private handlers = {
-    update: null as ((update: ToolProgressUpdate) => void | Promise<void>) | null,
+    update: null as
+      | ((update: ToolProgressUpdate) => void | Promise<void>)
+      | null,
     complete: null as ((result: TResult) => void | Promise<void>) | null,
     error: null as ((error: Error) => void | Promise<void>) | null,
     close: null as (() => void | Promise<void>) | null,
@@ -269,7 +352,9 @@ export class ProgressStreamControllerBuilder<TResult = any> {
     this.controller.createdAt = Date.now();
   }
 
-  onUpdate(handler: (update: ToolProgressUpdate) => void | Promise<void>): this {
+  onUpdate(
+    handler: (update: ToolProgressUpdate) => void | Promise<void>
+  ): this {
     this.handlers.update = handler;
     return this;
   }
@@ -308,10 +393,13 @@ export class ProgressStreamControllerBuilder<TResult = any> {
       throw new Error('Close handler is required');
     }
 
-    return {
+    // Create readonly version from mutable builder data
+    const builtController: ProgressStreamController<TResult> = {
       id: this.controller.id!,
       createdAt: this.controller.createdAt!,
-      metadata: this.controller.metadata,
+      metadata: this.controller.metadata
+        ? { ...this.controller.metadata }
+        : undefined,
       update: this.handlers.update,
       complete: this.handlers.complete,
       error: this.handlers.error,
@@ -320,7 +408,8 @@ export class ProgressStreamControllerBuilder<TResult = any> {
         await this.handlers.close!();
       },
       isActive: () => this.active,
-    };
+    } as const;
+    return builtController;
   }
 }
 
@@ -474,10 +563,10 @@ export class StreamingProgressManager {
           executionId,
           progress: update.progress,
         });
-        update.progress = undefined;
+        (update as any).progress = undefined;
       } else {
         // Clamp progress to 0-100 range
-        update.progress = Math.min(100, Math.max(0, update.progress));
+        (update as any).progress = Math.min(100, Math.max(0, update.progress));
       }
     }
 
@@ -490,7 +579,7 @@ export class StreamingProgressManager {
         executionId,
         toolName: update.toolName,
       });
-      update.toolName = undefined;
+      (update as any).toolName = undefined;
     }
 
     // Update tracker state
@@ -518,12 +607,17 @@ export class StreamingProgressManager {
     }
 
     // Skip duplicates if requested
-    if (options?.skipDuplicates && this.isDuplicateUpdate(progressUpdate, tracker)) {
+    if (
+      options?.skipDuplicates &&
+      this.isDuplicateUpdate(progressUpdate, tracker)
+    ) {
       return;
     }
 
-    // Add to history
-    (tracker.progressHistory as ToolProgressUpdate[]).push(progressUpdate);
+    // Add to history (cast to mutable for internal management)
+    (tracker.progressHistory as unknown as ToolProgressUpdate[]).push(
+      progressUpdate
+    );
 
     // Send to stream controller
     const controller = this.streamControllers.get(executionId);
@@ -636,9 +730,9 @@ export class StreamingProgressManager {
   /**
    * Get all progress history for an execution
    */
-  getProgressHistory(executionId: string): ToolProgressUpdate[] {
+  getProgressHistory(executionId: string): readonly ToolProgressUpdate[] {
     const tracker = this.activeTrackers.get(executionId);
-    return tracker?.progressHistory || [];
+    return tracker?.progressHistory ?? [];
   }
 
   /**
@@ -680,7 +774,7 @@ export class StreamingProgressManager {
    * Register a stream controller for an execution
    */
   registerController(
-    executionId: string, 
+    executionId: string,
     controller: ProgressStreamController
   ): void {
     this.streamControllers.set(executionId, controller);
@@ -725,7 +819,7 @@ export class StreamingProgressManager {
       } catch (error) {
         loggingService.warn('Failed to close controller during clear', {
           executionId,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
@@ -756,7 +850,7 @@ export class StreamingProgressManager {
     oldestTracking: { executionId: string; startTime: number } | null;
   } {
     const trackers = Array.from(this.activeTrackers.values());
-    
+
     if (trackers.length === 0) {
       return {
         totalActive: 0,
@@ -769,21 +863,30 @@ export class StreamingProgressManager {
           optimizing: 0,
           finalizing: 0,
           complete: 0,
-          error: 0
+          error: 0,
         },
-        oldestTracking: null
+        oldestTracking: null,
       };
     }
 
-    const stageCounts = trackers.reduce((counts, tracker) => {
-      counts[tracker.currentStage] = (counts[tracker.currentStage] || 0) + 1;
-      return counts;
-    }, {} as Record<ProgressStage, number>);
+    const stageCounts = trackers.reduce(
+      (counts, tracker) => {
+        counts[tracker.currentStage] = (counts[tracker.currentStage] || 0) + 1;
+        return counts;
+      },
+      {} as Record<ProgressStage, number>
+    );
 
     // Fill in missing stages with 0
     const allStages: ProgressStage[] = [
-      'initializing', 'validating', 'processing', 'generating',
-      'optimizing', 'finalizing', 'complete', 'error'
+      'initializing',
+      'validating',
+      'processing',
+      'generating',
+      'optimizing',
+      'finalizing',
+      'complete',
+      'error',
     ];
     for (const stage of allStages) {
       if (!(stage in stageCounts)) {
@@ -791,12 +894,13 @@ export class StreamingProgressManager {
       }
     }
 
-    const totalProgress = trackers.reduce((sum, tracker) => 
-      sum + this.calculateProgress(tracker), 0
+    const totalProgress = trackers.reduce(
+      (sum, tracker) => sum + this.calculateProgress(tracker),
+      0
     );
-    
-    const oldestTracker = trackers.reduce((oldest, current) => 
-      (!oldest || current.startTime < oldest.startTime) ? current : oldest
+
+    const oldestTracker = trackers.reduce((oldest, current) =>
+      !oldest || current.startTime < oldest.startTime ? current : oldest
     );
 
     return {
@@ -805,8 +909,8 @@ export class StreamingProgressManager {
       stageCounts,
       oldestTracking: {
         executionId: oldestTracker.executionId,
-        startTime: oldestTracker.startTime
-      }
+        startTime: oldestTracker.startTime,
+      },
     };
   }
 
@@ -815,19 +919,19 @@ export class StreamingProgressManager {
    */
   forceCompleteAll(reason?: string): void {
     const activeIds = Array.from(this.activeTrackers.keys());
-    
+
     for (const executionId of activeIds) {
       try {
         this.updateProgress(executionId, {
           stage: 'complete',
           progress: 100,
-          message: reason || 'Force completed by system'
+          message: reason || 'Force completed by system',
         });
         this.completeTracking(executionId, { forceCompleted: true, reason });
       } catch (error) {
         loggingService.error('Failed to force complete tracking', {
           executionId,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
@@ -966,34 +1070,40 @@ export class StreamingProgressManager {
    * Validate progress update for consistency and correctness
    */
   private validateProgressUpdate(
-    update: ToolProgressUpdate, 
+    update: ToolProgressUpdate,
     tracker: ProgressTracker
   ): void {
     // Validate progress range
     if (update.progress < 0 || update.progress > 100) {
-      throw new Error(`Invalid progress value: ${update.progress}. Must be between 0 and 100.`);
+      throw new Error(
+        `Invalid progress value: ${update.progress}. Must be between 0 and 100.`
+      );
     }
 
     // Validate stage transition
     const currentStageIndex = this.getStageIndex(tracker.currentStage);
     const newStageIndex = this.getStageIndex(update.stage);
-    
+
     if (newStageIndex < currentStageIndex && update.stage !== 'error') {
       loggingService.warn('Backward stage transition detected', {
         executionId: update.executionId,
         from: tracker.currentStage,
-        to: update.stage
+        to: update.stage,
       });
     }
 
     // Validate execution ID consistency
     if (update.executionId !== tracker.executionId) {
-      throw new Error(`Execution ID mismatch: expected ${tracker.executionId}, got ${update.executionId}`);
+      throw new Error(
+        `Execution ID mismatch: expected ${tracker.executionId}, got ${update.executionId}`
+      );
     }
 
     // Validate timestamp
     if (update.timestamp < tracker.startTime) {
-      throw new Error('Progress update timestamp cannot be before tracker start time');
+      throw new Error(
+        'Progress update timestamp cannot be before tracker start time'
+      );
     }
   }
 
@@ -1004,8 +1114,9 @@ export class StreamingProgressManager {
     update: ToolProgressUpdate,
     tracker: ProgressTracker
   ): boolean {
-    const lastUpdate = tracker.progressHistory[tracker.progressHistory.length - 1];
-    
+    const lastUpdate =
+      tracker.progressHistory[tracker.progressHistory.length - 1];
+
     if (!lastUpdate) {
       return false;
     }
@@ -1024,13 +1135,13 @@ export class StreamingProgressManager {
   private getStageIndex(stage: ProgressStage): number {
     const stageOrder: ProgressStage[] = [
       'initializing',
-      'validating', 
+      'validating',
       'processing',
       'generating',
       'optimizing',
       'finalizing',
       'complete',
-      'error'
+      'error',
     ];
 
     return stageOrder.indexOf(stage);
@@ -1052,7 +1163,7 @@ export class StreamingProgressManager {
       } catch (error) {
         loggingService.warn('Failed to close controller during cleanup', {
           executionId,
-          error: error instanceof Error ? error.message : 'Unknown error'
+          error: error instanceof Error ? error.message : 'Unknown error',
         });
       }
     }
@@ -1153,40 +1264,47 @@ export async function executeToolWithProgress<T>(
 export function createProgressStream(
   executionId: string
 ): ReadableStream<Uint8Array> {
-  let controller: ReadableStreamDefaultController<Uint8Array>;
+  let streamController: ReadableStreamDefaultController<Uint8Array>;
 
   const stream = new ReadableStream<Uint8Array>({
     start(ctrl) {
-      controller = ctrl;
+      streamController = ctrl;
 
       // Register stream controller
-      const progressController: ProgressStreamController = {
+      const progressHandlers = {
         update: (update: ToolProgressUpdate) => {
           const data = `data: ${JSON.stringify(update)}\n\n`;
-          controller.enqueue(new TextEncoder().encode(data));
+          streamController.enqueue(new TextEncoder().encode(data));
         },
         complete: (result: any) => {
           const data = `data: ${JSON.stringify({ type: 'complete', result })}\n\n`;
-          controller.enqueue(new TextEncoder().encode(data));
-          controller.close();
+          streamController.enqueue(new TextEncoder().encode(data));
+          streamController.close();
         },
         error: (error: Error) => {
           const data = `data: ${JSON.stringify({ type: 'error', error: error.message })}\n\n`;
-          controller.enqueue(new TextEncoder().encode(data));
-          controller.close();
+          streamController.enqueue(new TextEncoder().encode(data));
+          streamController.close();
         },
         close: () => {
-          controller.close();
+          streamController.close();
         },
       };
 
       // Register the controller using the public method
-      streamingProgressManager.registerController(executionId, {
+      const progressController: ProgressStreamController = {
         id: `controller_${executionId}`,
         createdAt: Date.now(),
-        ...progressController,
-        isActive: () => true
-      });
+        update: progressHandlers.update,
+        complete: progressHandlers.complete,
+        error: progressHandlers.error,
+        close: progressHandlers.close,
+        isActive: () => true,
+      };
+      streamingProgressManager.registerController(
+        executionId,
+        progressController
+      );
     },
     cancel() {
       streamingProgressManager.cancelTracking(executionId);
@@ -1213,7 +1331,7 @@ export const progressUpdateSchema = z.object({
   progress: z.number().min(0).max(100),
   message: z.string(),
   timestamp: z.number(),
-  metadata: z.record(z.any()).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
   estimatedTimeRemaining: z.number().optional(),
 });
 

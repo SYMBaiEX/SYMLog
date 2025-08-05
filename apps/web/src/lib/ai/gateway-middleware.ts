@@ -5,6 +5,7 @@ import type {
   LanguageModelResponseMetadata,
 } from 'ai';
 import { logError as logErrorToConsole } from '@/lib/logger';
+import { v2ErrorHandler } from './error-handling';
 import { FallbackChainManager } from './fallback-chain';
 import {
   AIGateway,
@@ -13,7 +14,6 @@ import {
 } from './gateway';
 import { IntelligentRoutingEngine } from './intelligent-routing';
 import { ProviderMetricsService } from './provider-metrics';
-import { v2ErrorHandler } from './error-handling';
 
 // Create a logger wrapper
 const loggingService = {

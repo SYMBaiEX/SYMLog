@@ -9,6 +9,7 @@ interface CoreTool {
     parameters: object;
   };
 }
+
 import { z } from 'zod';
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { standardErrorHandler, type ToolError } from './error-handler';
@@ -16,7 +17,8 @@ import { enhancedArtifactTools } from './tools/enhanced-tools';
 
 // Create a logger wrapper
 const loggingService = {
-  info: (message: string, data?: unknown) => console.log(`[INFO] ${message}`, data),
+  info: (message: string, data?: unknown) =>
+    console.log(`[INFO] ${message}`, data),
   warn: (message: string, data?: unknown) =>
     console.warn(`[WARN] ${message}`, data),
   error: (message: string, data?: unknown) => logErrorToConsole(message, data),
@@ -124,12 +126,12 @@ export class ToolChoiceEnforcer {
       const coreTool: CoreTool = {
         type: 'function',
         function: {
-          name: name,
+          name,
           description: tool.description || `Enhanced tool: ${name}`,
           parameters: tool.inputSchema || {},
         },
       };
-      
+
       this.toolRegistry.set(name, coreTool);
 
       // Initialize metrics with default values
@@ -334,7 +336,10 @@ export class ToolChoiceEnforcer {
       alternativeTools: alternatives,
       choiceMode:
         bestTool.score > CONFIDENCE_THRESHOLDS.HIGH
-          ? ({ type: 'tool', toolName: bestTool.name } as unknown as ToolChoice<any>)
+          ? ({
+              type: 'tool',
+              toolName: bestTool.name,
+            } as unknown as ToolChoice<any>)
           : ({ type: 'auto' } as unknown as ToolChoice<any>),
     };
   }
@@ -419,7 +424,9 @@ export class ToolChoiceEnforcer {
   /**
    * Get tool performance metrics
    */
-  getToolMetrics(toolName?: string): Map<string, ToolMetric> | ToolMetric | undefined {
+  getToolMetrics(
+    toolName?: string
+  ): Map<string, ToolMetric> | ToolMetric | undefined {
     if (toolName) {
       return this.toolMetrics.get(toolName);
     }

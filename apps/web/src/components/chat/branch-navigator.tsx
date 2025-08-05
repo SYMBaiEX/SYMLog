@@ -124,9 +124,9 @@ export function BranchNavigator({
 
   const getBranchPreview = (branch: Branch) => {
     // Get the last few characters of the branch for preview
-    const node: ConversationNode | undefined = Array.from(tree.nodes.values()).find(
-      (n) => n.id === branch.leafNodeId
-    );
+    const node: ConversationNode | undefined = Array.from(
+      tree.nodes.values()
+    ).find((n) => n.id === branch.leafNodeId);
     if (!node) return branch.name;
 
     const content = node.message.parts

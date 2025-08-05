@@ -1,8 +1,8 @@
 import type { LanguageModel } from 'ai';
 import { logError as logErrorToConsole } from '@/lib/logger';
+import { v2ErrorHandler } from './error-handling';
 import type { ModelInfo, ProviderInfo } from './gateway';
 import { ProviderMetricsService } from './provider-metrics';
-import { v2ErrorHandler } from './error-handling';
 
 // Create a logger wrapper
 const loggingService = {

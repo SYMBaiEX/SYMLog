@@ -1,7 +1,4 @@
-import type {
-  CoreMessage,
-  CoreToolMessage,
-} from 'ai';
+import type { CoreMessage, CoreToolMessage } from 'ai';
 import { generateText, type StopCondition, stepCountIs, streamText } from 'ai';
 import { getAIModel } from './providers';
 import { artifactTools } from './tools/artifact-tools';
@@ -88,8 +85,12 @@ export class WorkflowController {
           // Create workflow step
           const workflowStep: WorkflowStep = {
             stepNumber,
-            stepType: toolCalls && toolCalls.length > 0 ? 'tool-call' : 
-                     toolResults && toolResults.length > 0 ? 'tool-result' : 'text',
+            stepType:
+              toolCalls && toolCalls.length > 0
+                ? 'tool-call'
+                : toolResults && toolResults.length > 0
+                  ? 'tool-result'
+                  : 'text',
             timestamp: new Date(),
           };
 
@@ -97,7 +98,7 @@ export class WorkflowController {
           if (text) {
             workflowStep.content = text;
           }
-          
+
           if (toolCalls && toolCalls.length > 0) {
             workflowStep.toolCalls = toolCalls;
 
@@ -108,7 +109,7 @@ export class WorkflowController {
               }
             }
           }
-          
+
           if (toolResults && toolResults.length > 0) {
             workflowStep.toolResults = toolResults;
 
@@ -227,8 +228,12 @@ export class WorkflowController {
 
           const workflowStep: WorkflowStep = {
             stepNumber,
-            stepType: toolCalls && toolCalls.length > 0 ? 'tool-call' : 
-                     toolResults && toolResults.length > 0 ? 'tool-result' : 'text',
+            stepType:
+              toolCalls && toolCalls.length > 0
+                ? 'tool-call'
+                : toolResults && toolResults.length > 0
+                  ? 'tool-result'
+                  : 'text',
             timestamp: new Date(),
           };
 
@@ -236,14 +241,14 @@ export class WorkflowController {
           if (text) {
             workflowStep.content = text;
           }
-          
+
           if (toolCalls && toolCalls.length > 0) {
             workflowStep.toolCalls = toolCalls;
             for (const toolCall of toolCalls) {
               if (onToolCall) await onToolCall(toolCall);
             }
           }
-          
+
           if (toolResults && toolResults.length > 0) {
             workflowStep.toolResults = toolResults;
             for (const toolResult of toolResults) {
@@ -346,7 +351,13 @@ export class WorkflowController {
               language: { type: 'string' },
             },
           },
-          execute: async ({ code, language }: { code: string; language: string }) => {
+          execute: async ({
+            code,
+            language,
+          }: {
+            code: string;
+            language: string;
+          }) => {
             // Mock validation
             return { valid: true, message: '✓ Code validated successfully' };
           },
@@ -476,7 +487,8 @@ export const commonStopConditions = {
   // Stop on error
   onError: () =>
     createStopCondition(
-      (step) => step.toolResults?.some((tr: any) => tr.isError === true) ?? false,
+      (step) =>
+        step.toolResults?.some((tr: any) => tr.isError === true) ?? false,
       'On error'
     ),
 

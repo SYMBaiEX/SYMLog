@@ -273,7 +273,10 @@ class DatabaseConnection {
     return result.rows;
   }
 
-  async insert<T extends Record<string, any>>(table: string, data: Record<string, any>): Promise<T> {
+  async insert<T extends Record<string, any>>(
+    table: string,
+    data: Record<string, any>
+  ): Promise<T> {
     const keys = Object.keys(data);
     const values = Object.values(data);
     const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');

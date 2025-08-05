@@ -278,10 +278,15 @@ export async function POST(req: NextRequest) {
 
     // Handle error response
     const errorMessage = error instanceof Error ? error.message : String(error);
-    const isRateLimit = errorMessage.includes('rate') || errorMessage.includes('limit') || errorMessage.includes('429');
-    const isAuthError = errorMessage.includes('auth') || errorMessage.includes('401');
-    const isNotFound = errorMessage.includes('not found') || errorMessage.includes('404');
-    
+    const isRateLimit =
+      errorMessage.includes('rate') ||
+      errorMessage.includes('limit') ||
+      errorMessage.includes('429');
+    const isAuthError =
+      errorMessage.includes('auth') || errorMessage.includes('401');
+    const isNotFound =
+      errorMessage.includes('not found') || errorMessage.includes('404');
+
     // Log security events for rate limit errors
     if (isRateLimit) {
       logSecurityEvent({

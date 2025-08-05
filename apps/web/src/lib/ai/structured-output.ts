@@ -374,7 +374,12 @@ export async function streamStructuredData<T>(params: {
           cost: undefined, // cost is not available in LanguageModelV2Usage
         };
 
-        onFinish?.({ object: result.object as T, finishReason: 'stop', usage: typedUsage, success: true });
+        onFinish?.({
+          object: result.object as T,
+          finishReason: 'stop',
+          usage: typedUsage,
+          success: true,
+        });
       },
     });
 

@@ -339,7 +339,11 @@ export function usePrepareStep<
       customConfig?: Partial<PrepareStepResult<T>>
     ): PrepareStepFunction<T> => {
       return ({ steps, stepNumber, model, messages }) => {
-        const complexity = analyzeStepComplexity(messages, stepNumber, steps as StepResult<TOOLS>[]);
+        const complexity = analyzeStepComplexity(
+          messages,
+          stepNumber,
+          steps as StepResult<TOOLS>[]
+        );
         const selectedConfig = selectModelConfig(complexity);
         const compressedMessages = compressMessages(messages, maxContextWindow);
         const activeTools = selectActiveTools(
@@ -514,6 +518,4 @@ export function usePrepareStep<
 }
 
 // Export types for external use
-export type {
-  PrepareStepModelConfig as ModelConfig,
-};
+export type { PrepareStepModelConfig as ModelConfig };

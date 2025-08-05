@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
           totalSteps: context.totalSteps || 1,
           previousResults: context.previousResults || [],
           dependencies: context.dependencies || [],
-          parallelExecution: context.parallelExecution || false,
+          parallelExecution: context.parallelExecution ?? false,
         }
       : undefined;
 

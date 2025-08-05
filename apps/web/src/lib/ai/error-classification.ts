@@ -13,6 +13,7 @@ class ToolExecutionError extends Error {
     return error instanceof ToolExecutionError;
   }
 }
+
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { ErrorCategory, ErrorSeverity } from './advanced-error-handling';
 
@@ -538,7 +539,11 @@ export class ErrorClassifier {
     }
 
     // 5xx errors are transient
-    if (APICallError.isInstance(error) && error.statusCode && error.statusCode >= 500) {
+    if (
+      APICallError.isInstance(error) &&
+      error.statusCode &&
+      error.statusCode >= 500
+    ) {
       return true;
     }
 
@@ -558,8 +563,8 @@ export class ErrorClassifier {
     // Check API error retryability
     if (APICallError.isInstance(error)) {
       return (
-        Boolean(error.isRetryable) || 
-        (error.statusCode !== undefined && error.statusCode >= 500) || 
+        Boolean(error.isRetryable) ||
+        (error.statusCode !== undefined && error.statusCode >= 500) ||
         (error.statusCode !== undefined && error.statusCode === 429)
       );
     }

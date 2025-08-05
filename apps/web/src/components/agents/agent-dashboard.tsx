@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from 'convex/react';
-import type { Id } from '../../../convex/_generated/dataModel';
 import {
   Activity,
   BarChart3,
@@ -19,6 +18,7 @@ import { GlassButton } from '@/components/ui/glass-button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { cn } from '@/lib/utils';
 import { api } from '../../../convex/_generated/api';
+import type { Id } from '../../../convex/_generated/dataModel';
 import { AgentKnowledgeViewer } from './agent-knowledge-viewer';
 import { AgentLearningAnalytics } from './agent-learning-analytics';
 import { AgentMemoryTimeline } from './agent-memory-timeline';
@@ -282,7 +282,9 @@ export function AgentDashboard({ userId, className }: AgentDashboardProps) {
           <div className="relative">
             <select
               className="appearance-none rounded-lg border border-white/20 bg-white/10 px-3 py-2 pr-8 text-sm focus:border-periwinkle/50 focus:outline-none"
-              onChange={(e) => setSelectedAgentId(e.target.value as Id<'agents'>)}
+              onChange={(e) =>
+                setSelectedAgentId(e.target.value as Id<'agents'>)
+              }
               value={selectedAgentId}
             >
               {agents.map((agent) => (

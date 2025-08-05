@@ -397,7 +397,10 @@ export const getAgentLearningProgress = query({
       date: day,
       events: events.length,
       totalImpact: events.reduce((sum, e) => sum + e.impact, 0),
-      avgImpact: events.length > 0 ? events.reduce((sum, e) => sum + e.impact, 0) / events.length : 0,
+      avgImpact:
+        events.length > 0
+          ? events.reduce((sum, e) => sum + e.impact, 0) / events.length
+          : 0,
       eventTypes: events.reduce(
         (acc, e) => {
           acc[e.eventType] = (acc[e.eventType] || 0) + 1;

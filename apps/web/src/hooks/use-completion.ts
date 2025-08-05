@@ -145,7 +145,9 @@ export function useCompletion<
 
   const prepareStepFunction =
     customPrepareStep ??
-    (enableIntelligentStepping ? (prepareStepHook.configs as any).precise : undefined);
+    (enableIntelligentStepping
+      ? (prepareStepHook.configs as any).precise
+      : undefined);
 
   // Base completion hook with enhanced error handling
   const {

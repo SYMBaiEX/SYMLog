@@ -129,7 +129,7 @@ After reasoning, provide a clear and concise answer.`;
     prompt: string,
     systemPrompt?: string,
     onReasoningStep?: (step: ReasoningStep) => void
-  ): Promise<StreamTextResult> {
+  ) {
     const enhancedPrompt = this.options.startWithReasoning
       ? `${prompt}\n\nThink step by step about this problem before providing your answer.`
       : prompt;
@@ -328,7 +328,9 @@ Think through each option against each criterion, then make a recommendation.`;
             ).push(trimmed);
           } else {
             (sections[currentSection as keyof typeof sections] as string) =
-              (sections[currentSection as keyof typeof sections] as string) + ' ' + trimmed;
+              (sections[currentSection as keyof typeof sections] as string) +
+              ' ' +
+              trimmed;
           }
         }
       }

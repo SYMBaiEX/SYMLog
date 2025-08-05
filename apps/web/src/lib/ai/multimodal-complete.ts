@@ -785,7 +785,7 @@ export class MultiModalCompleteSystem {
    * Get comprehensive system metrics
    */
   getSystemMetrics(): {
-    performance: typeof this.performanceMetrics;
+    performance: any;
     cacheSize: number;
     videoProcessor: any;
     streaming: any;

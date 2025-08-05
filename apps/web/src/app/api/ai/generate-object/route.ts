@@ -11,9 +11,9 @@ import {
   generateStructuredData,
   type OutputStrategy,
   type SchemaType,
+  type StructuredResult,
   schemaRegistry,
   validateStructuredData,
-  type StructuredResult,
 } from '@/lib/ai/structured-output';
 import { config } from '@/lib/config';
 import { extractClientInfo, logAPIError, logSecurityEvent } from '@/lib/logger';
@@ -136,7 +136,10 @@ export async function POST(req: NextRequest) {
         }
       );
 
-      const result = await Promise.race([generationPromise, timeoutPromise]) as StructuredResult<any>;
+      const result = (await Promise.race([
+        generationPromise,
+        timeoutPromise,
+      ])) as StructuredResult<any>;
 
       // Log successful generation
       logSecurityEvent({

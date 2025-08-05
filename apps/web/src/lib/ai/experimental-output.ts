@@ -2,12 +2,12 @@
 // Implements the experimental_output feature with support for text and object generation
 
 import {
+  type GenerateTextResult,
+  generateText,
   type LanguageModel,
   Output,
-  generateText,
-  streamText,
   type StreamTextResult,
-  type GenerateTextResult,
+  streamText,
 } from 'ai';
 import { z } from 'zod';
 import { getAIModel } from './providers';
@@ -24,7 +24,8 @@ export interface OutputBuilder<T = any> {
 export type PartialOutputHandler<T> = (partial: Partial<T>) => void;
 
 // Output stream result with partial output support
-export interface OutputStreamResult<T> extends Omit<StreamTextResult<any, any>, 'experimental_partialOutputStream'> {
+export interface OutputStreamResult<T>
+  extends Omit<StreamTextResult<any, any>, 'experimental_partialOutputStream'> {
   experimental_partialOutputStream?: AsyncIterable<Partial<T>>;
 }
 
@@ -56,13 +57,17 @@ export class StructuredOutputBuilder {
   /**
    * Create an enum output configuration
    */
-  static enum<T extends readonly string[]>(values: T): OutputBuilder<T[number]> {
+  static enum<T extends readonly string[]>(
+    values: T
+  ): OutputBuilder<T[number]> {
     return {
       type: 'enum',
       enumValues: values,
       transform: (value) => {
         if (!values.includes(value)) {
-          throw new Error(`Invalid enum value: ${value}. Expected one of: ${values.join(', ')}`);
+          throw new Error(
+            `Invalid enum value: ${value}. Expected one of: ${values.join(', ')}`
+          );
         }
         return value;
       },
@@ -110,7 +115,9 @@ export class StructuredOutputService {
       });
     } else if (outputBuilder.type === 'enum') {
       // For enum, we use object output with enum schema
-      const enumSchema = z.enum(outputBuilder.enumValues as [string, ...string[]]);
+      const enumSchema = z.enum(
+        outputBuilder.enumValues as [string, ...string[]]
+      );
       output = Output.object({
         schema: z.object({ value: enumSchema }),
       });
@@ -132,16 +139,33 @@ export class StructuredOutputService {
     // Transform the output if needed
     let transformedOutput: T | undefined;
     if (result.text && outputBuilder.type === 'text') {
-      transformedOutput = outputBuilder.transform?.(result.text) ?? result.text as T;
+      transformedOutput =
+        outputBuilder.transform?.(result.text) ?? (result.text as T);
     } else if ('object' in result && result.object) {
       if (outputBuilder.type === 'enum') {
-        const enumValue = (result.object && typeof result.object === 'object' && result.object !== null && 'value' in result.object) ? (result.object as any).value : undefined;
-        transformedOutput = outputBuilder.transform?.(enumValue) ?? (enumValue as T | undefined);
+        const enumValue =
+          result.object &&
+          typeof result.object === 'object' &&
+          result.object !== null &&
+          'value' in result.object
+            ? (result.object as any).value
+            : undefined;
+        transformedOutput =
+          outputBuilder.transform?.(enumValue) ?? (enumValue as T | undefined);
       } else if (outputBuilder.type === 'array') {
-        const arrayItems = (result.object && typeof result.object === 'object' && result.object !== null && 'items' in result.object) ? (result.object as any).items : undefined;
-        transformedOutput = outputBuilder.transform?.(arrayItems) ?? (arrayItems as T | undefined);
+        const arrayItems =
+          result.object &&
+          typeof result.object === 'object' &&
+          result.object !== null &&
+          'items' in result.object
+            ? (result.object as any).items
+            : undefined;
+        transformedOutput =
+          outputBuilder.transform?.(arrayItems) ??
+          (arrayItems as T | undefined);
       } else {
-        transformedOutput = outputBuilder.transform?.(result.object) ?? (result.object as T);
+        transformedOutput =
+          outputBuilder.transform?.(result.object) ?? (result.object as T);
       }
     }
 
@@ -187,14 +211,17 @@ export class StructuredOutputService {
     });
 
     // Handle partial output streaming
-    if (options?.onPartialOutput && 'experimental_partialOutputStream' in stream) {
+    if (
+      options?.onPartialOutput &&
+      'experimental_partialOutputStream' in stream
+    ) {
       (async () => {
         try {
           if (stream.experimental_partialOutputStream) {
             for await (const partial of stream.experimental_partialOutputStream) {
               const transformedPartial = outputBuilder.transform
                 ? outputBuilder.transform(partial)
-                : partial as T;
+                : (partial as T);
               options.onPartialOutput?.(transformedPartial as Partial<T>);
             }
           }
@@ -277,7 +304,7 @@ export class OutputValidator {
             currentOutput = options.repairFunction(currentOutput, error);
           } else {
             // Default repair strategies
-            currentOutput = this.defaultRepair(currentOutput, error);
+            currentOutput = OutputValidator.defaultRepair(currentOutput, error);
           }
         } else {
           throw error;
@@ -303,38 +330,62 @@ export class OutputValidator {
         case 'invalid_type':
           // Try to coerce to expected type
           if (issue.expected === 'string') {
-            this.setNestedValue(repaired, path, String(this.getNestedValue(output, path)));
+            OutputValidator.setNestedValue(
+              repaired,
+              path,
+              String(OutputValidator.getNestedValue(output, path))
+            );
           } else if (issue.expected === 'number') {
-            const value = this.getNestedValue(output, path);
-            this.setNestedValue(repaired, path, Number(value) || 0);
+            const value = OutputValidator.getNestedValue(output, path);
+            OutputValidator.setNestedValue(repaired, path, Number(value) || 0);
           } else if (issue.expected === 'boolean') {
-            this.setNestedValue(repaired, path, Boolean(this.getNestedValue(output, path)));
+            OutputValidator.setNestedValue(
+              repaired,
+              path,
+              Boolean(OutputValidator.getNestedValue(output, path))
+            );
           } else if (issue.expected === 'array') {
-            this.setNestedValue(repaired, path, []);
+            OutputValidator.setNestedValue(repaired, path, []);
           } else if (issue.expected === 'object') {
-            this.setNestedValue(repaired, path, {});
+            OutputValidator.setNestedValue(repaired, path, {});
           }
           break;
 
         case 'invalid_value':
           // Set to first valid enum value
-          if ('options' in issue && Array.isArray((issue as any).options) && (issue as any).options.length > 0) {
-            this.setNestedValue(repaired, path, (issue as any).options[0]);
+          if (
+            'options' in issue &&
+            Array.isArray((issue as any).options) &&
+            (issue as any).options.length > 0
+          ) {
+            OutputValidator.setNestedValue(
+              repaired,
+              path,
+              (issue as any).options[0]
+            );
           }
           break;
 
         case 'too_small':
           // Set minimum value
-          if ('type' in issue && issue.type === 'string' && 'minimum' in issue) {
-            this.setNestedValue(repaired, path, 'a'.repeat(issue.minimum as number));
+          if (
+            'type' in issue &&
+            issue.type === 'string' &&
+            'minimum' in issue
+          ) {
+            OutputValidator.setNestedValue(
+              repaired,
+              path,
+              'a'.repeat(issue.minimum as number)
+            );
           } else if ('type' in issue && issue.type === 'array') {
-            this.setNestedValue(repaired, path, []);
+            OutputValidator.setNestedValue(repaired, path, []);
           }
           break;
 
         default:
           // Remove invalid field
-          this.deleteNestedValue(repaired, path);
+          OutputValidator.deleteNestedValue(repaired, path);
       }
     }
 

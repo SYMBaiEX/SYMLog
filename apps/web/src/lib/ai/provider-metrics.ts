@@ -1323,12 +1323,13 @@ export class ProviderMetricsService {
   private calculateCostEfficiencyScore(metrics: ProviderMetrics): number {
     // Calculate cost efficiency score based on cost per successful request
     if (metrics.successCount === 0) return 0;
-    
-    const costPerSuccess = metrics.costTracking.totalCost / metrics.successCount;
+
+    const costPerSuccess =
+      metrics.costTracking.totalCost / metrics.successCount;
     // Lower cost per success = higher score
     // $0.01 per success = 100, $0.10 per success = 0
     if (costPerSuccess <= 0.01) return 100;
-    if (costPerSuccess >= 0.10) return 0;
+    if (costPerSuccess >= 0.1) return 0;
     return Math.round(100 - ((costPerSuccess - 0.01) / 0.09) * 100);
   }
 

@@ -59,25 +59,34 @@ export const getAgentMemories = query({
     limit: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Verify user owns the agent
-    const agent = await ctx.db.get(args.agentId);
-    if (!agent || agent.userId !== args.userId) {
-      return [];
-    }
-
-    let query = ctx.db
-      .query('agentMemories')
-      .withIndex('by_user_agent', (q) =>
-        q.eq('userId', args.userId).eq('agentId', args.agentId)
-      );
+    // Use compound index for authorization and filtering in one query
+    let query;
 
     if (args.type) {
+      // Use the more specific compound index when type is provided
       query = ctx.db
         .query('agentMemories')
-        .withIndex('by_agent_type', (q) =>
-          q.eq('agentId', args.agentId).eq('type', args.type as "conversation" | "learning" | "reflection" | "context" | "preference")
-        )
-        .filter((q) => q.eq(q.field('userId'), args.userId));
+        .withIndex('by_user_agent_type', (q) =>
+          q
+            .eq('userId', args.userId)
+            .eq('agentId', args.agentId)
+            .eq(
+              'type',
+              args.type as
+                | 'conversation'
+                | 'learning'
+                | 'reflection'
+                | 'context'
+                | 'preference'
+            )
+        );
+    } else {
+      // Use user_agent index when no type filter
+      query = ctx.db
+        .query('agentMemories')
+        .withIndex('by_user_agent', (q) =>
+          q.eq('userId', args.userId).eq('agentId', args.agentId)
+        );
     }
 
     const memories = await query.order('desc').take(args.limit || 50);
@@ -94,38 +103,28 @@ export const getAgentMemoryTimeline = query({
     endTime: v.optional(v.number()),
   },
   handler: async (ctx, args) => {
-    // Verify user owns the agent
-    const agent = await ctx.db.get(args.agentId);
-    if (!agent || agent.userId !== args.userId) {
-      return [];
-    }
-
+    // Use compound index for authorization and filtering in one query
     let query = ctx.db
       .query('agentMemories')
       .withIndex('by_user_agent', (q) =>
         q.eq('userId', args.userId).eq('agentId', args.agentId)
       );
 
+    // Apply time filtering if provided
     if (args.startTime || args.endTime) {
-      query = ctx.db.query('agentMemories').withIndex('by_timestamp');
-
       if (args.startTime && args.endTime) {
         query = query.filter((q) =>
           q.and(
-            q.eq(q.field('userId'), args.userId),
-            q.eq(q.field('agentId'), args.agentId),
             q.gte(q.field('timestamp'), args.startTime!),
             q.lte(q.field('timestamp'), args.endTime!)
           )
         );
       } else if (args.startTime) {
         query = query.filter((q) =>
-          q.and(
-            q.eq(q.field('userId'), args.userId),
-            q.eq(q.field('agentId'), args.agentId),
-            q.gte(q.field('timestamp'), args.startTime!)
-          )
+          q.gte(q.field('timestamp'), args.startTime!)
         );
+      } else if (args.endTime) {
+        query = query.filter((q) => q.lte(q.field('timestamp'), args.endTime!));
       }
     }
 
@@ -167,7 +166,18 @@ export const getAgentKnowledge = query({
       query = ctx.db
         .query('agentKnowledge')
         .withIndex('by_agent_category', (q) =>
-          q.eq('agentId', args.agentId).eq('category', args.category as "facts" | "skills" | "preferences" | "relationships" | "procedures" | "concepts")
+          q
+            .eq('agentId', args.agentId)
+            .eq(
+              'category',
+              args.category as
+                | 'facts'
+                | 'skills'
+                | 'preferences'
+                | 'relationships'
+                | 'procedures'
+                | 'concepts'
+            )
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -339,7 +349,17 @@ export const getAgentLearningEvents = query({
       query = ctx.db
         .query('agentLearningEvents')
         .withIndex('by_agent_type', (q) =>
-          q.eq('agentId', args.agentId).eq('eventType', args.eventType as "knowledge_gained" | "memory_created" | "skill_improved" | "preference_learned" | "mistake_corrected")
+          q
+            .eq('agentId', args.agentId)
+            .eq(
+              'eventType',
+              args.eventType as
+                | 'knowledge_gained'
+                | 'memory_created'
+                | 'skill_improved'
+                | 'preference_learned'
+                | 'mistake_corrected'
+            )
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -421,18 +441,13 @@ export const searchAgentData = query({
     ),
   },
   handler: async (ctx, args) => {
-    // Verify user owns the agent
-    const agent = await ctx.db.get(args.agentId);
-    if (!agent || agent.userId !== args.userId) {
-      return { memories: [], knowledge: [] };
-    }
-
     const query = args.searchQuery.toLowerCase();
     const searchMemories = args.dataType !== 'knowledge';
     const searchKnowledge = args.dataType !== 'memories';
 
     const results = { memories: [] as any[], knowledge: [] as any[] };
 
+    // Use compound index for authorization - no separate agent lookup needed
     if (searchMemories) {
       const memories = await ctx.db
         .query('agentMemories')

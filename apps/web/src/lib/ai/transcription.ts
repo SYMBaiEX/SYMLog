@@ -355,7 +355,9 @@ export async function extractAudioFromVideo(videoFile: File): Promise<Blob> {
   // This is a placeholder - actual implementation would use
   // Web Audio API or a library to extract audio track
   // TODO: Implement audio extraction using Web Audio API
-  throw new Error('Audio extraction from video not yet implemented - pending Web Audio API integration')
+  throw new Error(
+    'Audio extraction from video not yet implemented - pending Web Audio API integration'
+  );
 }
 
 /**
@@ -371,7 +373,9 @@ export async function splitAudioIntoChunks(
   // This is a placeholder - actual implementation would use
   // Web Audio API to split audio into time-based chunks
   // TODO: Implement audio splitting using Web Audio API
-  throw new Error('Audio splitting not yet implemented - pending Web Audio API integration')
+  throw new Error(
+    'Audio splitting not yet implemented - pending Web Audio API integration'
+  );
 }
 
 /**
@@ -383,23 +387,23 @@ export function mergeTranscriptionResults(
   results: TranscriptionResult[]
 ): TranscriptionResult {
   if (results.length === 0) {
-    throw new Error('No results to merge')
+    throw new Error('No results to merge');
   }
 
-  const mergedText = results.map(r => r.text).join(' ')
-  const totalDuration = results.reduce((sum, r) => sum + (r.duration || 0), 0)
-  
+  const mergedText = results.map((r) => r.text).join(' ');
+  const totalDuration = results.reduce((sum, r) => sum + (r.duration || 0), 0);
+
   const merged: TranscriptionResult = {
     text: mergedText,
     language: results[0].language,
-    duration: totalDuration
-  }
+    duration: totalDuration,
+  };
 
   // Merge segments if available
-  if (results.some(r => r.segments)) {
-    merged.segments = []
-    let segmentOffset = 0
-    
+  if (results.some((r) => r.segments)) {
+    merged.segments = [];
+    let segmentOffset = 0;
+
     for (const result of results) {
       if (result.segments) {
         for (const segment of result.segments) {
@@ -407,15 +411,15 @@ export function mergeTranscriptionResults(
             ...segment,
             id: merged.segments.length,
             start: segment.start + segmentOffset,
-            end: segment.end + segmentOffset
-          })
+            end: segment.end + segmentOffset,
+          });
         }
       }
-      segmentOffset += result.duration || 0
+      segmentOffset += result.duration || 0;
     }
   }
 
-  return merged
+  return merged;
 }
 
 /**
@@ -429,50 +433,50 @@ export function generateSubtitles(
   format: 'srt' | 'vtt' = 'srt'
 ): string {
   if (!result.segments || result.segments.length === 0) {
-    throw new Error('No segments available for subtitle generation')
+    throw new Error('No segments available for subtitle generation');
   }
 
   if (format === 'srt') {
     return result.segments
       .map((segment, index) => {
-        const start = formatTimeSRT(segment.start)
-        const end = formatTimeSRT(segment.end)
-        return `${index + 1}\n${start} --> ${end}\n${segment.text.trim()}\n`
+        const start = formatTimeSRT(segment.start);
+        const end = formatTimeSRT(segment.end);
+        return `${index + 1}\n${start} --> ${end}\n${segment.text.trim()}\n`;
       })
-      .join('\n')
+      .join('\n');
   }
-  
+
   // VTT format
-  let vtt = 'WEBVTT\n\n'
+  let vtt = 'WEBVTT\n\n';
   vtt += result.segments
-    .map(segment => {
-      const start = formatTimeVTT(segment.start)
-      const end = formatTimeVTT(segment.end)
-      return `${start} --> ${end}\n${segment.text.trim()}\n`
+    .map((segment) => {
+      const start = formatTimeVTT(segment.start);
+      const end = formatTimeVTT(segment.end);
+      return `${start} --> ${end}\n${segment.text.trim()}\n`;
     })
-    .join('\n')
-  return vtt
+    .join('\n');
+  return vtt;
 }
 
 // Helper functions for time formatting
 function formatTimeSRT(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
-  const ms = Math.floor((seconds % 1) * 1000)
-  
-  return `${pad(hours)}:${pad(minutes)}:${pad(secs)},${pad(ms, 3)}`
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)},${pad(ms, 3)}`;
 }
 
 function formatTimeVTT(seconds: number): string {
-  const hours = Math.floor(seconds / 3600)
-  const minutes = Math.floor((seconds % 3600) / 60)
-  const secs = Math.floor(seconds % 60)
-  const ms = Math.floor((seconds % 1) * 1000)
-  
-  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}.${pad(ms, 3)}`
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds % 1) * 1000);
+
+  return `${pad(hours)}:${pad(minutes)}:${pad(secs)}.${pad(ms, 3)}`;
 }
 
 function pad(num: number, size = 2): string {
-  return num.toString().padStart(size, '0')
+  return num.toString().padStart(size, '0');
 }

@@ -1,12 +1,7 @@
 'use client';
 
 import { useChat as useBaseChat } from '@ai-sdk/react';
-import type {
-  ChatRequestOptions,
-  CoreMessage,
-  Tool,
-  UIMessage,
-} from 'ai';
+import type { ChatRequestOptions, CoreMessage, Tool, UIMessage } from 'ai';
 import { DefaultChatTransport } from 'ai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -21,6 +16,7 @@ interface ToolInvocation {
 type EnhancedUIMessage = UIMessage & {
   content?: string; // For backward compatibility with v4 interface
 };
+
 import { toast } from 'sonner';
 import {
   type CompressionTransformConfig,
@@ -52,7 +48,7 @@ function getMessageText(message: Message): string | undefined {
       .map((part: any) => part.text)
       .join('');
   }
-  return undefined;
+  return;
 }
 
 export interface UseChatEnhancedOptions<
@@ -98,7 +94,7 @@ export interface UseChatEnhancedOptions<
   filterConfig?: FilterTransformConfig;
   collectProviderMetrics?: boolean;
   onProviderMetrics?: (metrics: ProviderMetricsData) => void;
-  
+
   // V5-compatible options
   messages?: Message[];
   transport?: any;
@@ -296,7 +292,7 @@ export function useChatEnhanced<
       appliedTransforms: appliedTransformNames,
     }));
 
-    return undefined; // Transforms not supported in AI SDK v5
+    return; // Transforms not supported in AI SDK v5
   }, [
     transformPreset,
     compressionConfig,
@@ -347,15 +343,16 @@ export function useChatEnhanced<
     onToolCall: async (options: any): Promise<void> => {
       try {
         // Handle different AI SDK callback formats
-        const actualToolCall = 'toolCall' in options ? options.toolCall : options;
-        
+        const actualToolCall =
+          'toolCall' in options ? options.toolCall : options;
+
         // Ensure args property exists for compatibility
         const compatibleToolCall: ToolInvocation = {
           toolCallId: actualToolCall.toolCallId || actualToolCall.id,
           toolName: actualToolCall.toolName || actualToolCall.name,
           args: actualToolCall.args || actualToolCall.arguments || {},
         };
-        
+
         await onToolCall?.(compatibleToolCall);
       } catch (error) {
         console.error('Tool execution error:', error);
@@ -367,7 +364,15 @@ export function useChatEnhanced<
     },
     // Note: onResponse is not supported in AI SDK v5 useChat hook
     // Custom response handling would need to be implemented via transport
-    onFinish: ({ message, usage, finishReason }: { message: UIMessage; usage?: any; finishReason?: string }) => {
+    onFinish: ({
+      message,
+      usage,
+      finishReason,
+    }: {
+      message: UIMessage;
+      usage?: any;
+      finishReason?: string;
+    }) => {
       // Track request metrics
       requestCount.current += 1;
       const endTime = Date.now();
@@ -411,7 +416,10 @@ export function useChatEnhanced<
             total: usage?.totalTokens ?? 0,
           },
           quality: {
-            coherenceScore: Math.min((getMessageText(message)?.length ?? 0) / 100, 1.0),
+            coherenceScore: Math.min(
+              (getMessageText(message)?.length ?? 0) / 100,
+              1.0
+            ),
             relevanceScore: 0.8, // Simplified calculation
             completenessScore: finishReason === 'stop' ? 0.9 : 0.6,
           },
@@ -501,9 +509,10 @@ export function useChatEnhanced<
   const messages = baseChatResult.messages;
   const input = (baseChatResult as any).input || '';
   const setInput = (baseChatResult as any).setInput || (() => {});
-  const baseIsLoading = (baseChatResult as any).isLoading || false;
+  const baseIsLoading = (baseChatResult as any).isLoading;
   const baseError = baseChatResult.error;
-  const baseAppend = (baseChatResult as any).append || baseChatResult.sendMessage;
+  const baseAppend =
+    (baseChatResult as any).append || baseChatResult.sendMessage;
   const baseReload = (baseChatResult as any).reload || (() => {});
   const baseStop = (baseChatResult as any).stop || (() => {});
   const setMessages = baseChatResult.setMessages;
@@ -515,10 +524,10 @@ export function useChatEnhanced<
     async (message: Message | string, options?: ChatRequestOptions) => {
       const messageObj: Message =
         typeof message === 'string'
-          ? { 
-              role: 'user' as const, 
+          ? {
+              role: 'user' as const,
               id: `msg-${Date.now()}`,
-              parts: [{ type: 'text', text: message }]
+              parts: [{ type: 'text', text: message }],
             }
           : message;
 
@@ -686,7 +695,9 @@ export function useChatEnhanced<
 
         case 'txt':
           return messages
-            .map((msg) => `${msg.role.toUpperCase()}: ${getMessageText(msg) || ''}`)
+            .map(
+              (msg) => `${msg.role.toUpperCase()}: ${getMessageText(msg) || ''}`
+            )
             .join('\n\n');
 
         default:

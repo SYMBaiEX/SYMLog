@@ -510,12 +510,16 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
             `Created: ${new Date(thread.createdAt).toLocaleString()}`,
             `Updated: ${new Date(thread.updatedAt).toLocaleString()}`,
             '',
-            ...thread.messages.map(
-              (msg) => {
-                const content = msg.content ?? msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') ?? '';
-                return `## ${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}\n\n${content}\n`;
-              }
-            ),
+            ...thread.messages.map((msg) => {
+              const content =
+                msg.content ??
+                msg.parts
+                  ?.filter((p: any) => p.type === 'text')
+                  .map((p: any) => p.text)
+                  .join('') ??
+                '';
+              return `## ${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}\n\n${content}\n`;
+            }),
           ].join('\n');
 
         case 'txt':
@@ -524,12 +528,16 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
             `Created: ${new Date(thread.createdAt).toLocaleString()}`,
             `Updated: ${new Date(thread.updatedAt).toLocaleString()}`,
             '',
-            ...thread.messages.map(
-              (msg) => {
-                const content = msg.content ?? msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') ?? '';
-                return `${msg.role.toUpperCase()}: ${content}`;
-              }
-            ),
+            ...thread.messages.map((msg) => {
+              const content =
+                msg.content ??
+                msg.parts
+                  ?.filter((p: any) => p.type === 'text')
+                  .map((p: any) => p.text)
+                  .join('') ??
+                '';
+              return `${msg.role.toUpperCase()}: ${content}`;
+            }),
           ].join('\n\n');
 
         default:
@@ -543,22 +551,22 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
   const searchMessages = useCallback(
     (query: string): Message[] => {
       const searchTerm = query.toLowerCase();
-      return chat.messages.filter(
-        (msg) => {
-          // Handle UIMessage content structure
-          let content = '';
-          if (msg.content) {
-            content = msg.content;
-          } else if (msg.parts) {
-            content = msg.parts
-              .filter((part: any) => part.type === 'text')
-              .map((part: any) => part.text)
-              .join(' ');
-          }
-          return content.toLowerCase().includes(searchTerm) ||
-                 msg.role.toLowerCase().includes(searchTerm);
+      return chat.messages.filter((msg) => {
+        // Handle UIMessage content structure
+        let content = '';
+        if (msg.content) {
+          content = msg.content;
+        } else if (msg.parts) {
+          content = msg.parts
+            .filter((part: any) => part.type === 'text')
+            .map((part: any) => part.text)
+            .join(' ');
         }
-      );
+        return (
+          content.toLowerCase().includes(searchTerm) ||
+          msg.role.toLowerCase().includes(searchTerm)
+        );
+      });
     },
     [chat.messages]
   );
@@ -584,7 +592,9 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
     // Actions
     submitMessage,
     appendMessage,
-    regenerateLastMessage: async () => { await chat.reload(); },
+    regenerateLastMessage: async () => {
+      await chat.reload();
+    },
     stop: chat.stop,
     clearMessages: () => chat.setMessages([]),
 

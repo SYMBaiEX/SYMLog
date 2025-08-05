@@ -125,14 +125,17 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const response: WorkflowExecutionResponse = {
       success: result.success,
-      result: result.success && result.data ? result.data as {
-        workflowName: string;
-        totalSteps: number;
-        completedSteps: number;
-        results: any[];
-        errors?: string[];
-        executedAt: number;
-      } : undefined,
+      result:
+        result.success && result.data
+          ? (result.data as {
+              workflowName: string;
+              totalSteps: number;
+              completedSteps: number;
+              results: any[];
+              errors?: string[];
+              executedAt: number;
+            })
+          : undefined,
       executionId,
     };
 
@@ -164,7 +167,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
   let executionId: string | null = null;
-  
+
   try {
     const { searchParams } = new URL(request.url);
     executionId = searchParams.get('executionId');

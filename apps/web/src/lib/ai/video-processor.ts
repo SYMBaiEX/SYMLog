@@ -698,10 +698,10 @@ Provide insights about the video content, main themes, and key moments.`,
           width: video.videoWidth,
           height: video.videoHeight,
           frameRate: VIDEO_PROCESSING_CONSTANTS.DEFAULT_FRAME_RATE,
-          hasAudio: (video as any).audioTracks?.length > 0 || false,
+          hasAudio: (video as any).audioTracks?.length > 0,
           audioTracks: (video as any).audioTracks?.length || 0,
-          videoTracks: (video as any).videoTracks?.length || 1
-        }
+          videoTracks: (video as any).videoTracks?.length || 1,
+        };
 
         // Try to extract additional metadata if available
         if ((video as any).mozHasAudio !== undefined) {

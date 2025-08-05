@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from 'convex/react';
-import type { Id } from '../../../convex/_generated/dataModel';
 import {
   Activity,
   Award,
@@ -21,6 +20,7 @@ import { GlassButton } from '@/components/ui/glass-button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { cn } from '@/lib/utils';
 import { api } from '../../../convex/_generated/api';
+import type { Id } from '../../../convex/_generated/dataModel';
 
 interface AgentLearningAnalyticsProps {
   userId: string;
@@ -36,7 +36,10 @@ export function AgentLearningAnalytics({
   const [timeRange, setTimeRange] = useState<7 | 30 | 90>(30);
 
   // Fetch analytics data
-  const agent = useQuery(api.agents.getAgentById, { userId, agentId: agentId as Id<'agents'> });
+  const agent = useQuery(api.agents.getAgentById, {
+    userId,
+    agentId: agentId as Id<'agents'>,
+  });
   const learningProgress = useQuery(api.agents.getAgentLearningProgress, {
     userId,
     agentId: agentId as Id<'agents'>,

@@ -38,7 +38,9 @@ class ToolExecutionError extends Error {
 class TooManyEmbeddingValuesForCallError extends Error {
   values?: number;
   maxValuesPerCall?: number;
-  static isInstance(error: unknown): error is TooManyEmbeddingValuesForCallError {
+  static isInstance(
+    error: unknown
+  ): error is TooManyEmbeddingValuesForCallError {
     return error instanceof TooManyEmbeddingValuesForCallError;
   }
 }

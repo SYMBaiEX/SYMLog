@@ -48,7 +48,7 @@ export function createOptimizedDynamicImport<T extends ComponentType<any>>(
     loadingSize?: 'small' | 'default' | 'large';
   } = {}
 ) {
-  const loadingComponent = options.loading 
+  const loadingComponent = options.loading
     ? () => React.createElement(options.loading!)
     : () => <OptimizedLoader size={options.loadingSize} />;
 
@@ -67,7 +67,10 @@ export function createOptimizedDynamicImport<T extends ComponentType<any>>(
   // Preload component when requested
   if (options.preload && typeof window !== 'undefined') {
     const preloadTimer = setTimeout(() => {
-      if ('preload' in DynamicComponent && typeof DynamicComponent.preload === 'function') {
+      if (
+        'preload' in DynamicComponent &&
+        typeof DynamicComponent.preload === 'function'
+      ) {
         DynamicComponent.preload();
       }
     }, 100); // Small delay to not block initial render

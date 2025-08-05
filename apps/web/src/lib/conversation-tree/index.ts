@@ -302,15 +302,17 @@ export class ConversationTreeManager {
   getNavigationState(): TreeNavigationState {
     return {
       currentBranch: this.getCurrentBranchId() || 'main',
-      availableBranches: this.getBranchNames().map(branch => branch.name),
+      availableBranches: this.getBranchNames().map((branch) => branch.name),
       canGoBack: this.tree.currentPath.length > 1,
       canGoForward: this.hasChildren(this.tree.currentNodeId),
-      breadcrumbs: this.tree.currentPath.map(nodeId => {
+      breadcrumbs: this.tree.currentPath.map((nodeId) => {
         const node = this.tree.nodes.get(nodeId);
         return {
           nodeId,
           branchName: this.getCurrentBranchId(),
-          messagePreview: node ? TreeUtils.getMessageContent(node.message).substring(0, 50) : ''
+          messagePreview: node
+            ? TreeUtils.getMessageContent(node.message).substring(0, 50)
+            : '',
         };
       }),
     };

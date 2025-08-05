@@ -1,5 +1,10 @@
 import { logError as logErrorToConsole } from '@/lib/logger';
-import type { ModelInfo, ModelRequirements, ProviderInfo, SupportedModelId } from './gateway';
+import type {
+  ModelInfo,
+  ModelRequirements,
+  ProviderInfo,
+  SupportedModelId,
+} from './gateway';
 import { LoadBalancer, type LoadBalancingStrategy } from './load-balancing';
 import { ProviderMetricsService } from './provider-metrics';
 
@@ -476,7 +481,8 @@ export class IntelligentRoutingEngine {
     return {
       primaryChoice: {
         providerId: topModel.provider.id,
-        modelId: `${topModel.provider.id}:${topModel.model.id}` as SupportedModelId,
+        modelId:
+          `${topModel.provider.id}:${topModel.model.id}` as SupportedModelId,
         reason: this.explainModelChoice(topModel),
         confidence: topModel.score,
       },

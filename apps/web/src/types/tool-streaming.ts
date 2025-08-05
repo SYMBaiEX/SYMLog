@@ -280,8 +280,8 @@ export type ToolStreamingEventMap = {
   'execution-start': { toolName: string; executionId: string; input: any };
   'execution-progress': ToolExecutionProgress;
   'execution-complete': { result: any; metadata: ToolExecutionMetadata };
-  'error': ToolStreamingError;
-  'end': { executionId: string; finalState: ToolStreamingState };
+  error: ToolStreamingError;
+  end: { executionId: string; finalState: ToolStreamingState };
   // Additional events for connection state
   'connection-established': { connectionId: string; timestamp: number };
   'stream-close': { executionId: string; reason: string };

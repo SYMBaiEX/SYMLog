@@ -65,14 +65,14 @@ export interface RecoveryResult<T> {
 }
 
 // Type for registry model IDs
-type RegistryModelId = 
-  | "openai:premium" 
-  | "openai:code" 
-  | "openai:fast" 
-  | "anthropic:fast" 
-  | "anthropic:balanced" 
-  | "anthropic:reasoning" 
-  | "anthropic:creative";
+type RegistryModelId =
+  | 'openai:premium'
+  | 'openai:code'
+  | 'openai:fast'
+  | 'anthropic:fast'
+  | 'anthropic:balanced'
+  | 'anthropic:reasoning'
+  | 'anthropic:creative';
 
 // Helper function to ensure model ID is valid for registry
 function getRegistryModelId(modelId: string): RegistryModelId {
@@ -90,28 +90,16 @@ function getRegistryModelId(modelId: string): RegistryModelId {
     'anthropic:reasoning': 'anthropic:reasoning',
     'anthropic:creative': 'anthropic:creative',
   };
-  
+
   return modelMap[modelId] || 'openai:premium';
 }
 
 // Model fallback chain - updated to use registry model IDs
 const MODEL_FALLBACK_CHAINS: Record<string, RegistryModelId[]> = {
-  'openai:gpt-4.1-nano': [
-    'openai:fast',
-    'anthropic:balanced',
-  ],
-  'anthropic:claude-3-5-sonnet-20241022': [
-    'anthropic:fast',
-    'openai:premium',
-  ],
-  'openai:gpt-4o-mini': [
-    'anthropic:fast',
-    'openai:premium',
-  ],
-  'anthropic:claude-3-haiku-20240307': [
-    'openai:fast',
-    'anthropic:balanced',
-  ],
+  'openai:gpt-4.1-nano': ['openai:fast', 'anthropic:balanced'],
+  'anthropic:claude-3-5-sonnet-20241022': ['anthropic:fast', 'openai:premium'],
+  'openai:gpt-4o-mini': ['anthropic:fast', 'openai:premium'],
+  'anthropic:claude-3-haiku-20240307': ['openai:fast', 'anthropic:balanced'],
 };
 
 // Default recovery strategies
@@ -562,7 +550,11 @@ export class ErrorRecoveryManager {
     const errorInfo = this.errorHandler.handleError(error);
 
     // Always retry API errors with 5xx status codes
-    if (APICallError.isInstance(error) && error.statusCode && error.statusCode >= 500) {
+    if (
+      APICallError.isInstance(error) &&
+      error.statusCode &&
+      error.statusCode >= 500
+    ) {
       return true;
     }
 

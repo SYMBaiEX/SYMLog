@@ -118,7 +118,14 @@ export const enhancedArtifactTools = {
         .default(true)
         .describe('Enable validation checks'),
     }),
-    execute: async ({ title, language, content, runnable, dependencies, validation }) => {
+    execute: async ({
+      title,
+      language,
+      content,
+      runnable,
+      dependencies,
+      validation,
+    }) => {
       // Create the artifact
       const artifact: CodeArtifact = {
         id: generateSecureArtifactId(),
@@ -167,7 +174,7 @@ export class ToolExecutionService {
 
     try {
       const startTime = Date.now();
-      
+
       // Execute the tool with timeout and cancellation
       const timeoutId = setTimeout(() => {
         controller.abort();
@@ -179,7 +186,7 @@ export class ToolExecutionService {
           reject(new ToolExecutionError('Execution cancelled', toolName));
           return;
         }
-        
+
         // Mock execution for now
         setTimeout(() => {
           resolve({} as T);
@@ -193,13 +200,13 @@ export class ToolExecutionService {
         success: true,
         data: result,
         executionTime,
-        retryCount: context?.retryCount ?? 0
+        retryCount: context?.retryCount ?? 0,
       };
     } catch (error) {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
-        retryCount: context?.retryCount ?? 0
+        retryCount: context?.retryCount ?? 0,
       };
     } finally {
       this.activeExecutions.delete(executionId);
@@ -217,7 +224,9 @@ export class ToolExecutionService {
   }
 
   cancelAllExecutions(): void {
-    for (const [id, controller] of Array.from(this.activeExecutions.entries())) {
+    for (const [id, controller] of Array.from(
+      this.activeExecutions.entries()
+    )) {
       controller.abort();
     }
     this.activeExecutions.clear();

@@ -159,7 +159,8 @@ export class AuthService {
         { id: data.userId },
         {
           email: data.email || (existingUser as any).email,
-          wallet_address: data.walletAddress || (existingUser as any).wallet_address,
+          wallet_address:
+            data.walletAddress || (existingUser as any).wallet_address,
           updated_at: new Date(),
         }
       );

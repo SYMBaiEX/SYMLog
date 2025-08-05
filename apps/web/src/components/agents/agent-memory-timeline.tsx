@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from 'convex/react';
-import type { Id } from '../../../convex/_generated/dataModel';
 import {
   Brain,
   Calendar,
@@ -21,6 +20,7 @@ import { GlassButton } from '@/components/ui/glass-button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { cn } from '@/lib/utils';
 import { api } from '../../../convex/_generated/api';
+import type { Id } from '../../../convex/_generated/dataModel';
 
 interface AgentMemoryTimelineProps {
   userId: string;
@@ -54,7 +54,10 @@ export function AgentMemoryTimeline({
   };
 
   // Fetch memory data
-  const agent = useQuery(api.agents.getAgentById, { userId, agentId: agentId as Id<'agents'> });
+  const agent = useQuery(api.agents.getAgentById, {
+    userId,
+    agentId: agentId as Id<'agents'>,
+  });
   const memories = useQuery(api.agents.getAgentMemoryTimeline, {
     userId,
     agentId: agentId as Id<'agents'>,

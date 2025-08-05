@@ -427,7 +427,10 @@ export function ToolStreamingDisplay({
       <CardContent className="space-y-4 pt-0">
         {/* Progress Display */}
         {showProgress && (
-          <ProgressDisplay progress={session.progress ?? null} state={session.state} />
+          <ProgressDisplay
+            progress={session.progress ?? null}
+            state={session.state}
+          />
         )}
 
         {/* Error Display */}

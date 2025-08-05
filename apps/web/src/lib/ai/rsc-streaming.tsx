@@ -2,9 +2,8 @@ import { openai } from '@ai-sdk/openai';
 import {
   createStreamableUI,
   createStreamableValue,
-  streamUI,
   type StreamableValue,
-  type Streamable,
+  streamUI,
 } from '@ai-sdk/rsc';
 import type { Tool } from 'ai';
 import type { ReactNode } from 'react';
@@ -36,15 +35,83 @@ export interface StreamableToolResult {
   message?: string;
 }
 
+// Status wrapper component for streaming tools
+const ToolStatusIndicator = ({ 
+  status, 
+  message, 
+  validating 
+}: { 
+  status?: string; 
+  message?: string; 
+  validating?: boolean; 
+}): ReactNode => {
+  if (validating) {
+    return <LoadingIndicator message="Validating data..." />;
+  }
+  if (status === 'executing') {
+    return <LoadingIndicator message={message || 'Executing tool...'} />;
+  }
+  if (status === 'processing') {
+    return <LoadingIndicator message={message || 'Processing output...'} />;
+  }
+  return null;
+};
+
 // Proper AsyncGenerator type for streaming tools compatible with AI SDK v5
 export type StreamingToolGenerator<TResult = any> = AsyncGenerator<
-  StreamableToolResult, 
+  ReactNode, 
   TResult, 
   void
 >;
 
-// AI SDK v5 Streamable compatibility wrapper
-export type StreamableCompatible<T> = T extends Streamable ? T : StreamableValue<T>;
+// AI SDK v5 Streamable compatibility wrapper and type guards
+export type StreamableCompatible<T> = T extends ReactNode
+  ? T
+  : StreamableValue<T>;
+
+// Type guard for StreamableValue
+export function isStreamableValue<T>(value: any): value is StreamableValue<T> {
+  return (
+    value &&
+    typeof value === 'object' &&
+    'value' in value &&
+    'update' in value &&
+    'done' in value
+  );
+}
+
+// Type guard for ReactNode that ensures non-undefined values
+export function isValidReactNode(value: any): value is NonNullable<ReactNode> {
+  return value !== null && value !== undefined;
+}
+
+// Safe streamable value creation with proper type constraints
+export function createSafeStreamableValue<T>(initialValue?: T): {
+  stream: StreamableValue<T>;
+  update: (value: T) => void;
+  done: (finalValue?: T) => void;
+  error: (error: Error) => void;
+} {
+  const streamable = createStreamableValue<T>(initialValue);
+
+  return {
+    stream: streamable.value,
+    update: (value: T) => {
+      if (value !== null && value !== undefined) {
+        streamable.update(value);
+      }
+    },
+    done: (finalValue?: T) => {
+      if (finalValue !== null && finalValue !== undefined) {
+        streamable.update(finalValue);
+      }
+      streamable.done();
+    },
+    error: (error: Error) => {
+      streamable.error(error);
+    },
+  };
+}
 
 // Enhanced streaming options with AI SDK v5 constraints
 export interface EnhancedStreamingOptions<
@@ -61,7 +128,7 @@ export interface StreamingOptions<
 > {
   model?: string;
   temperature?: number;
-  maxTokens?: number;
+  maxOutputTokens?: number;
   onProgress?: (progress: number) => void;
   onPartial?: (content: any) => void;
 
@@ -114,6 +181,51 @@ const ErrorDisplay = ({ error }: { error: string }): ReactNode => {
   return null as any;
 };
 
+const StatusComponent = ({
+  status,
+  message,
+}: {
+  status: string;
+  message?: string;
+}): ReactNode => {
+  // This would be an actual React component for status updates
+  return null as any;
+};
+
+const ProgressComponent = ({
+  progress,
+  validating,
+}: {
+  progress?: string;
+  validating?: boolean;
+}): ReactNode => {
+  // This would be an actual React component for progress updates
+  return null as any;
+};
+
+const SuccessComponent = ({
+  message,
+  artifactId,
+  type,
+  title,
+  created,
+  updated,
+  generated,
+  data,
+}: {
+  message?: string;
+  artifactId?: string;
+  type?: string;
+  title?: string;
+  created?: boolean;
+  updated?: boolean;
+  generated?: boolean;
+  data?: any;
+}): ReactNode => {
+  // This would be an actual React component for success states
+  return null as any;
+};
+
 /**
  * Stream artifact generation with real-time UI updates
  */
@@ -123,7 +235,9 @@ export async function streamingArtifactGeneration<
   const streamableUI = createStreamableUI();
 
   // Show initial loading state
-  streamableUI.update(<LoadingIndicator message="Processing your request..." />);
+  streamableUI.update(
+    <LoadingIndicator message="Processing your request..." />
+  );
 
   // Create intelligent prepareStep function if enabled
   const prepareStepFunction =
@@ -141,7 +255,7 @@ export async function streamingArtifactGeneration<
           if (isArtifactGeneration && stepNumber === 0) {
             return {
               temperature: 0.4,
-              maxTokens: 4096,
+              maxOutputTokens: 4096,
               system:
                 'You are an expert content creator. Generate high-quality, detailed artifacts with proper structure and formatting.',
             };
@@ -156,112 +270,129 @@ export async function streamingArtifactGeneration<
       model: getAIModel(options.model),
       prompt,
       temperature: options.temperature,
-      maxTokens: options.maxTokens,
-      prepareStep: prepareStepFunction,
+      maxOutputTokens: options.maxOutputTokens,
       text: ({ content, done }: { content: string; done: boolean }) => {
-        if (!done) {
-          streamableUI.update(
-            <ArtifactPreview content={content} streaming={true} />
+        if (done) {
+          const finalPreview = (
+            <ArtifactPreview content={content} streaming={false} />
           );
-          options.onPartial?.(content);
+          streamableUI.done(finalPreview);
+          return finalPreview;
         }
+        const preview = <ArtifactPreview content={content} streaming={true} />;
+        streamableUI.update(preview);
+        options.onPartial?.(content);
+        return preview;
       },
       tools: {
         createArtifact: {
           description: 'Create an interactive artifact',
-          parameters: z.object({
+          inputSchema: z.object({
             type: z.enum(['code', 'document', 'chart', 'data', 'image']),
             title: z.string(),
             content: z.string(),
             language: z.string().optional(),
-            metadata: z.record(z.any()).optional(),
+            metadata: z.record(z.string(), z.any()).optional(),
           }),
-          generate: async function* ({ type, title, content, language, metadata }: { 
-            type: string; 
-            title: string; 
-            content: string; 
-            language?: string; 
-            metadata?: Record<string, any> 
-          }): StreamingToolGenerator<{
-            artifactId: string;
+          async *generate({
+            type,
+            title,
+            content,
+            language,
+            metadata,
+          }: {
             type: string;
             title: string;
-            created: boolean;
-          }> {
+            content: string;
+            language?: string;
+            metadata?: Record<string, any>;
+          }): StreamingToolGenerator {
             // Stream the artifact creation process
             streamableUI.update(
-              <LoadingIndicator message={`Creating ${type} artifact: ${title}...`} />
-            );
-            
-            yield {
-              status: 'processing',
-              message: 'Validating content...'
-            };
-
-            // Simulate processing steps
-            yield {
-              status: 'formatting',
-              message: 'Formatting artifact...'
-            };
-
-            // Final artifact
-            streamableUI.done(
-              <ArtifactViewer 
-                type={type} 
-                content={content}
-                metadata={{ ...metadata, title, language }}
+              <LoadingIndicator
+                message={`Creating ${type} artifact: ${title}...`}
               />
             );
 
-            return {
-              artifactId: `artifact_${Date.now()}`,
-              type,
-              title,
-              created: true
-            };
-          }
+            yield <LoadingIndicator message="Validating content..." />;
+
+            // Simulate processing steps
+            yield <LoadingIndicator message="Formatting artifact..." />;
+
+            // Create the artifact ID and prepare final result
+            const artifactId = `artifact_${Date.now()}`;
+
+            // Final artifact
+            const finalArtifact = (
+              <ArtifactViewer
+                content={content}
+                metadata={{
+                  ...metadata,
+                  title,
+                  language,
+                  artifactId,
+                  created: true,
+                }}
+                type={type}
+              />
+            );
+
+            streamableUI.done(finalArtifact);
+
+            // Return the final artifact component (Streamable)
+            return finalArtifact;
+          },
         },
         updateArtifact: {
           description: 'Update an existing artifact',
-          parameters: z.object({
+          inputSchema: z.object({
             artifactId: z.string(),
             updates: z.object({
               content: z.string().optional(),
-              metadata: z.record(z.any()).optional(),
-            })
+              metadata: z.record(z.string(), z.any()).optional(),
+            }),
           }),
-          generate: async function* ({ artifactId, updates }: { 
-            artifactId: string; 
-            updates: { content?: string; metadata?: Record<string, any> } 
-          }): StreamingToolGenerator<{ updated: boolean; artifactId: string }> {
+          async *generate({
+            artifactId,
+            updates,
+          }: {
+            artifactId: string;
+            updates: { content?: string; metadata?: Record<string, any> };
+          }): StreamingToolGenerator {
             streamableUI.update(
               <LoadingIndicator message="Updating artifact..." />
             );
-            
-            yield {
-              status: 'updating',
-              artifactId
-            };
 
-            // In a real implementation, this would update the actual artifact
-            streamableUI.done(
-              <ArtifactViewer 
-                type="updated" 
-                content={updates.content || 'Updated content'}
-                metadata={{ artifactId, ...updates.metadata }}
+            yield (
+              <LoadingIndicator
+                message={`Updating artifact ${artifactId}...`}
               />
             );
 
-            return { updated: true, artifactId };
-          }
-        }
-      }
+            // In a real implementation, this would update the actual artifact
+            const updatedArtifact = (
+              <ArtifactViewer
+                content={updates.content || 'Updated content'}
+                metadata={{ artifactId, ...updates.metadata, updated: true }}
+                type="updated"
+              />
+            );
+
+            streamableUI.done(updatedArtifact);
+
+            // Return the updated artifact component (Streamable)
+            return updatedArtifact;
+          },
+        },
+      },
     });
 
     return streamableUI.value;
   } catch (error) {
     streamableUI.done(
-      <ErrorDisplay error={error instanceof Error ? error.message : 'Unknown error'} />
+      <ErrorDisplay
+        error={error instanceof Error ? error.message : 'Unknown error'}
+      />
     );
     throw error;
   }
@@ -279,9 +410,9 @@ export function createProgressiveDataStream<T>(): {
   value: StreamableValue<T>;
 } {
   const stream = createStreamableValue<T>();
-  
+
   return {
-    stream,
+    stream: stream.value,
     update: (value: Partial<T>) => {
       stream.update(value as T);
     },
@@ -297,8 +428,8 @@ export function createProgressiveDataStream<T>(): {
     error: (error: Error) => {
       stream.error(error);
     },
-    value: stream.value
-  }
+    value: stream.value,
+  };
 }
 
 /**
@@ -308,9 +439,19 @@ export interface StreamErrorBoundary<TFallback = any> {
   maxRetries: number;
   retryDelay: number;
   fallbackResponse?: TFallback;
-  onError?: (error: StreamingError, retryCount: number, context: ErrorContext) => void | Promise<void>;
-  onRecovery?: (error: StreamingError, context: RecoveryContext) => void | Promise<void>;
-  onFinalFailure?: (error: StreamingError, context: ErrorContext) => void | Promise<void>;
+  onError?: (
+    error: StreamingError,
+    retryCount: number,
+    context: ErrorContext
+  ) => void | Promise<void>;
+  onRecovery?: (
+    error: StreamingError,
+    context: RecoveryContext
+  ) => void | Promise<void>;
+  onFinalFailure?: (
+    error: StreamingError,
+    context: ErrorContext
+  ) => void | Promise<void>;
   shouldRetry?: (error: StreamingError, retryCount: number) => boolean;
   retryStrategy?: 'exponential' | 'linear' | 'custom';
   customRetryDelay?: (retryCount: number, baseDelay: number) => number;
@@ -364,7 +505,7 @@ export async function withStreamErrorBoundary<T>(
   let retryCount = 0;
   const previousErrors: StreamingError[] = [];
   const startTime = Date.now();
-  
+
   while (retryCount <= errorBoundary.maxRetries) {
     try {
       return await streamFunction();
@@ -379,60 +520,66 @@ export async function withStreamErrorBoundary<T>(
         metadata: {
           ...context?.metadata,
           totalElapsed: Date.now() - startTime,
-          originalErrorType: originalError?.constructor?.name
-        }
+          originalErrorType: originalError?.constructor?.name,
+        },
       };
-      
+
       previousErrors.push(streamingError);
-      
+
       // Check if should retry
-      const shouldRetry = errorBoundary.shouldRetry 
+      const shouldRetry = errorBoundary.shouldRetry
         ? errorBoundary.shouldRetry(streamingError, retryCount)
         : isRetryableError(streamingError);
-      
+
       // Notify error handler
       try {
         await errorBoundary.onError?.(streamingError, retryCount, errorContext);
       } catch (handlerError) {
         console.warn('Error handler threw exception:', handlerError);
       }
-      
+
       // Final retry attempt or non-retryable error
       if (retryCount >= errorBoundary.maxRetries || !shouldRetry) {
         if (errorBoundary.fallbackResponse !== undefined) {
           const recoveryContext: RecoveryContext = {
             ...errorContext,
             recoveryMethod: 'fallback',
-            recoveryAttempts: 1
+            recoveryAttempts: 1,
           };
-          
+
           try {
             await errorBoundary.onRecovery?.(streamingError, recoveryContext);
           } catch (recoveryError) {
             console.warn('Recovery handler threw exception:', recoveryError);
           }
-          
+
           return errorBoundary.fallbackResponse;
         }
-        
+
         // Notify final failure
         try {
           await errorBoundary.onFinalFailure?.(streamingError, errorContext);
         } catch (finalFailureError) {
-          console.warn('Final failure handler threw exception:', finalFailureError);
+          console.warn(
+            'Final failure handler threw exception:',
+            finalFailureError
+          );
         }
-        
+
         throw streamingError;
       }
-      
+
       // Calculate retry delay
       let delay: number;
       if (errorBoundary.customRetryDelay) {
-        delay = errorBoundary.customRetryDelay(retryCount, errorBoundary.retryDelay);
+        delay = errorBoundary.customRetryDelay(
+          retryCount,
+          errorBoundary.retryDelay
+        );
       } else {
         switch (errorBoundary.retryStrategy || 'exponential') {
           case 'exponential':
-            delay = errorBoundary.retryDelay * Math.pow(2, retryCount);
+            delay = errorBoundary.retryDelay * 2 ** retryCount;
             break;
           case 'linear':
             delay = errorBoundary.retryDelay * (retryCount + 1);
@@ -441,19 +588,19 @@ export async function withStreamErrorBoundary<T>(
             delay = errorBoundary.retryDelay;
             break;
           default:
-            delay = errorBoundary.retryDelay * Math.pow(2, retryCount);
+            delay = errorBoundary.retryDelay * 2 ** retryCount;
         }
       }
-      
+
       // Add jitter to prevent thundering herd
       const jitter = delay * 0.1 * Math.random();
-      const finalDelay = Math.min(delay + jitter, 60000); // Cap at 1 minute
-      
-      await new Promise(resolve => setTimeout(resolve, finalDelay));
+      const finalDelay = Math.min(delay + jitter, 60_000); // Cap at 1 minute
+
+      await new Promise((resolve) => setTimeout(resolve, finalDelay));
       retryCount++;
     }
   }
-  
+
   throw new StreamingError(
     'Unexpected error in stream boundary',
     'STREAM_UNKNOWN_ERROR',
@@ -468,25 +615,43 @@ function classifyStreamingError(error: any): StreamingError {
   if (error instanceof StreamingError) {
     return error;
   }
-  
+
   const message = error?.message || 'Unknown error';
   const errorString = message.toLowerCase();
-  
+
   let code: StreamingErrorCode;
-  
+
   if (errorString.includes('timeout') || errorString.includes('timed out')) {
     code = 'STREAM_TIMEOUT';
-  } else if (errorString.includes('network') || errorString.includes('connection')) {
+  } else if (
+    errorString.includes('network') ||
+    errorString.includes('connection')
+  ) {
     code = 'STREAM_NETWORK_ERROR';
-  } else if (errorString.includes('rate limit') || errorString.includes('too many requests')) {
+  } else if (
+    errorString.includes('rate limit') ||
+    errorString.includes('too many requests')
+  ) {
     code = 'STREAM_RATE_LIMITED';
-  } else if (errorString.includes('auth') || errorString.includes('unauthorized')) {
+  } else if (
+    errorString.includes('auth') ||
+    errorString.includes('unauthorized')
+  ) {
     code = 'STREAM_AUTHENTICATION_ERROR';
-  } else if (errorString.includes('quota') || errorString.includes('limit exceeded')) {
+  } else if (
+    errorString.includes('quota') ||
+    errorString.includes('limit exceeded')
+  ) {
     code = 'STREAM_QUOTA_EXCEEDED';
-  } else if (errorString.includes('invalid') || errorString.includes('malformed')) {
+  } else if (
+    errorString.includes('invalid') ||
+    errorString.includes('malformed')
+  ) {
     code = 'STREAM_INVALID_DATA';
-  } else if (errorString.includes('interrupted') || errorString.includes('aborted')) {
+  } else if (
+    errorString.includes('interrupted') ||
+    errorString.includes('aborted')
+  ) {
     code = 'STREAM_INTERRUPTED';
   } else if (error?.status >= 500) {
     code = 'STREAM_SERVER_ERROR';
@@ -495,7 +660,7 @@ function classifyStreamingError(error: any): StreamingError {
   } else {
     code = 'STREAM_UNKNOWN_ERROR';
   }
-  
+
   return new StreamingError(
     message,
     code,
@@ -513,9 +678,9 @@ function isRetryableError(error: StreamingError): boolean {
     'STREAM_NETWORK_ERROR',
     'STREAM_RATE_LIMITED',
     'STREAM_SERVER_ERROR',
-    'STREAM_INTERRUPTED'
+    'STREAM_INTERRUPTED',
   ];
-  
+
   return retryableCodes.includes(error.code);
 }
 
@@ -523,56 +688,63 @@ function isRetryableError(error: StreamingError): boolean {
  * Stream reconnection manager
  */
 export class StreamReconnectionManager {
-  private reconnectAttempts = 0
-  private maxReconnectAttempts = 5
-  private reconnectDelay = 1000
-  private isReconnecting = false
-  
-  constructor(options: {
-    maxReconnectAttempts?: number
-    reconnectDelay?: number
-  } = {}) {
-    this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5
-    this.reconnectDelay = options.reconnectDelay ?? 1000
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
+  private isReconnecting = false;
+
+  constructor(
+    options: {
+      maxReconnectAttempts?: number;
+      reconnectDelay?: number;
+    } = {}
+  ) {
+    this.maxReconnectAttempts = options.maxReconnectAttempts ?? 5;
+    this.reconnectDelay = options.reconnectDelay ?? 1000;
   }
-  
+
   async attemptReconnection(streamFunction: () => Promise<any>): Promise<any> {
     if (this.isReconnecting) {
-      throw new Error('Reconnection already in progress')
+      throw new Error('Reconnection already in progress');
     }
-    
-    this.isReconnecting = true
-    
+
+    this.isReconnecting = true;
+
     try {
       while (this.reconnectAttempts < this.maxReconnectAttempts) {
         try {
-          const result = await streamFunction()
-          this.reconnectAttempts = 0 // Reset on success
-          this.isReconnecting = false
-          return result
+          const result = await streamFunction();
+          this.reconnectAttempts = 0; // Reset on success
+          this.isReconnecting = false;
+          return result;
         } catch (error) {
-          this.reconnectAttempts++
-          
+          this.reconnectAttempts++;
+
           if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            throw new Error(`Failed to reconnect after ${this.maxReconnectAttempts} attempts`)
+            throw new Error(
+              `Failed to reconnect after ${this.maxReconnectAttempts} attempts`
+            );
           }
-          
+
           // Exponential backoff with jitter
-          const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts) * (0.5 + Math.random() * 0.5)
-          await new Promise(resolve => setTimeout(resolve, delay))
+          const delay =
+            this.reconnectDelay *
+            2 ** this.reconnectAttempts *
+            (0.5 + Math.random() * 0.5);
+          await new Promise((resolve) => setTimeout(resolve, delay));
         }
       }
     } finally {
-      this.isReconnecting = false
+      this.isReconnecting = false;
     }
   }
-  
+
   get isCurrentlyReconnecting() {
-    return this.isReconnecting
+    return this.isReconnecting;
   }
-  
+
   get currentAttempts() {
-    return this.reconnectAttempts
+    return this.reconnectAttempts;
   }
 }
 
@@ -580,38 +752,42 @@ export class StreamReconnectionManager {
  * Rate limiting for streaming operations
  */
 export class StreamRateLimiter {
-  private requests: number[] = []
-  private maxRequests: number
-  private timeWindow: number
-  
-  constructor(maxRequests: number = 10, timeWindowMs: number = 60000) {
-    this.maxRequests = maxRequests
-    this.timeWindow = timeWindowMs
+  private requests: number[] = [];
+  private maxRequests: number;
+  private timeWindow: number;
+
+  constructor(maxRequests = 10, timeWindowMs = 60_000) {
+    this.maxRequests = maxRequests;
+    this.timeWindow = timeWindowMs;
   }
-  
+
   async checkRateLimit(): Promise<void> {
-    const now = Date.now()
-    
+    const now = Date.now();
+
     // Clean old requests
-    this.requests = this.requests.filter(time => now - time < this.timeWindow)
-    
+    this.requests = this.requests.filter(
+      (time) => now - time < this.timeWindow
+    );
+
     if (this.requests.length >= this.maxRequests) {
-      const oldestRequest = Math.min(...this.requests)
-      const waitTime = this.timeWindow - (now - oldestRequest)
-      
+      const oldestRequest = Math.min(...this.requests);
+      const waitTime = this.timeWindow - (now - oldestRequest);
+
       if (waitTime > 0) {
-        await new Promise(resolve => setTimeout(resolve, waitTime))
-        return this.checkRateLimit() // Re-check after waiting
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+        return this.checkRateLimit(); // Re-check after waiting
       }
     }
-    
-    this.requests.push(now)
+
+    this.requests.push(now);
   }
-  
+
   getRemainingRequests(): number {
-    const now = Date.now()
-    this.requests = this.requests.filter(time => now - time < this.timeWindow)
-    return Math.max(0, this.maxRequests - this.requests.length)
+    const now = Date.now();
+    this.requests = this.requests.filter(
+      (time) => now - time < this.timeWindow
+    );
+    return Math.max(0, this.maxRequests - this.requests.length);
   }
 }
 
@@ -619,54 +795,57 @@ export class StreamRateLimiter {
  * Concurrent stream manager
  */
 export class ConcurrentStreamManager {
-  private activeStreams = new Map<string, Promise<any>>()
-  private maxConcurrent: number
-  
-  constructor(maxConcurrent: number = 3) {
-    this.maxConcurrent = maxConcurrent
+  private activeStreams = new Map<string, Promise<any>>();
+  private maxConcurrent: number;
+
+  constructor(maxConcurrent = 3) {
+    this.maxConcurrent = maxConcurrent;
   }
-  
+
   async executeStream<T>(
     id: string,
     streamFunction: () => Promise<T>,
     options: {
-      priority?: 'high' | 'medium' | 'low'
-      timeout?: number
+      priority?: 'high' | 'medium' | 'low';
+      timeout?: number;
     } = {}
   ): Promise<T> {
     // Wait for available slot
     while (this.activeStreams.size >= this.maxConcurrent) {
-      await Promise.race(Array.from(this.activeStreams.values()))
+      await Promise.race(Array.from(this.activeStreams.values()));
     }
-    
+
     // Add timeout wrapper
-    const timeoutMs = options.timeout ?? 30000
+    const timeoutMs = options.timeout ?? 30_000;
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error(`Stream ${id} timed out after ${timeoutMs}ms`)), timeoutMs)
-    )
-    
+      setTimeout(
+        () => reject(new Error(`Stream ${id} timed out after ${timeoutMs}ms`)),
+        timeoutMs
+      )
+    );
+
     const streamPromise = Promise.race([
       streamFunction(),
-      timeoutPromise
+      timeoutPromise,
     ]).finally(() => {
-      this.activeStreams.delete(id)
-    })
-    
-    this.activeStreams.set(id, streamPromise)
-    
-    return streamPromise
+      this.activeStreams.delete(id);
+    });
+
+    this.activeStreams.set(id, streamPromise);
+
+    return streamPromise;
   }
-  
+
   getActiveStreamCount(): number {
-    return this.activeStreams.size
+    return this.activeStreams.size;
   }
-  
+
   async waitForAll(): Promise<void> {
-    await Promise.all(this.activeStreams.values())
+    await Promise.all(this.activeStreams.values());
   }
-  
+
   cancelStream(id: string): boolean {
-    return this.activeStreams.delete(id)
+    return this.activeStreams.delete(id);
   }
 }
 
@@ -678,23 +857,25 @@ export async function streamStructuredData<T>(
   schema: z.ZodSchema<T>,
   prompt: string,
   options: EnhancedStreamingOptions<any> & {
-    errorBoundary?: StreamErrorBoundary<{ data: StreamableValue<T>; ui: StreamableValue<ReactNode> }>
-    rateLimiter?: StreamRateLimiter
-    reconnectionManager?: StreamReconnectionManager
+    errorBoundary?: StreamErrorBoundary<{
+      data: StreamableValue<T>;
+      ui: StreamableValue<ReactNode>;
+    }>;
+    rateLimiter?: StreamRateLimiter;
+    reconnectionManager?: StreamReconnectionManager;
   } = {}
 ): Promise<{
   data: StreamableValue<T>;
-  ui: StreamableValue<ReactNode>;
+  ui: ReactNode;
 }> {
-  const dataStream = createProgressiveDataStream<T>()
-  const uiStream = createStreamableUI()
-
-  // Initial UI
-  uiStream.update(<LoadingIndicator message="Generating structured data..." />)
+  const dataStream = createProgressiveDataStream<T>();
+  const uiStream = createStreamableUI(
+    <LoadingIndicator message="Generating structured data..." />
+  );
 
   try {
-    const model = getAIModel(options.model)
-    
+    const model = getAIModel(options.model);
+
     // Stream the generation
     const result = await streamUI({
       model,
@@ -704,18 +885,18 @@ export async function streamStructuredData<T>(
         if (!done) {
           try {
             // Try to parse partial JSON
-            const partial = JSON.parse(content)
-            dataStream.update(partial)
+            const partial = JSON.parse(content);
+            dataStream.update(partial);
             return (
-              <ArtifactPreview 
-                content={JSON.stringify(partial, null, 2)} 
-                type="json"
+              <ArtifactPreview
+                content={JSON.stringify(partial, null, 2)}
                 streaming={true}
+                type="json"
               />
-            )
+            );
           } catch {
             // If parsing fails, just show raw content
-            return <ArtifactPreview content={content} streaming={true} />
+            return <ArtifactPreview content={content} streaming={true} />;
           }
         }
         return null;
@@ -723,46 +904,52 @@ export async function streamStructuredData<T>(
       tools: {
         generateStructuredData: {
           description: 'Generate structured data matching the schema',
-          parameters: schema,
-          generate: async function* (data: T): StreamingToolGenerator<{ generated: boolean; data: T }> {
-            yield { 
-              status: 'validating',
-              validating: true 
-            }
-            
+          inputSchema: schema,
+          async *generate(data: T): AsyncGenerator<ReactNode, ReactNode, void> {
+            // Yield status components instead of plain objects
+            yield <ToolStatusIndicator 
+              status="validating" 
+              validating={true}
+              message="Validating data against schema..."
+            />;
+
             // Validate against schema
-            const validation = schema.safeParse(data)
+            const validation = schema.safeParse(data);
             if (!validation.success) {
-              throw new Error(`Validation failed: ${validation.error.message}`)
+              throw new Error(`Validation failed: ${validation.error.message}`);
             }
 
-            dataStream.done(data)
-            uiStream.done(
-              <ArtifactViewer 
-                type="data" 
+            dataStream.done(data);
+            const finalResult = (
+              <ArtifactViewer
                 content={data}
-                metadata={{ schema: schema._def }}
+                metadata={{ schema: schema._def, generated: true, data }}
+                type="data"
               />
-            )
+            );
+            
+            uiStream.done(finalResult);
 
-            return { generated: true, data }
-          }
-}
-}
-    })
+            // Return the final component (Streamable)
+            return finalResult;
+          },
+        },
+      },
+    });
 
-return {
+    return {
       data: dataStream.stream,
-      ui: uiStream.value
-    }
-} catch (error)
-{
-  dataStream.error(error as Error);
-  uiStream.done(
-      <ErrorDisplay error={error instanceof Error ? error.message : 'Generation failed'} />
-    )
-  throw error;
-}
+      ui: uiStream.value,
+    };
+  } catch (error) {
+    dataStream.error(error as Error);
+    uiStream.done(
+      <ErrorDisplay
+        error={error instanceof Error ? error.message : 'Generation failed'}
+      />
+    );
+    throw error;
+  }
 }
 
 /**
@@ -932,84 +1119,84 @@ export async function streamWorkflowExecution(
 ): Promise<{
   results: StreamableValue<any[]>;
   progress: StreamableValue<number>;
-  ui: StreamableValue<ReactNode>;
+  ui: ReactNode;
 }> {
-  const uiStream = createStreamableUI();
+  const uiStream = createStreamableUI(
+    <LoadingIndicator message={`Starting workflow: ${workflow.name}`} />
+  );
   const progressStream = createStreamableValue<number>();
   const resultsStream = createStreamableValue<any[]>();
 
   const totalSteps = workflow.steps.length;
   const results: any[] = [];
 
-  // Initial UI
-  uiStream.update(
-    <LoadingIndicator message={`Starting workflow: ${workflow.name}`} />
-  )
-
   try {
     for (let i = 0; i < workflow.steps.length; i++) {
-      const step = workflow.steps[i]
-      const progress = ((i + 1) / totalSteps) * 100
+      const step = workflow.steps[i];
+      const progress = ((i + 1) / totalSteps) * 100;
 
       // Update progress
-      progressStream.update(progress)
-      options.onProgress?.(progress)
+      progressStream.update(progress);
+      options.onProgress?.(progress);
 
       // Update UI for current step
       uiStream.update(
         <div>
-          <LoadingIndicator message={`Step ${i + 1}/${totalSteps}: ${step.description}`} />
+          <LoadingIndicator
+            message={`Step ${i + 1}/${totalSteps}: ${step.description}`}
+          />
           <div>Progress: {progress.toFixed(0)}%</div>
         </div>
-      )
+      );
 
-  // Execute step
-  try {
-    const result = await step.action();
-    results.push({ stepId: step.id, result, success: true });
-    resultsStream.append(results);
-  } catch (error) {
-    results.push({
-      stepId: step.id,
-      error: error instanceof Error ? error.message : 'Step failed',
-      success: false,
-    });
-    resultsStream.append(results);
+      // Execute step
+      try {
+        const result = await step.action();
+        results.push({ stepId: step.id, result, success: true });
+        resultsStream.append(results);
+      } catch (error) {
+        results.push({
+          stepId: step.id,
+          error: error instanceof Error ? error.message : 'Step failed',
+          success: false,
+        });
+        resultsStream.append(results);
 
-    // Continue or fail based on workflow configuration
-    if (options.model === 'strict') {
-      throw error;
+        // Continue or fail based on workflow configuration
+        if (options.model === 'strict') {
+          throw error;
+        }
+      }
     }
-  }
-}
 
-// Complete streams
-progressStream.done();
-resultsStream.done();
+    // Complete streams
+    progressStream.done();
+    resultsStream.done();
 
-// Final UI
-uiStream.done(
+    // Final UI
+    uiStream.done(
       <div>
         <h3>Workflow Complete: {workflow.name}</h3>
         <div>Total steps: {totalSteps}</div>
-        <div>Successful: {results.filter(r => r.success).length}</div>
-        <div>Failed: {results.filter(r => !r.success).length}</div>
+        <div>Successful: {results.filter((r) => r.success).length}</div>
+        <div>Failed: {results.filter((r) => !r.success).length}</div>
       </div>
-    )
+    );
 
-return {
+    return {
       results: resultsStream.value,
       progress: progressStream.value,
-      ui: uiStream.value
-    }
-} catch (error)
-{
-  progressStream.error(error as Error);
-  resultsStream.error(error as Error);
-  uiStream.done(
-      <ErrorDisplay error={`Workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`} />
-    )
-    throw error
+      ui: uiStream.value,
+    };
+  } catch (error) {
+    progressStream.error(error as Error);
+    resultsStream.error(error as Error);
+    uiStream.done(
+      <ErrorDisplay
+        error={`Workflow failed: ${error instanceof Error ? error.message : 'Unknown error'}`}
+      />
+    );
+    throw error;
   }
 }
 
@@ -1024,107 +1211,126 @@ export async function streamWithTools(
 ): Promise<{
   result: any;
   toolCalls: StreamableValue<any[]>;
-  ui: StreamableValue<ReactNode>;
+  ui: ReactNode;
 }> {
-  const uiStream = createStreamableUI()
-  const toolCallsStream = createStreamableValue<any[]>()
+  const uiStream = createStreamableUI(
+    <LoadingIndicator message="Processing..." />
+  );
+  const toolCallsStream = createStreamableValue<any[]>();
+
+  const toolCalls: any[] = [];
   
-  const toolCalls: any[] = []
+  // Ensure UI stream is initialized with loading state
+  uiStream.update(<LoadingIndicator message="Processing..." />);
 
   try {
     const result = await streamUI({
       model: getAIModel(options.model),
       prompt,
       temperature: options.temperature,
-      maxTokens: options.maxTokens,
+      maxOutputTokens: options.maxOutputTokens,
       text: ({ content, done }: { content: string; done: boolean }) => {
         if (!done) {
           return <ArtifactPreview content={content} streaming={true} />;
         }
         return <ArtifactPreview content={content} streaming={false} />;
       },
-      tools: Object.entries(tools).reduce((acc, [name, tool]) => {
-        acc[name] = {
-          ...tool,
-          generate: async function* (...args: any[]): StreamingToolGenerator<any> {
-            // Track tool call
-            const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-            const callInfo = {
-              id: callId,
-              tool: name,
-              args,
-              timestamp: Date.now(),
-              status: 'executing' as const,
-              result: undefined as any,
-              error: undefined as string | undefined
-            }
-            
-            toolCalls.push(callInfo)
-            toolCallsStream.append(toolCalls)
+      tools: Object.entries(tools).reduce(
+        (acc, [name, tool]) => {
+          acc[name] = {
+            ...tool,
+            async *generate(...args: any[]): StreamingToolGenerator {
+              // Track tool call
+              const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+              const callInfo = {
+                id: callId,
+                tool: name,
+                args,
+                timestamp: Date.now(),
+                status: 'executing' as const,
+                result: undefined as any,
+                error: undefined as string | undefined,
+              };
 
-            // Update UI to show tool execution
-            uiStream.update(
-              <div>
-                <LoadingIndicator message={`Executing tool: ${name}`} />
-                <div>Arguments: {JSON.stringify(args, null, 2)}</div>
-              </div>
-            )
+              toolCalls.push(callInfo);
+              toolCallsStream.append(toolCalls);
 
-            // Yield initial status
-            yield {
-              status: 'executing',
-              message: `Executing tool: ${name}`
-            }
-
-            try {
-              // Execute original tool - handle both sync and async generators
-              let result: any
-              if (tool.generate && typeof tool.generate === 'function') {
-                const toolResult = tool.generate(...args)
-                if (toolResult && typeof toolResult[Symbol.asyncIterator] === 'function') {
-                  // Handle async generator tools
-                  let finalResult: any
-                  for await (const partial of toolResult) {
-                    yield {
-                      status: 'processing',
-                      message: 'Processing tool output...'
-                    }
-                    finalResult = partial
-                  }
-                  result = finalResult
-                } else {
-                  result = await toolResult
-                }
-              } else {
-                result = await tool.generate(...args)
-              }
-
-              // Update call info
-              (callInfo as any).status = 'completed'
-              callInfo.result = result
-              toolCallsStream.update(toolCalls)
-
-              // Update UI with result
+              // Update UI to show tool execution
               uiStream.update(
-                <ArtifactViewer 
-                  type="tool-result" 
-                  content={result}
-                  metadata={{ tool: name, callId }}
-                />
-              )
+                <div>
+                  <LoadingIndicator message={`Executing tool: ${name}`} />
+                  <div>Arguments: {JSON.stringify(args, null, 2)}</div>
+                </div>
+              );
 
-              return result
-            } catch (error) {
-              (callInfo as any).status = 'failed'
-              callInfo.error = error instanceof Error ? error.message : 'Unknown error'
-              toolCallsStream.update(toolCalls)
-              throw error
-            }
-          }
-        };
-        return acc;
-      }, {} as Record<string, any>)
-    })
+              // Yield initial status
+              yield (
+                <StatusComponent
+                  status="executing"
+                  message={`Executing tool: ${name}`}
+                />
+              );
+
+              try {
+                // Execute original tool - handle both sync and async generators
+                let result: any;
+                if (tool.generate && typeof tool.generate === 'function') {
+                  const toolResult = tool.generate(...args);
+                  if (
+                    toolResult &&
+                    typeof toolResult[Symbol.asyncIterator] === 'function'
+                  ) {
+                    // Handle async generator tools
+                    let finalResult: any;
+                    for await (const partial of toolResult) {
+                      yield (
+                        <StatusComponent
+                          status="processing"
+                          message="Processing tool output..."
+                        />
+                      );
+                      finalResult = partial;
+                    }
+                    result = finalResult;
+                  } else {
+                    result = await toolResult;
+                  }
+                } else {
+                  result = await tool.generate(...args);
+                }
+
+                // Update call info
+                (callInfo as any).status = 'completed';
+                callInfo.result = result;
+                toolCallsStream.update(toolCalls);
+
+                // Update UI with result
+                const resultComponent = (
+                  <ArtifactViewer
+                    content={result}
+                    metadata={{ tool: name, callId }}
+                    type="tool-result"
+                  />
+                );
+                
+                uiStream.update(resultComponent);
+
+                // Return ReactNode instead of raw result
+                return resultComponent;
+              } catch (error) {
+                (callInfo as any).status = 'failed';
+                callInfo.error =
+                  error instanceof Error ? error.message : 'Unknown error';
+                toolCallsStream.update(toolCalls);
+                throw error;
+              }
+            },
+          };
+          return acc;
+        },
+        {} as Record<string, any>
+      ),
+    });
 
     // Final state
     toolCallsStream.done();
@@ -1132,32 +1338,261 @@ export async function streamWithTools(
     return {
       result,
       toolCalls: toolCallsStream.value,
-      ui: uiStream.value
+      ui: uiStream.value,
     };
   } catch (error) {
     toolCallsStream.error(error as Error);
     uiStream.done(
-      <ErrorDisplay error={error instanceof Error ? error.message : 'Stream failed'} />
+      <ErrorDisplay
+        error={error instanceof Error ? error.message : 'Stream failed'}
+      />
     );
     throw error;
   }
 }
 
+// Advanced streaming pattern utilities
+
+/**
+ * Create a composition of multiple streaming patterns
+ */
+export function createStreamingComposition<T extends Record<string, any>>(
+  patterns: T
+): {
+  compose: () => Promise<{ [K in keyof T]: Awaited<ReturnType<T[K]>> }>;
+  abort: () => void;
+  status: 'idle' | 'running' | 'completed' | 'aborted';
+} {
+  let status: 'idle' | 'running' | 'completed' | 'aborted' = 'idle';
+  const abortController = new AbortController();
+
+  return {
+    async compose() {
+      if (status !== 'idle') {
+        throw new Error(`Cannot compose streaming patterns in ${status} state`);
+      }
+
+      status = 'running';
+
+      try {
+        const results = {} as { [K in keyof T]: Awaited<ReturnType<T[K]>> };
+        const entries = Object.entries(patterns) as Array<
+          [keyof T, T[keyof T]]
+        >;
+
+        await Promise.all(
+          entries.map(async ([key, pattern]) => {
+            if (abortController.signal.aborted) {
+              throw new Error('Streaming composition aborted');
+            }
+
+            if (typeof pattern === 'function') {
+              results[key] = await pattern();
+            } else {
+              results[key] = pattern;
+            }
+          })
+        );
+
+        status = 'completed';
+        return results;
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          status = 'aborted';
+        }
+        throw error;
+      }
+    },
+
+    abort() {
+      if (status === 'running') {
+        abortController.abort();
+        status = 'aborted';
+      }
+    },
+
+    get status() {
+      return status;
+    },
+  };
+}
+
+/**
+ * Create a progressive streaming pattern that yields intermediate results
+ */
+export function createProgressiveStreamingPattern<TInput, TOutput>(
+  processor: (
+    input: TInput,
+    progress: (value: Partial<TOutput>) => void
+  ) => Promise<TOutput>
+): {
+  process: (
+    input: TInput
+  ) => AsyncGenerator<Partial<TOutput>, TOutput, unknown>;
+  abort: () => void;
+} {
+  const abortController = new AbortController();
+
+  return {
+    async *process(
+      input: TInput
+    ): AsyncGenerator<Partial<TOutput>, TOutput, unknown> {
+      const progressUpdates: Partial<TOutput>[] = [];
+
+      const progressCallback = (value: Partial<TOutput>) => {
+        if (!abortController.signal.aborted) {
+          progressUpdates.push(value);
+        }
+      };
+
+      // Start the processor
+      const resultPromise = processor(input, progressCallback);
+
+      // Yield progress updates as they come in
+      let lastYieldedIndex = 0;
+      while (true) {
+        if (abortController.signal.aborted) {
+          throw new Error('Progressive streaming pattern aborted');
+        }
+
+        // Yield any new progress updates
+        for (let i = lastYieldedIndex; i < progressUpdates.length; i++) {
+          yield progressUpdates[i];
+        }
+        lastYieldedIndex = progressUpdates.length;
+
+        // Check if processing is complete
+        const result = await Promise.race([
+          resultPromise,
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 100)),
+        ]);
+
+        if (result !== null) {
+          return result;
+        }
+      }
+    },
+
+    abort() {
+      abortController.abort();
+    },
+  };
+}
+
+/**
+ * Create a streaming state manager for complex streaming scenarios
+ */
+export function createStreamingStateManager<TState extends Record<string, any>>(
+  initialState: TState
+): {
+  getState: () => TState;
+  setState: (
+    updater: Partial<TState> | ((current: TState) => Partial<TState>)
+  ) => void;
+  subscribe: (
+    listener: (state: TState, previousState: TState) => void
+  ) => () => void;
+  createStream: () => ReadableStream<TState>;
+  reset: () => void;
+} {
+  let currentState = { ...initialState };
+  const listeners = new Set<(state: TState, previousState: TState) => void>();
+  let streamController: ReadableStreamDefaultController<TState> | null = null;
+
+  return {
+    getState() {
+      return { ...currentState };
+    },
+
+    setState(updater) {
+      const previousState = { ...currentState };
+
+      if (typeof updater === 'function') {
+        const updates = updater(currentState);
+        currentState = { ...currentState, ...updates };
+      } else {
+        currentState = { ...currentState, ...updater };
+      }
+
+      // Notify listeners
+      listeners.forEach((listener) => {
+        try {
+          listener(currentState, previousState);
+        } catch (error) {
+          console.error('State listener error:', error);
+        }
+      });
+
+      // Update stream if active
+      if (streamController) {
+        try {
+          streamController.enqueue({ ...currentState });
+        } catch (error) {
+          console.error('Stream controller error:', error);
+        }
+      }
+    },
+
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
+
+    createStream() {
+      return new ReadableStream<TState>({
+        start(controller) {
+          streamController = controller;
+          // Send initial state
+          controller.enqueue({ ...currentState });
+        },
+
+        cancel() {
+          streamController = null;
+        },
+      });
+    },
+
+    reset() {
+      const previousState = { ...currentState };
+      currentState = { ...initialState };
+
+      // Notify listeners of reset
+      listeners.forEach((listener) => {
+        try {
+          listener(currentState, previousState);
+        } catch (error) {
+          console.error('State listener error during reset:', error);
+        }
+      });
+
+      // Update stream if active
+      if (streamController) {
+        try {
+          streamController.enqueue({ ...currentState });
+        } catch (error) {
+          console.error('Stream controller error during reset:', error);
+        }
+      }
+    },
+  };
+}
+
 // Export RSC utilities
-export {
-  streamUI,
-  createStreamableUI,
-  createStreamableValue,
-};
+export { streamUI, createStreamableUI, createStreamableValue };
 
-// Export advanced streaming pattern utilities
-export {
-  createStreamingComposition,
-  createProgressiveStreamingPattern,
-  createStreamingStateManager,
-};
+// Advanced streaming pattern utilities are already exported above via function declarations
 
-// Export all streaming pattern types that are defined above
+// Export streaming pattern types
+export type StreamingComposition<T extends Record<string, any>> = ReturnType<
+  typeof createStreamingComposition<T>
+>;
+export type ProgressiveStreamingPattern<TInput, TOutput> = ReturnType<
+  typeof createProgressiveStreamingPattern<TInput, TOutput>
+>;
+export type StreamingStateManager<TState extends Record<string, any>> =
+  ReturnType<typeof createStreamingStateManager<TState>>;
 
 // Export unique type names to avoid conflicts
 export type { StreamableArtifact as RSCStreamableArtifact };

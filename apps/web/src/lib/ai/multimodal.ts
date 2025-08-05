@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import type { CoreMessage } from 'ai';
-import { generateObject, transcribe } from 'ai';
+import { generateObject, experimental_transcribe as transcribe } from 'ai';
 import { z } from 'zod';
 import {
   scanForMaliciousContent,
@@ -86,7 +86,7 @@ export async function addAttachmentsToMessage(
     return {
       ...message,
       content: `${message.content}\n\n[Attachment Error: ${validation.error}]`,
-    } as ModelMessage;
+    } as CoreMessage;
   }
 
   const safeAttachments = validation.sanitizedAttachments!;
@@ -308,7 +308,7 @@ export class AdvancedMultiModal {
     const transcription = await transcribe({
       model: openai.transcription('whisper-1'),
       audio: audioBuffer,
-      language: opts.language,
+      ...(opts.language && { language: opts.language }),
     });
 
     const results: {
@@ -538,7 +538,9 @@ export class AdvancedMultiModal {
       duration: video.duration,
       width: video.videoWidth,
       height: video.videoHeight,
-      hasAudio: (video as any).audioTracks?.length > 0 || (video as any).webkitAudioDecodedByteCount > 0,
+      hasAudio:
+        (video as any).audioTracks?.length > 0 ||
+        (video as any).webkitAudioDecodedByteCount > 0,
       frameRate: 30, // Default, could be calculated more precisely
     };
   }
@@ -721,7 +723,10 @@ export class AdvancedMultiModal {
       // This is a simplified approach - in production you'd want to use Web Audio API
       // or a library like ffmpeg.wasm for proper audio extraction
 
-      if (!(video as any).audioTracks || (video as any).audioTracks.length === 0) {
+      if (
+        !(video as any).audioTracks ||
+        (video as any).audioTracks.length === 0
+      ) {
         return null;
       }
 

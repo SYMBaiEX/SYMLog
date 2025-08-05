@@ -94,12 +94,7 @@ export class SYMLogAgent {
         tools: this.config.tools,
         temperature: this.config.temperature,
         maxOutputTokens: this.config.maxOutputTokens,
-        onStepFinish: ({
-          text,
-          toolCalls,
-          toolResults,
-          finishReason,
-        }) => {
+        onStepFinish: ({ text, toolCalls, toolResults, finishReason }) => {
           this.currentStep++;
 
           // Update current input for next step tracking
@@ -130,10 +125,7 @@ export class SYMLogAgent {
           }
 
           // Check completion conditions
-          if (
-            finishReason === 'stop' ||
-            this.isWorkflowComplete(agentStep)
-          ) {
+          if (finishReason === 'stop' || this.isWorkflowComplete(agentStep)) {
             // Stop will be handled by finish reason
             return;
           }
@@ -191,12 +183,7 @@ export class SYMLogAgent {
       tools: this.config.tools,
       temperature: this.config.temperature,
       maxOutputTokens: this.config.maxOutputTokens,
-      onStepFinish: ({
-        text,
-        toolCalls,
-        toolResults,
-        finishReason,
-      }) => {
+      onStepFinish: ({ text, toolCalls, toolResults, finishReason }) => {
         this.currentStep++;
 
         // Update current input for step tracking
@@ -226,10 +213,7 @@ export class SYMLogAgent {
           return;
         }
 
-        if (
-          finishReason === 'stop' ||
-          this.isWorkflowComplete(agentStep)
-        ) {
+        if (finishReason === 'stop' || this.isWorkflowComplete(agentStep)) {
           // Stop will be handled by finish reason
           return;
         }
@@ -268,12 +252,14 @@ export class SYMLogAgent {
    */
   private isWorkflowComplete(step: AgentStep): boolean {
     // Check if any tool results indicate completion
-    return step.toolResults?.some(
-      (result) =>
-        result.type === 'complete' ||
-        result.status === 'completed' ||
-        result.done === true
-    ) ?? false;
+    return (
+      step.toolResults?.some(
+        (result) =>
+          result.type === 'complete' ||
+          result.status === 'completed' ||
+          result.done === true
+      ) ?? false
+    );
   }
 
   /**

@@ -429,7 +429,9 @@ export class RealtimeStreamingProcessor {
     if (!this.eventListeners.has(eventType)) {
       this.eventListeners.set(eventType, []);
     }
-    this.eventListeners.get(eventType)!.push(callback as (event: StreamEvent) => void);
+    this.eventListeners
+      .get(eventType)!
+      .push(callback as (event: StreamEvent) => void);
   }
 
   /**
@@ -445,11 +447,11 @@ export class RealtimeStreamingProcessor {
       toolName,
       toolCallId,
       streamId: this.streamId,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
-    this.emit({ 
-      type: 'frame', 
+    this.emit({
+      type: 'frame',
       data: {
         timestamp: context.timestamp,
         frameData: '',
@@ -457,9 +459,9 @@ export class RealtimeStreamingProcessor {
           scene: `Executing tool: ${toolName}`,
           objects: [],
           motion: 'none',
-          confidence: 1.0
-        }
-      }
+          confidence: 1.0,
+        },
+      },
     });
 
     try {
@@ -477,9 +479,9 @@ export class RealtimeStreamingProcessor {
               scene: `Tool ${toolName} progress`,
               objects: [toolName],
               motion: 'low',
-              confidence: 0.8
-            }
-          }
+              confidence: 0.8,
+            },
+          },
         });
         finalResult = partial;
       }
@@ -488,7 +490,7 @@ export class RealtimeStreamingProcessor {
     } catch (error) {
       this.emit({
         type: 'error',
-        error: `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        error: `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
       throw error;
     }
@@ -564,7 +566,10 @@ export class RealtimeStreamingProcessor {
       };
 
       // Validate MediaRecorder support for the specified MIME type
-      if (options.mimeType && !MediaRecorder.isTypeSupported(options.mimeType)) {
+      if (
+        options.mimeType &&
+        !MediaRecorder.isTypeSupported(options.mimeType)
+      ) {
         console.warn(
           `MIME type ${options.mimeType} not supported, falling back to default`
         );

@@ -17,7 +17,8 @@ import {
 
 // Logger wrapper
 const loggingService = {
-  info: (message: string, data?: unknown) => console.log(`[INFO] ${message}`, data),
+  info: (message: string, data?: unknown) =>
+    console.log(`[INFO] ${message}`, data),
   warn: (message: string, data?: unknown) =>
     console.warn(`[WARN] ${message}`, data),
   error: (message: string, data?: unknown) => logErrorToConsole(message, data),
@@ -142,7 +143,10 @@ export class AdaptiveRoutingSystem {
   /**
    * Main routing decision method
    */
-  async route(request: Record<string, unknown>, context: RoutingContext): Promise<RoutingDecision> {
+  async route(
+    request: Record<string, unknown>,
+    context: RoutingContext
+  ): Promise<RoutingDecision> {
     const startTime = Date.now();
 
     try {
@@ -515,7 +519,10 @@ export class AdaptiveRoutingSystem {
       );
 
       // Fallback to load balancing
-      const selection = await this.loadBalancer.selectProvider(providers, context);
+      const selection = await this.loadBalancer.selectProvider(
+        providers,
+        context
+      );
 
       return {
         selectedProvider: selection.providerId,

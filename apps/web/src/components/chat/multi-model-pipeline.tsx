@@ -18,7 +18,10 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { GlassButton } from '@/components/ui/glass-button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { modelOrchestrator, type ModelConfig } from '@/lib/ai/model-orchestration';
+import {
+  type ModelConfig,
+  modelOrchestrator,
+} from '@/lib/ai/model-orchestration';
 import { cn } from '@/lib/utils';
 
 interface PipelineStep {

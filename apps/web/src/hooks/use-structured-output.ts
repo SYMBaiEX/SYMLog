@@ -62,7 +62,9 @@ export function useStructuredOutput<T extends SchemaType>(schemaName: T) {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Get the schema for validation
-  const schema = schemaRegistry[schemaName] as unknown as z.ZodSchema<SchemaData<T>>;
+  const schema = schemaRegistry[schemaName] as unknown as z.ZodSchema<
+    SchemaData<T>
+  >;
 
   const generate = useCallback(
     async (prompt: string, options: GenerateObjectOptions = {}) => {
@@ -138,10 +140,9 @@ export function useStructuredOutput<T extends SchemaType>(schemaName: T) {
                     }));
                   } else if (data.type === 'complete') {
                     // Validate final data
-                    const validationResult = validateStructuredData<SchemaData<T>>(
-                      data.object,
-                      schema
-                    );
+                    const validationResult = validateStructuredData<
+                      SchemaData<T>
+                    >(data.object, schema);
                     if (!validationResult.success) {
                       throw new Error(
                         `Validation failed: ${validationResult.error}`
@@ -350,7 +351,9 @@ export function useStructuredArray<T extends SchemaType>(schemaName: T) {
   });
 
   const abortControllerRef = useRef<AbortController | null>(null);
-  const schema = z.array(schemaRegistry[schemaName] as unknown as z.ZodSchema<SchemaData<T>>);
+  const schema = z.array(
+    schemaRegistry[schemaName] as unknown as z.ZodSchema<SchemaData<T>>
+  );
 
   const generateArray = useCallback(
     async (

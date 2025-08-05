@@ -466,11 +466,11 @@ export function useToolStreaming(
                     currentMessage.data = JSON.parse(data);
                   } catch {
                     // Handle multi-line data
-                    currentMessage.data = { 
-                      toolName: 'unknown', 
-                      executionId: 'unknown', 
-                      timestamp: Date.now(), 
-                      payload: data 
+                    currentMessage.data = {
+                      toolName: 'unknown',
+                      executionId: 'unknown',
+                      timestamp: Date.now(),
+                      payload: data,
                     };
                   }
                 } else if (line.startsWith('event: ')) {

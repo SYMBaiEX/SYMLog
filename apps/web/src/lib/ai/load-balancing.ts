@@ -356,7 +356,9 @@ export class StickySessionStrategy extends LoadBalancingStrategyBase {
     if (!sessionId) {
       // No session ID, use fallback strategy
       const fallbackResult = this.fallbackStrategy.selectProvider(providers);
-      return fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
+      return fallbackResult instanceof Promise
+        ? await fallbackResult
+        : fallbackResult;
     }
 
     // Check for existing session
@@ -387,8 +389,9 @@ export class StickySessionStrategy extends LoadBalancingStrategyBase {
 
     // Create new session
     const fallbackResult = this.fallbackStrategy.selectProvider(providers);
-    const selection = fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
-    
+    const selection =
+      fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
+
     this.sessions.set(sessionId, {
       sessionId,
       providerId: selection.providerId,
@@ -664,7 +667,10 @@ export class OptimizationAwareStrategy extends LoadBalancingStrategyBase {
         providers,
         context
       );
-      const fallbackSelection = fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
+      const fallbackSelection =
+        fallbackResult instanceof Promise
+          ? await fallbackResult
+          : fallbackResult;
       return {
         ...fallbackSelection,
         reason: `Low optimization confidence (${optimizationResult.confidence.toFixed(2)}), ${fallbackSelection.reason}`,
@@ -681,7 +687,10 @@ export class OptimizationAwareStrategy extends LoadBalancingStrategyBase {
         providers,
         context
       );
-      const fallbackSelection = fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
+      const fallbackSelection =
+        fallbackResult instanceof Promise
+          ? await fallbackResult
+          : fallbackResult;
       return {
         ...fallbackSelection,
         reason: `Optimization failed, ${fallbackSelection.reason}`,
@@ -1140,11 +1149,12 @@ export class LoadBalancer {
     try {
       // Handle both sync and async strategies uniformly
       const selectionResult = this.strategy.selectProvider(providers, context);
-      
+
       // Await if it's a Promise, otherwise use directly
-      const selection = selectionResult instanceof Promise 
-        ? await selectionResult 
-        : selectionResult;
+      const selection =
+        selectionResult instanceof Promise
+          ? await selectionResult
+          : selectionResult;
 
       loggingService.debug('Provider selected', {
         strategy: this.strategy.getName(),
@@ -1344,12 +1354,16 @@ export class LoadBalancer {
       for (let i = 0; i < iterations; i++) {
         try {
           // Handle both sync and async strategies uniformly
-          const selectionResult = testStrategy.selectProvider(providers, context);
-          
+          const selectionResult = testStrategy.selectProvider(
+            providers,
+            context
+          );
+
           // Await if it's a Promise, otherwise use directly
-          const selection = selectionResult instanceof Promise 
-            ? await selectionResult 
-            : selectionResult;
+          const selection =
+            selectionResult instanceof Promise
+              ? await selectionResult
+              : selectionResult;
 
           contextResults.push(selection);
           allSelections.push(selection);
@@ -1463,20 +1477,30 @@ export class LoadBalancer {
 
     // Determine winner (highest confidence with low error rate)
     const lowErrorResults = results.filter((r) => r.errorRate < 0.1);
-    const winner = lowErrorResults.length > 0
-      ? lowErrorResults.sort((a, b) => b.averageConfidence - a.averageConfidence)[0].strategy
-      : strategies[0];
+    const winner =
+      lowErrorResults.length > 0
+        ? lowErrorResults.sort(
+            (a, b) => b.averageConfidence - a.averageConfidence
+          )[0].strategy
+        : strategies[0];
 
     // Generate recommendations
     const recommendations = [];
     const sortedByConfidence = results.sort(
       (a, b) => b.averageConfidence - a.averageConfidence
     );
-    const bestPerforming = sortedByConfidence.length > 0 ? sortedByConfidence[0] : null;
-    const sortedByLatency = results.sort((a, b) => a.averageLatency - b.averageLatency);
-    const fastestResponse = sortedByLatency.length > 0 ? sortedByLatency[0] : null;
-    const sortedByReliability = results.sort((a, b) => a.errorRate - b.errorRate);
-    const mostReliable = sortedByReliability.length > 0 ? sortedByReliability[0] : null;
+    const bestPerforming =
+      sortedByConfidence.length > 0 ? sortedByConfidence[0] : null;
+    const sortedByLatency = results.sort(
+      (a, b) => a.averageLatency - b.averageLatency
+    );
+    const fastestResponse =
+      sortedByLatency.length > 0 ? sortedByLatency[0] : null;
+    const sortedByReliability = results.sort(
+      (a, b) => a.errorRate - b.errorRate
+    );
+    const mostReliable =
+      sortedByReliability.length > 0 ? sortedByReliability[0] : null;
 
     if (bestPerforming) {
       recommendations.push(

@@ -11,10 +11,13 @@ import {
 
 // Define TooManyEmbeddingValuesForCallError locally since it's not exported from 'ai'
 class TooManyEmbeddingValuesForCallError extends Error {
-  static isInstance(error: unknown): error is TooManyEmbeddingValuesForCallError {
+  static isInstance(
+    error: unknown
+  ): error is TooManyEmbeddingValuesForCallError {
     return error instanceof TooManyEmbeddingValuesForCallError;
   }
 }
+
 import { responseCache } from './caching';
 import {
   type AIErrorInfo,
@@ -351,7 +354,10 @@ export class ResilientAIService {
         model,
         prompt,
         onChunk: ({ chunk }) => {
-          options?.onChunk?.(chunk);
+          // Extract text content from streaming chunk based on chunk type
+          if (chunk.type === 'text-delta') {
+            options?.onChunk?.(chunk.text);
+          }
         },
       });
 
@@ -370,7 +376,10 @@ export class ResilientAIService {
             model,
             prompt,
             onChunk: ({ chunk }) => {
-              options?.onChunk?.(chunk);
+              // Extract text content from streaming chunk based on chunk type
+              if (chunk.type === 'text-delta') {
+                options?.onChunk?.(chunk.text);
+              }
             },
           });
 
@@ -396,8 +405,11 @@ export class ResilientAIService {
       enableCache?: boolean;
     }
   ) {
-    const primaryModel = options?.model || 'openai';
-    const fallbackModels = options?.fallbackModels || ['openai'];
+    const primaryModel = options?.model || 'openai:text-embedding-3-small';
+    const fallbackModels = options?.fallbackModels || [
+      'openai:text-embedding-3-small',
+      'openai:text-embedding-ada-002',
+    ];
 
     // Check cache for embeddings
     if (options?.enableCache) {
@@ -412,7 +424,9 @@ export class ResilientAIService {
     }
 
     const primaryAction = async () => {
-      const provider = registry.textEmbeddingModel(primaryModel);
+      // Ensure the model ID follows the template literal pattern
+      const normalizedModelId = this.normalizeEmbeddingModelId(primaryModel);
+      const provider = registry.textEmbeddingModel(normalizedModelId);
       const result = await embed({
         model: provider,
         value,
@@ -432,18 +446,22 @@ export class ResilientAIService {
     };
 
     const fallbackChain = fallbackModels.map((modelId) => async () => {
-      const provider = registry.textEmbeddingModel(modelId);
+      // Ensure the model ID follows the template literal pattern
+      const normalizedModelId = this.normalizeEmbeddingModelId(modelId);
+      const provider = registry.textEmbeddingModel(normalizedModelId);
 
       // For array inputs that might be too large, chunk them
       if (Array.isArray(value) && value.length > 100) {
         const chunks = this.chunkArray(value, 100);
         const results = await Promise.all(
-          chunks.map((chunk) => embed({ model: provider, value: chunk.join(' ') }))
+          chunks.map((chunk) =>
+            embed({ model: provider, value: chunk.join(' ') })
+          )
         );
 
         // Combine results
         return {
-          embedding: results.map((r) => r.embedding).flat(),
+          embedding: results.flatMap((r) => r.embedding),
           usage: results.reduce(
             (acc, r) => ({
               tokens: acc.tokens + (r.usage?.tokens || 0),
@@ -744,6 +762,38 @@ export class ResilientAIService {
       chunks.push(array.slice(i, i + size));
     }
     return chunks;
+  }
+
+  /**
+   * Normalize embedding model ID to match template literal constraints
+   */
+  private normalizeEmbeddingModelId(
+    modelId: string
+  ): `openai:${string}` | `anthropic:${string}` {
+    // Handle legacy model IDs and ensure proper provider prefix
+    if (modelId === 'openai' || modelId === 'text-embedding-3-small') {
+      return 'openai:text-embedding-3-small';
+    }
+    if (modelId === 'text-embedding-3-large') {
+      return 'openai:text-embedding-3-large';
+    }
+    if (modelId === 'text-embedding-ada-002') {
+      return 'openai:text-embedding-ada-002';
+    }
+    if (modelId === 'mistral-embed') {
+      return 'anthropic:claude-3-haiku-20240307'; // Use Claude as fallback for non-OpenAI
+    }
+
+    // If already has provider prefix, use as-is if it matches the expected format
+    if (
+      modelId.includes(':') &&
+      (modelId.startsWith('openai:') || modelId.startsWith('anthropic:'))
+    ) {
+      return modelId as `openai:${string}` | `anthropic:${string}`;
+    }
+
+    // Default to OpenAI if no provider specified
+    return `openai:${modelId}`;
   }
 
   // Public methods for monitoring

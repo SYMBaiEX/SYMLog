@@ -172,13 +172,15 @@ export class MessageManager {
       // Handle different content formats
       if (typeof message.content === 'string') {
         enhanced.content = message.content;
-        enhanced.parts = [{
-          type: 'text',
-          text: message.content,
-        }];
+        enhanced.parts = [
+          {
+            type: 'text',
+            text: message.content,
+          },
+        ];
       } else if (Array.isArray(message.content)) {
-        enhanced.parts = message.content.map((part: any) => 
-          this.convertContentPart(part)
+        enhanced.parts = message.content.map((part: any) =>
+          MessageManager.convertContentPart(part)
         );
       }
 
@@ -202,7 +204,9 @@ export class MessageManager {
       // Otherwise, return parts array
       return {
         role: message.role,
-        content: message.parts.map((part) => this.convertPartToContent(part)),
+        content: message.parts.map((part) =>
+          MessageManager.convertPartToContent(part)
+        ),
       };
     }) as ModelMessage[];
   }
@@ -248,7 +252,8 @@ export class MessageManager {
         return {
           type: 'file',
           filename: part.filename || part.name || 'file',
-          mediaType: part.mediaType || part.mimeType || 'application/octet-stream',
+          mediaType:
+            part.mediaType || part.mimeType || 'application/octet-stream',
           data: part.data || part.content,
         };
 
@@ -323,7 +328,10 @@ export class MessageManager {
    * Extract text content from messages
    */
   static extractText(messages: EnhancedMessage[]): string {
-    const textParts = this.filterParts(messages, ['text', 'reasoning']);
+    const textParts = MessageManager.filterParts(messages, [
+      'text',
+      'reasoning',
+    ]);
     return textParts
       .map((part) => {
         if (part.type === 'text') return part.text;
@@ -341,12 +349,18 @@ export class MessageManager {
     call: ToolCallMessagePart;
     result?: ToolResultMessagePart;
   }> {
-    const toolCalls = this.filterParts(messages, ['tool-call']) as ToolCallMessagePart[];
-    const toolResults = this.filterParts(messages, ['tool-result']) as ToolResultMessagePart[];
+    const toolCalls = MessageManager.filterParts(messages, [
+      'tool-call',
+    ]) as ToolCallMessagePart[];
+    const toolResults = MessageManager.filterParts(messages, [
+      'tool-result',
+    ]) as ToolResultMessagePart[];
 
     return toolCalls.map((call) => ({
       call,
-      result: toolResults.find((result) => result.toolCallId === call.toolCallId),
+      result: toolResults.find(
+        (result) => result.toolCallId === call.toolCallId
+      ),
     }));
   }
 
@@ -362,7 +376,11 @@ export class MessageManager {
     }
   ): EnhancedMessage[] {
     const maxMessages = options?.maxMessages || 10;
-    const preserveTypes = options?.preserveTypes || ['tool-call', 'tool-result', 'error'];
+    const preserveTypes = options?.preserveTypes || [
+      'tool-call',
+      'tool-result',
+      'error',
+    ];
 
     // Always keep system messages
     const systemMessages = messages.filter((m) => m.role === 'system');
@@ -377,12 +395,14 @@ export class MessageManager {
 
     // Combine and deduplicate
     const compressed = new Map<string, EnhancedMessage>();
-    
-    [...systemMessages, ...importantMessages, ...recentMessages].forEach((msg) => {
-      if (msg.id) {
-        compressed.set(msg.id, msg);
+
+    [...systemMessages, ...importantMessages, ...recentMessages].forEach(
+      (msg) => {
+        if (msg.id) {
+          compressed.set(msg.id, msg);
+        }
       }
-    });
+    );
 
     // Sort by original order
     return Array.from(compressed.values()).sort((a, b) => {
@@ -397,7 +417,10 @@ export class MessageManager {
    */
   static addStepBoundaries(
     messages: EnhancedMessage[],
-    stepInfo: Array<{ type: 'initial' | 'continue' | 'tool-result'; description?: string }>
+    stepInfo: Array<{
+      type: 'initial' | 'continue' | 'tool-result';
+      description?: string;
+    }>
   ): EnhancedMessage[] {
     const result: EnhancedMessage[] = [];
     let stepNumber = 0;
@@ -448,9 +471,7 @@ export class MessageManager {
       errors.push('Message must have a role');
     }
 
-    if (!message.parts || !Array.isArray(message.parts)) {
-      errors.push('Message must have parts array');
-    } else {
+    if (message.parts && Array.isArray(message.parts)) {
       // Validate each part
       message.parts.forEach((part, index) => {
         if (!part.type) {
@@ -465,21 +486,27 @@ export class MessageManager {
             }
             break;
 
-          case 'tool-call':
+          case 'tool-call': {
             const toolCall = part as ToolCallMessagePart;
-            if (!toolCall.toolCallId || !toolCall.toolName) {
-              errors.push(`Tool call part ${index} must have toolCallId and toolName`);
+            if (!(toolCall.toolCallId && toolCall.toolName)) {
+              errors.push(
+                `Tool call part ${index} must have toolCallId and toolName`
+              );
             }
             break;
+          }
 
-          case 'tool-result':
+          case 'tool-result': {
             const toolResult = part as ToolResultMessagePart;
             if (!toolResult.toolCallId) {
               errors.push(`Tool result part ${index} must have toolCallId`);
             }
             break;
+          }
         }
       });
+    } else {
+      errors.push('Message must have parts array');
     }
 
     return {
@@ -510,7 +537,8 @@ export class MessageStreamer {
         };
       }
 
-      const lastPart = this.currentMessage.parts[this.currentMessage.parts.length - 1];
+      const lastPart =
+        this.currentMessage.parts[this.currentMessage.parts.length - 1];
       if (lastPart?.type === 'text') {
         (lastPart as TextMessagePart).text += chunk.textDelta;
       } else {
