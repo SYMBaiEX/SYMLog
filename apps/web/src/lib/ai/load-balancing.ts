@@ -91,7 +91,7 @@ export abstract class LoadBalancingStrategyBase {
   abstract selectProvider(
     providers: string[],
     context?: Record<string, any>
-  ): ProviderSelection;
+  ): ProviderSelection | Promise<ProviderSelection>;
 
   abstract getName(): string;
 }
@@ -344,10 +344,10 @@ export class StickySessionStrategy extends LoadBalancingStrategyBase {
     return 'sticky-session';
   }
 
-  selectProvider(
+  async selectProvider(
     providers: string[],
     context?: Record<string, any>
-  ): ProviderSelection {
+  ): Promise<ProviderSelection> {
     if (providers.length === 0) {
       throw new Error('No providers available');
     }
@@ -355,7 +355,8 @@ export class StickySessionStrategy extends LoadBalancingStrategyBase {
     const sessionId = context?.sessionId;
     if (!sessionId) {
       // No session ID, use fallback strategy
-      return this.fallbackStrategy.selectProvider(providers);
+      const fallbackResult = this.fallbackStrategy.selectProvider(providers);
+      return fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
     }
 
     // Check for existing session
@@ -385,7 +386,9 @@ export class StickySessionStrategy extends LoadBalancingStrategyBase {
     }
 
     // Create new session
-    const selection = this.fallbackStrategy.selectProvider(providers);
+    const fallbackResult = this.fallbackStrategy.selectProvider(providers);
+    const selection = fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
+    
     this.sessions.set(sessionId, {
       sessionId,
       providerId: selection.providerId,
@@ -661,11 +664,12 @@ export class OptimizationAwareStrategy extends LoadBalancingStrategyBase {
         providers,
         context
       );
+      const fallbackSelection = fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
       return {
-        ...fallbackResult,
-        reason: `Low optimization confidence (${optimizationResult.confidence.toFixed(2)}), ${fallbackResult.reason}`,
+        ...fallbackSelection,
+        reason: `Low optimization confidence (${optimizationResult.confidence.toFixed(2)}), ${fallbackSelection.reason}`,
         metadata: {
-          ...fallbackResult.metadata,
+          ...fallbackSelection.metadata,
           optimizationAttempted: true,
           optimizationConfidence: optimizationResult.confidence,
           fallbackReason: 'Low confidence',
@@ -677,11 +681,12 @@ export class OptimizationAwareStrategy extends LoadBalancingStrategyBase {
         providers,
         context
       );
+      const fallbackSelection = fallbackResult instanceof Promise ? await fallbackResult : fallbackResult;
       return {
-        ...fallbackResult,
-        reason: `Optimization failed, ${fallbackResult.reason}`,
+        ...fallbackSelection,
+        reason: `Optimization failed, ${fallbackSelection.reason}`,
         metadata: {
-          ...fallbackResult.metadata,
+          ...fallbackSelection.metadata,
           optimizationError:
             error instanceof Error ? error.message : 'Unknown error',
           fallbackReason: 'Optimization error',
@@ -1133,20 +1138,13 @@ export class LoadBalancer {
     context?: Record<string, any>
   ): Promise<ProviderSelection> {
     try {
-      let selection: ProviderSelection;
-
-      // Handle async strategies
-      if (
-        this.strategy instanceof OptimizationAwareStrategy ||
-        this.strategy instanceof IntelligentRoutingStrategy
-      ) {
-        selection = await (this.strategy as any).selectProvider(
-          providers,
-          context
-        );
-      } else {
-        selection = this.strategy.selectProvider(providers, context);
-      }
+      // Handle both sync and async strategies uniformly
+      const selectionResult = this.strategy.selectProvider(providers, context);
+      
+      // Await if it's a Promise, otherwise use directly
+      const selection = selectionResult instanceof Promise 
+        ? await selectionResult 
+        : selectionResult;
 
       loggingService.debug('Provider selected', {
         strategy: this.strategy.getName(),
@@ -1345,19 +1343,13 @@ export class LoadBalancer {
 
       for (let i = 0; i < iterations; i++) {
         try {
-          let selection: ProviderSelection;
-
-          if (
-            testStrategy instanceof OptimizationAwareStrategy ||
-            testStrategy instanceof IntelligentRoutingStrategy
-          ) {
-            selection = await (testStrategy as any).selectProvider(
-              providers,
-              context
-            );
-          } else {
-            selection = testStrategy.selectProvider(providers, context);
-          }
+          // Handle both sync and async strategies uniformly
+          const selectionResult = testStrategy.selectProvider(providers, context);
+          
+          // Await if it's a Promise, otherwise use directly
+          const selection = selectionResult instanceof Promise 
+            ? await selectionResult 
+            : selectionResult;
 
           contextResults.push(selection);
           allSelections.push(selection);

@@ -3,6 +3,8 @@ import {
   createStreamableUI,
   createStreamableValue,
   streamUI,
+  type StreamableValue,
+  type Streamable,
 } from '@ai-sdk/rsc';
 import type { Tool } from 'ai';
 import type { ReactNode } from 'react';
@@ -13,13 +15,45 @@ import {
 } from '../../hooks/use-prepare-step';
 import { getAIModel } from './providers';
 
-// Type definitions for RSC streaming
+// Type definitions for RSC streaming with proper AI SDK v5 constraints
 export interface StreamableArtifact {
   id: string;
   type: 'code' | 'document' | 'chart' | 'data' | 'image';
   status: 'streaming' | 'complete' | 'error';
   content: any;
   metadata?: Record<string, any>;
+}
+
+// AI SDK v5 compatible streaming types
+export interface StreamableToolResult {
+  status: string;
+  artifactId?: string;
+  type?: string;
+  title?: string;
+  created?: boolean;
+  updated?: boolean;
+  validating?: boolean;
+  message?: string;
+}
+
+// Proper AsyncGenerator type for streaming tools compatible with AI SDK v5
+export type StreamingToolGenerator<TResult = any> = AsyncGenerator<
+  StreamableToolResult, 
+  TResult, 
+  void
+>;
+
+// AI SDK v5 Streamable compatibility wrapper
+export type StreamableCompatible<T> = T extends Streamable ? T : StreamableValue<T>;
+
+// Enhanced streaming options with AI SDK v5 constraints
+export interface EnhancedStreamingOptions<
+  TOOLS extends Record<string, Tool> = Record<string, Tool>,
+> extends StreamingOptions<TOOLS> {
+  streamable?: boolean;
+  enableStreamableUI?: boolean;
+  streamableTimeout?: number;
+  streamableBufferSize?: number;
 }
 
 export interface StreamingOptions<
@@ -142,7 +176,18 @@ export async function streamingArtifactGeneration<
             language: z.string().optional(),
             metadata: z.record(z.any()).optional(),
           }),
-          async *generate({ type, title, content, language, metadata }: { type: string; title: string; content: string; language?: string; metadata?: Record<string, any> }) {
+          generate: async function* ({ type, title, content, language, metadata }: { 
+            type: string; 
+            title: string; 
+            content: string; 
+            language?: string; 
+            metadata?: Record<string, any> 
+          }): StreamingToolGenerator<{
+            artifactId: string;
+            type: string;
+            title: string;
+            created: boolean;
+          }> {
             // Stream the artifact creation process
             streamableUI.update(
               <LoadingIndicator message={`Creating ${type} artifact: ${title}...`} />
@@ -185,7 +230,10 @@ export async function streamingArtifactGeneration<
               metadata: z.record(z.any()).optional(),
             })
           }),
-          generate: async function* ({ artifactId, updates }: { artifactId: string; updates: { content?: string; metadata?: Record<string, any> } }) {
+          generate: async function* ({ artifactId, updates }: { 
+            artifactId: string; 
+            updates: { content?: string; metadata?: Record<string, any> } 
+          }): StreamingToolGenerator<{ updated: boolean; artifactId: string }> {
             streamableUI.update(
               <LoadingIndicator message="Updating artifact..." />
             );
@@ -220,9 +268,16 @@ export async function streamingArtifactGeneration<
 }
 
 /**
- * Create streamable values for progressive data loading
+ * Create streamable values for progressive data loading with AI SDK v5 compatibility
  */
-export function createProgressiveDataStream<T>() {
+export function createProgressiveDataStream<T>(): {
+  stream: StreamableValue<T>;
+  update: (value: Partial<T>) => void;
+  append: (value: Partial<T>) => void;
+  done: (finalValue?: T) => void;
+  error: (error: Error) => void;
+  value: StreamableValue<T>;
+} {
   const stream = createStreamableValue<T>();
   
   return {
@@ -241,51 +296,227 @@ export function createProgressiveDataStream<T>() {
     },
     error: (error: Error) => {
       stream.error(error);
-    }
+    },
+    value: stream.value
   }
 }
 
 /**
- * Enhanced error handling and stream recovery
+ * Enhanced error handling and stream recovery with comprehensive type safety
  */
-export interface StreamErrorBoundary {
-  maxRetries: number
-  retryDelay: number
-  fallbackResponse?: any
-  onError?: (error: Error, retryCount: number) => void
-  onRecovery?: (error: Error) => void
+export interface StreamErrorBoundary<TFallback = any> {
+  maxRetries: number;
+  retryDelay: number;
+  fallbackResponse?: TFallback;
+  onError?: (error: StreamingError, retryCount: number, context: ErrorContext) => void | Promise<void>;
+  onRecovery?: (error: StreamingError, context: RecoveryContext) => void | Promise<void>;
+  onFinalFailure?: (error: StreamingError, context: ErrorContext) => void | Promise<void>;
+  shouldRetry?: (error: StreamingError, retryCount: number) => boolean;
+  retryStrategy?: 'exponential' | 'linear' | 'custom';
+  customRetryDelay?: (retryCount: number, baseDelay: number) => number;
+}
+
+// Enhanced streaming error types
+export class StreamingError extends Error {
+  constructor(
+    message: string,
+    public readonly code: StreamingErrorCode,
+    public readonly context?: Record<string, any>,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = 'StreamingError';
+  }
+}
+
+export type StreamingErrorCode =
+  | 'STREAM_TIMEOUT'
+  | 'STREAM_INTERRUPTED'
+  | 'STREAM_INVALID_DATA'
+  | 'STREAM_NETWORK_ERROR'
+  | 'STREAM_QUOTA_EXCEEDED'
+  | 'STREAM_AUTHENTICATION_ERROR'
+  | 'STREAM_RATE_LIMITED'
+  | 'STREAM_SERVER_ERROR'
+  | 'STREAM_CLIENT_ERROR'
+  | 'STREAM_UNKNOWN_ERROR';
+
+export interface ErrorContext {
+  streamId?: string;
+  executionId?: string;
+  toolName?: string;
+  timestamp: number;
+  retryCount: number;
+  previousErrors?: StreamingError[];
+  metadata?: Record<string, any>;
+}
+
+export interface RecoveryContext extends ErrorContext {
+  recoveryMethod: 'retry' | 'fallback' | 'skip';
+  recoveryAttempts: number;
 }
 
 export async function withStreamErrorBoundary<T>(
   streamFunction: () => Promise<T>,
-  errorBoundary: StreamErrorBoundary
+  errorBoundary: StreamErrorBoundary<T>,
+  context?: Partial<ErrorContext>
 ): Promise<T> {
-  let retryCount = 0
+  let retryCount = 0;
+  const previousErrors: StreamingError[] = [];
+  const startTime = Date.now();
   
   while (retryCount <= errorBoundary.maxRetries) {
     try {
-      return await streamFunction()
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('Unknown streaming error')
-      
-      errorBoundary.onError?.(err, retryCount)
-      
-      if (retryCount === errorBoundary.maxRetries) {
-        if (errorBoundary.fallbackResponse !== undefined) {
-          errorBoundary.onRecovery?.(err)
-          return errorBoundary.fallbackResponse
+      return await streamFunction();
+    } catch (originalError) {
+      // Convert to StreamingError with proper classification
+      const streamingError = classifyStreamingError(originalError);
+      const errorContext: ErrorContext = {
+        ...context,
+        timestamp: Date.now(),
+        retryCount,
+        previousErrors: [...previousErrors],
+        metadata: {
+          ...context?.metadata,
+          totalElapsed: Date.now() - startTime,
+          originalErrorType: originalError?.constructor?.name
         }
-        throw err
+      };
+      
+      previousErrors.push(streamingError);
+      
+      // Check if should retry
+      const shouldRetry = errorBoundary.shouldRetry 
+        ? errorBoundary.shouldRetry(streamingError, retryCount)
+        : isRetryableError(streamingError);
+      
+      // Notify error handler
+      try {
+        await errorBoundary.onError?.(streamingError, retryCount, errorContext);
+      } catch (handlerError) {
+        console.warn('Error handler threw exception:', handlerError);
       }
       
-      // Exponential backoff
-      const delay = errorBoundary.retryDelay * Math.pow(2, retryCount)
-      await new Promise(resolve => setTimeout(resolve, delay))
-      retryCount++
+      // Final retry attempt or non-retryable error
+      if (retryCount >= errorBoundary.maxRetries || !shouldRetry) {
+        if (errorBoundary.fallbackResponse !== undefined) {
+          const recoveryContext: RecoveryContext = {
+            ...errorContext,
+            recoveryMethod: 'fallback',
+            recoveryAttempts: 1
+          };
+          
+          try {
+            await errorBoundary.onRecovery?.(streamingError, recoveryContext);
+          } catch (recoveryError) {
+            console.warn('Recovery handler threw exception:', recoveryError);
+          }
+          
+          return errorBoundary.fallbackResponse;
+        }
+        
+        // Notify final failure
+        try {
+          await errorBoundary.onFinalFailure?.(streamingError, errorContext);
+        } catch (finalFailureError) {
+          console.warn('Final failure handler threw exception:', finalFailureError);
+        }
+        
+        throw streamingError;
+      }
+      
+      // Calculate retry delay
+      let delay: number;
+      if (errorBoundary.customRetryDelay) {
+        delay = errorBoundary.customRetryDelay(retryCount, errorBoundary.retryDelay);
+      } else {
+        switch (errorBoundary.retryStrategy || 'exponential') {
+          case 'exponential':
+            delay = errorBoundary.retryDelay * Math.pow(2, retryCount);
+            break;
+          case 'linear':
+            delay = errorBoundary.retryDelay * (retryCount + 1);
+            break;
+          case 'custom':
+            delay = errorBoundary.retryDelay;
+            break;
+          default:
+            delay = errorBoundary.retryDelay * Math.pow(2, retryCount);
+        }
+      }
+      
+      // Add jitter to prevent thundering herd
+      const jitter = delay * 0.1 * Math.random();
+      const finalDelay = Math.min(delay + jitter, 60000); // Cap at 1 minute
+      
+      await new Promise(resolve => setTimeout(resolve, finalDelay));
+      retryCount++;
     }
   }
   
-  throw new Error('Unexpected error in stream boundary')
+  throw new StreamingError(
+    'Unexpected error in stream boundary',
+    'STREAM_UNKNOWN_ERROR',
+    { retryCount, maxRetries: errorBoundary.maxRetries }
+  );
+}
+
+/**
+ * Classify errors into streaming error types
+ */
+function classifyStreamingError(error: any): StreamingError {
+  if (error instanceof StreamingError) {
+    return error;
+  }
+  
+  const message = error?.message || 'Unknown error';
+  const errorString = message.toLowerCase();
+  
+  let code: StreamingErrorCode;
+  
+  if (errorString.includes('timeout') || errorString.includes('timed out')) {
+    code = 'STREAM_TIMEOUT';
+  } else if (errorString.includes('network') || errorString.includes('connection')) {
+    code = 'STREAM_NETWORK_ERROR';
+  } else if (errorString.includes('rate limit') || errorString.includes('too many requests')) {
+    code = 'STREAM_RATE_LIMITED';
+  } else if (errorString.includes('auth') || errorString.includes('unauthorized')) {
+    code = 'STREAM_AUTHENTICATION_ERROR';
+  } else if (errorString.includes('quota') || errorString.includes('limit exceeded')) {
+    code = 'STREAM_QUOTA_EXCEEDED';
+  } else if (errorString.includes('invalid') || errorString.includes('malformed')) {
+    code = 'STREAM_INVALID_DATA';
+  } else if (errorString.includes('interrupted') || errorString.includes('aborted')) {
+    code = 'STREAM_INTERRUPTED';
+  } else if (error?.status >= 500) {
+    code = 'STREAM_SERVER_ERROR';
+  } else if (error?.status >= 400) {
+    code = 'STREAM_CLIENT_ERROR';
+  } else {
+    code = 'STREAM_UNKNOWN_ERROR';
+  }
+  
+  return new StreamingError(
+    message,
+    code,
+    { originalError: error },
+    error instanceof Error ? error : undefined
+  );
+}
+
+/**
+ * Determine if an error is retryable
+ */
+function isRetryableError(error: StreamingError): boolean {
+  const retryableCodes: StreamingErrorCode[] = [
+    'STREAM_TIMEOUT',
+    'STREAM_NETWORK_ERROR',
+    'STREAM_RATE_LIMITED',
+    'STREAM_SERVER_ERROR',
+    'STREAM_INTERRUPTED'
+  ];
+  
+  return retryableCodes.includes(error.code);
 }
 
 /**
@@ -441,16 +672,20 @@ export class ConcurrentStreamManager {
 
 /**
  * Stream structured data with progressive rendering and advanced error handling
+ * Enhanced with AI SDK v5 Streamable interface compatibility
  */
 export async function streamStructuredData<T>(
   schema: z.ZodSchema<T>,
   prompt: string,
-  options: StreamingOptions<any> & {
-    errorBoundary?: StreamErrorBoundary
+  options: EnhancedStreamingOptions<any> & {
+    errorBoundary?: StreamErrorBoundary<{ data: StreamableValue<T>; ui: StreamableValue<ReactNode> }>
     rateLimiter?: StreamRateLimiter
     reconnectionManager?: StreamReconnectionManager
   } = {}
-) {
+): Promise<{
+  data: StreamableValue<T>;
+  ui: StreamableValue<ReactNode>;
+}> {
   const dataStream = createProgressiveDataStream<T>()
   const uiStream = createStreamableUI()
 
@@ -471,7 +706,7 @@ export async function streamStructuredData<T>(
             // Try to parse partial JSON
             const partial = JSON.parse(content)
             dataStream.update(partial)
-            uiStream.update(
+            return (
               <ArtifactPreview 
                 content={JSON.stringify(partial, null, 2)} 
                 type="json"
@@ -480,18 +715,20 @@ export async function streamStructuredData<T>(
             )
           } catch {
             // If parsing fails, just show raw content
-            uiStream.update(
-              <ArtifactPreview content={content} streaming={true} />
-            )
+            return <ArtifactPreview content={content} streaming={true} />
           }
         }
+        return null;
       },
       tools: {
         generateStructuredData: {
           description: 'Generate structured data matching the schema',
           parameters: schema,
-          generate: async function* (data: T) {
-            yield { validating: true }
+          generate: async function* (data: T): StreamingToolGenerator<{ generated: boolean; data: T }> {
+            yield { 
+              status: 'validating',
+              validating: true 
+            }
             
             // Validate against schema
             const validation = schema.safeParse(data)
@@ -683,12 +920,20 @@ export async function streamWorkflowExecution(
     }>;
   },
   options: StreamingOptions<any> & {
-    errorBoundary?: StreamErrorBoundary;
+    errorBoundary?: StreamErrorBoundary<{
+      results: StreamableValue<any[]>;
+      progress: StreamableValue<number>;
+      ui: StreamableValue<ReactNode>;
+    }>;
     optimisticUpdates?: boolean;
     rateLimiter?: StreamRateLimiter;
     concurrentManager?: ConcurrentStreamManager;
   } = {}
-) {
+): Promise<{
+  results: StreamableValue<any[]>;
+  progress: StreamableValue<number>;
+  ui: StreamableValue<ReactNode>;
+}> {
   const uiStream = createStreamableUI();
   const progressStream = createStreamableValue<number>();
   const resultsStream = createStreamableValue<any[]>();
@@ -770,12 +1015,17 @@ return {
 
 /**
  * Stream AI responses with tool calls and UI updates
+ * Enhanced with AI SDK v5 compatibility and proper type constraints
  */
 export async function streamWithTools(
   prompt: string,
   tools: Record<string, any>,
-  options: StreamingOptions = {}
-) {
+  options: EnhancedStreamingOptions = {}
+): Promise<{
+  result: any;
+  toolCalls: StreamableValue<any[]>;
+  ui: StreamableValue<ReactNode>;
+}> {
   const uiStream = createStreamableUI()
   const toolCallsStream = createStreamableValue<any[]>()
   
@@ -789,15 +1039,14 @@ export async function streamWithTools(
       maxTokens: options.maxTokens,
       text: ({ content, done }: { content: string; done: boolean }) => {
         if (!done) {
-          uiStream.update(
-            <ArtifactPreview content={content} streaming={true} />
-          )
+          return <ArtifactPreview content={content} streaming={true} />;
         }
+        return <ArtifactPreview content={content} streaming={false} />;
       },
       tools: Object.entries(tools).reduce((acc, [name, tool]) => {
         acc[name] = {
           ...tool,
-          generate: async function* (...args: any[]) {
+          generate: async function* (...args: any[]): StreamingToolGenerator<any> {
             // Track tool call
             const callId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
             const callInfo = {
@@ -821,32 +1070,57 @@ export async function streamWithTools(
               </div>
             )
 
-  try {
-    // Execute original tool
-    const result = await tool.generate(...args);
+            // Yield initial status
+            yield {
+              status: 'executing',
+              message: `Executing tool: ${name}`
+            }
 
-    // Update call info
-    callInfo.status = 'completed';
-    callInfo.result = result;
-    toolCallsStream.update(toolCalls);
+            try {
+              // Execute original tool - handle both sync and async generators
+              let result: any
+              if (tool.generate && typeof tool.generate === 'function') {
+                const toolResult = tool.generate(...args)
+                if (toolResult && typeof toolResult[Symbol.asyncIterator] === 'function') {
+                  // Handle async generator tools
+                  let finalResult: any
+                  for await (const partial of toolResult) {
+                    yield {
+                      status: 'processing',
+                      message: 'Processing tool output...'
+                    }
+                    finalResult = partial
+                  }
+                  result = finalResult
+                } else {
+                  result = await toolResult
+                }
+              } else {
+                result = await tool.generate(...args)
+              }
 
-    // Update UI with result
-    uiStream.update(
+              // Update call info
+              (callInfo as any).status = 'completed'
+              callInfo.result = result
+              toolCallsStream.update(toolCalls)
+
+              // Update UI with result
+              uiStream.update(
                 <ArtifactViewer 
                   type="tool-result" 
                   content={result}
                   metadata={{ tool: name, callId }}
                 />
-              );
+              )
 
-    return result;
-  } catch (error) {
-    callInfo.status = 'failed';
-    callInfo.error = error instanceof Error ? error.message : 'Unknown error';
-    toolCallsStream.update(toolCalls);
-    throw error;
-  }
-}
+              return result
+            } catch (error) {
+              (callInfo as any).status = 'failed'
+              callInfo.error = error instanceof Error ? error.message : 'Unknown error'
+              toolCallsStream.update(toolCalls)
+              throw error
+            }
+          }
         };
         return acc;
       }, {} as Record<string, any>)
@@ -874,6 +1148,17 @@ export {
   streamUI,
   createStreamableUI,
   createStreamableValue,
-  type StreamableArtifact,
-  type StreamingOptions,
 };
+
+// Export advanced streaming pattern utilities
+export {
+  createStreamingComposition,
+  createProgressiveStreamingPattern,
+  createStreamingStateManager,
+};
+
+// Export all streaming pattern types that are defined above
+
+// Export unique type names to avoid conflicts
+export type { StreamableArtifact as RSCStreamableArtifact };
+export type { StreamingOptions as RSCStreamingOptions };

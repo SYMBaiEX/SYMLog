@@ -117,14 +117,6 @@ const customAnthropic = customProvider({
         defaultSettingsMiddleware({
           settings: {
             maxOutputTokens: 100_000,
-            providerMetadata: {
-              anthropic: {
-                thinking: {
-                  type: 'enabled',
-                  budgetTokens: 32_000,
-                },
-              } satisfies AnthropicProviderOptions,
-            },
           },
         })
       ),
@@ -191,7 +183,7 @@ export const getAIModel = (
 
   try {
     // Get model from registry
-    const model = registry.languageModel(modelToUse);
+    const model = registry.languageModel(modelToUse as any);
 
     // Add request metadata if provided
     if (metadata) {
@@ -227,15 +219,9 @@ export const collectResponseMetadata = (
   return {
     id: response.id || crypto.randomUUID(),
     modelId: response.modelId,
-    usage: response.usage,
-    finishReason: response.finishReason,
-    custom: {
-      timestamp: new Date().toISOString(),
-      latency: response.latency,
-      cached: response.cached,
-      provider: response.provider,
-    },
-  };
+    // Note: AI SDK v5 doesn't support custom properties in LanguageModelResponseMetadata
+    // Store additional data separately or extend interface if needed
+  } as LanguageModelResponseMetadata;
 };
 
 // Rate limiting configuration

@@ -18,7 +18,7 @@ const loggingService = {
     console.debug(`[DEBUG] ${message}`, data),
 };
 
-// Stream optimization configuration
+// Stream optimization configuration with AI SDK v5 compatibility
 export interface StreamOptimizationConfig {
   enableChunking: boolean;
   chunkSize: number;
@@ -29,6 +29,7 @@ export interface StreamOptimizationConfig {
   maxConcurrentStreams: number;
   bufferSize: number;
   enableMetrics: boolean;
+  streamableCompatible?: boolean;
 }
 
 // Stream metrics
@@ -117,6 +118,7 @@ export class StreamingOptimizer {
 
   /**
    * Optimize text streaming with chunking and compression
+   * Enhanced with proper AsyncGenerator type constraints
    */
   async optimizeTextStream(
     streamFn: () => Promise<AsyncIterable<string>>,
@@ -127,7 +129,7 @@ export class StreamingOptimizer {
       chunkSize?: number;
       metadata?: Record<string, any>;
     }
-  ): Promise<AsyncIterable<OptimizedChunk<string>>> {
+  ): Promise<AsyncGenerator<OptimizedChunk<string>, void, unknown>> {
     const streamId = this.generateStreamId();
     const startTime = Date.now();
 
@@ -171,6 +173,7 @@ export class StreamingOptimizer {
 
   /**
    * Optimize object streaming with progressive parsing
+   * Enhanced with proper AsyncGenerator type constraints
    */
   async optimizeObjectStream<T>(
     streamFn: () => Promise<AsyncIterable<any>>,
@@ -182,7 +185,7 @@ export class StreamingOptimizer {
       validator?: (obj: T) => boolean;
       metadata?: Record<string, any>;
     }
-  ): Promise<AsyncIterable<OptimizedChunk<T>>> {
+  ): Promise<AsyncGenerator<OptimizedChunk<T>, void, unknown>> {
     const streamId = this.generateStreamId();
     const startTime = Date.now();
 
@@ -226,11 +229,12 @@ export class StreamingOptimizer {
 
   /**
    * Create buffered stream for better performance
+   * Enhanced with proper AsyncGenerator type constraints
    */
   async createBufferedStream<T>(
     originalStream: AsyncIterable<T>,
     bufferSize?: number
-  ): Promise<AsyncIterable<T[]>> {
+  ): Promise<AsyncGenerator<T[], void, unknown>> {
     const effectiveBufferSize = bufferSize ?? this.config.bufferSize;
 
     return (async function* () {
@@ -254,11 +258,12 @@ export class StreamingOptimizer {
 
   /**
    * Create parallel stream processing
+   * Enhanced with proper AsyncGenerator type constraints
    */
   async createParallelStream<T, R>(
     streams: AsyncIterable<T>[],
     processor: (chunk: T, streamIndex: number) => Promise<R>
-  ): Promise<AsyncIterable<R>> {
+  ): Promise<AsyncGenerator<R, void, unknown>> {
     const maxConcurrent = Math.min(
       streams.length,
       this.config.maxConcurrentStreams
@@ -325,7 +330,7 @@ export class StreamingOptimizer {
       chunkSize?: number;
       metadata?: Record<string, any>;
     }
-  ): AsyncIterable<OptimizedChunk<string>> {
+  ): AsyncGenerator<OptimizedChunk<string>, void, unknown> {
     const state = this.activeStreams.get(streamId)!;
     const chunks: OptimizedChunk<string>[] = [];
     const chunkSize = options?.chunkSize ?? this.config.chunkSize;
@@ -396,7 +401,7 @@ export class StreamingOptimizer {
       validator?: (obj: T) => boolean;
       metadata?: Record<string, any>;
     }
-  ): AsyncIterable<OptimizedChunk<T>> {
+  ): AsyncGenerator<OptimizedChunk<T>, void, unknown> {
     const state = this.activeStreams.get(streamId)!;
     const chunks: OptimizedChunk<T>[] = [];
     let chunkIndex = 0;
@@ -575,7 +580,7 @@ export class StreamingOptimizer {
 
   private async getCachedStream(
     cacheKey: string
-  ): Promise<AsyncIterable<OptimizedChunk<any>> | null> {
+  ): Promise<AsyncGenerator<OptimizedChunk<any>, void, unknown> | null> {
     try {
       const cached = this.streamBuffer.get(cacheKey);
       if (cached) {
@@ -661,7 +666,7 @@ export async function optimizeTextStream(
     chunkSize?: number;
     metadata?: Record<string, any>;
   }
-): Promise<AsyncIterable<OptimizedChunk<string>>> {
+): Promise<AsyncGenerator<OptimizedChunk<string>, void, unknown>> {
   return streamingOptimizer.optimizeTextStream(streamFn, options);
 }
 
@@ -675,14 +680,14 @@ export async function optimizeObjectStream<T>(
     validator?: (obj: T) => boolean;
     metadata?: Record<string, any>;
   }
-): Promise<AsyncIterable<OptimizedChunk<T>>> {
+): Promise<AsyncGenerator<OptimizedChunk<T>, void, unknown>> {
   return streamingOptimizer.optimizeObjectStream(streamFn, options);
 }
 
 export async function createBufferedStream<T>(
   originalStream: AsyncIterable<T>,
   bufferSize?: number
-): Promise<AsyncIterable<T[]>> {
+): Promise<AsyncGenerator<T[], void, unknown>> {
   return streamingOptimizer.createBufferedStream(originalStream, bufferSize);
 }
 
@@ -694,6 +699,5 @@ export function clearStreamingCache(): void {
   streamingOptimizer.clearCache();
 }
 
-// Export types and singleton
-export type { StreamOptimizationConfig, StreamMetrics, OptimizedChunk };
+// Export types already exported above
 export { streamingOptimizer };

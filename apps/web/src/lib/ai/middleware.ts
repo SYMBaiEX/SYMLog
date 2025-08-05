@@ -7,10 +7,17 @@ import {
   type LanguageModel,
   type LanguageModelRequestMetadata,
   type LanguageModelResponseMetadata,
-  type LanguageModelV2Middleware,
+  // type LanguageModelV2Middleware, // Not exported in AI SDK v5
   simulateStreamingMiddleware,
   wrapLanguageModel,
 } from 'ai';
+
+// Define middleware types (not exported in AI SDK v5)
+interface LanguageModelV2Middleware {
+  wrapGenerate?: any;
+  wrapStream?: any;
+  transformParams?: any;
+}
 
 // Define middleware parameter types
 interface TransformParamsOptions {

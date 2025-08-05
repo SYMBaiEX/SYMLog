@@ -100,7 +100,7 @@ export function extractMetadataFromChunk(chunk: StreamChunk | TextStreamPart<any
   
   return metadata;
 }
-import type { z } from 'zod';
+import { z } from 'zod';
 import { getAIModel } from './providers';
 import { aiTelemetry } from './telemetry';
 import { enhancedArtifactTools } from './tools/enhanced-tools';
@@ -656,7 +656,7 @@ export class ExperimentalAI {
       try {
         return await generateObject({
           model: getAIModel(options?.model),
-          schema,
+          schema: schema as any,
           prompt,
         });
       } catch (error) {
@@ -1332,8 +1332,8 @@ export class ExperimentalAI {
     // Handle partial output stream if available
     if ('experimental_partialOutputStream' in stream && options?.onPartialOutput) {
       (async () => {
-        for await (const partialOutput of stream.experimental_partialOutputStream) {
-          options.onPartialOutput(partialOutput);
+        for await (const partialOutput of stream.experimental_partialOutputStream!) {
+          options.onPartialOutput!(partialOutput);
         }
       })();
     }
@@ -1473,7 +1473,7 @@ export class ExperimentalAI {
           }
           if ('toolCalls' in step && step.toolCalls) {
             step.toolCalls.forEach((call: any) => {
-              options.onMessagePart({
+              options.onMessagePart!({
                 type: 'tool-call',
                 toolCallId: call.toolCallId || call.id,
                 toolName: call.toolName || call.name,
@@ -1483,7 +1483,7 @@ export class ExperimentalAI {
           }
           if ('toolResults' in step && step.toolResults) {
             step.toolResults.forEach((result: any) => {
-              options.onMessagePart({
+              options.onMessagePart!({
                 type: 'tool-result',
                 toolCallId: result.toolCallId,
                 toolName: result.toolName,
@@ -1562,7 +1562,7 @@ export class ExperimentalAI {
       return {
         ...result,
         experimental_providerMetadata: {
-          ...('experimental_providerMetadata' in result ? result.experimental_providerMetadata : {}),
+          ...(('experimental_providerMetadata' in result && result.experimental_providerMetadata) ? result.experimental_providerMetadata as Record<string, any> : {}),
           metricsCollected: options?.collectMetrics ?? false,
           responseTime: performance.now() - startTime,
         },

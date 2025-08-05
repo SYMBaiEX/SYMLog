@@ -573,7 +573,7 @@ export class FallbackChainManager {
       // Import registry dynamically to avoid circular dependency
       const { registry } = await import('./providers');
       const modelKey = `${fallback.providerId}:${fallback.modelId}`;
-      return registry.languageModel(modelKey);
+      return registry.languageModel(modelKey as any);
     } catch (error) {
       loggingService.error('Failed to get model instance', {
         model: `${fallback.providerId}:${fallback.modelId}`,

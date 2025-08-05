@@ -1064,11 +1064,11 @@ export class ProviderMetricsService {
       const recentAccuracy =
         recentPredictions
           .slice(-5)
-          .reduce((sum, s) => (sum + s.actual!.success ? 1 : 0), 0) / 5;
+          .reduce((sum, s) => sum + (s.actual!.success ? 1 : 0), 0) / 5;
       const olderAccuracy =
         recentPredictions
           .slice(-10, -5)
-          .reduce((sum, s) => (sum + s.actual!.success ? 1 : 0), 0) / 5;
+          .reduce((sum, s) => sum + (s.actual!.success ? 1 : 0), 0) / 5;
 
       if (recentAccuracy > olderAccuracy + 0.1) {
         metrics.optimizationMetrics.trendDirection = 'improving';

@@ -17,6 +17,7 @@ import { IntelligentRoutingEngine } from './intelligent-routing';
 import type { LoadBalancingStrategy } from './load-balancing';
 import { ProviderMetricsService } from './provider-metrics';
 import { getAIModel, registry, systemPrompts } from './providers';
+import type { SupportedModelId, GatewayRequestMetadata } from './gateway';
 
 // Create a logger wrapper
 const loggingService = {
@@ -37,7 +38,7 @@ export interface EnhancedModelConfig {
   capabilities?: string[];
   maxCost?: number;
   maxLatency?: number;
-  metadata?: LanguageModelRequestMetadata;
+  metadata?: GatewayRequestMetadata;
   fallbackEnabled?: boolean;
   loadBalancing?: LoadBalancingStrategy;
   aggregation?: boolean;
@@ -149,7 +150,7 @@ export class GatewayRegistry {
   ): Promise<LanguageModel> {
     // Try to get model from registry first
     try {
-      const baseModel = registry.languageModel(modelId);
+      const baseModel = registry.languageModel(modelId as SupportedModelId);
 
       if (!config.fallbackEnabled) {
         return baseModel;
@@ -159,7 +160,7 @@ export class GatewayRegistry {
       const [providerId, modelName] = modelId.split(':');
       const modelSelection: ModelSelection = {
         provider: providerId,
-        modelId,
+        modelId: modelId as SupportedModelId,
         model: baseModel,
         reason: 'Direct model request',
         fallbackOptions: this.buildFallbackChain(modelId),
@@ -343,20 +344,21 @@ export class GatewayRegistry {
     // This is a simplified version - the full implementation would require
     // creating a custom provider that implements the aggregation logic
     // Using a default model ID since selectModels doesn't exist
-    const baseModel = this.gateway.getModelById('gpt-4o-mini');
+    const baseModelId = 'openai:gpt-4o-mini' as SupportedModelId;
+    const baseModel = registry.languageModel(baseModelId);
     if (!baseModel) {
       throw new Error('No base model available for aggregation');
     }
 
     // Use wrapLanguageModel to add aggregation middleware
     return wrapLanguageModel({
-      model: baseModel.model as any,
+      model: baseModel as any,
       middleware: {
-        wrapGenerate: async ({ doGenerate, params }) => {
+        wrapGenerate: async ({ doGenerate, params }: { doGenerate: any; params: any }) => {
           // This would implement the aggregation logic
           return await doGenerate();
         },
-        wrapStream: async ({ doStream, params }) => {
+        wrapStream: async ({ doStream, params }: { doStream: any; params: any }) => {
           // This would implement the streaming aggregation logic
           return await doStream();
         },
@@ -364,36 +366,36 @@ export class GatewayRegistry {
     });
   }
 
-  private buildFallbackChain(primaryModelId: string): string[] {
+  private buildFallbackChain(primaryModelId: string): SupportedModelId[] {
     // Build a fallback chain based on model type
-    const fallbackChains: Record<string, string[]> = {
-      'openai:fast': ['anthropic:fast', 'openai:premium', 'anthropic:balanced'],
-      'anthropic:fast': ['openai:fast', 'anthropic:balanced', 'openai:premium'],
+    const fallbackChains: Record<string, SupportedModelId[]> = {
+      'openai:fast': ['anthropic:fast', 'openai:premium', 'anthropic:balanced'] as SupportedModelId[],
+      'anthropic:fast': ['openai:fast', 'anthropic:balanced', 'openai:premium'] as SupportedModelId[],
       'openai:premium': [
         'anthropic:balanced',
         'openai:fast',
         'anthropic:reasoning',
-      ],
-      'anthropic:balanced': ['openai:premium', 'anthropic:fast', 'openai:fast'],
+      ] as SupportedModelId[],
+      'anthropic:balanced': ['openai:premium', 'anthropic:fast', 'openai:fast'] as SupportedModelId[],
       'openai:code': [
         'anthropic:balanced',
         'openai:premium',
         'anthropic:reasoning',
-      ],
+      ] as SupportedModelId[],
       'anthropic:reasoning': [
         'openai:premium',
         'anthropic:balanced',
         'openai:code',
-      ],
+      ] as SupportedModelId[],
       'anthropic:creative': [
         'openai:premium',
         'anthropic:balanced',
         'openai:fast',
-      ],
+      ] as SupportedModelId[],
     };
 
     return (
-      fallbackChains[primaryModelId] || DEFAULT_GATEWAY_CONFIG.fallbackChain
+      fallbackChains[primaryModelId] || DEFAULT_GATEWAY_CONFIG.fallbackChain as SupportedModelId[]
     );
   }
 

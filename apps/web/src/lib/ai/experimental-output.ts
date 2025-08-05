@@ -9,7 +9,7 @@ import {
   type StreamTextResult,
   type GenerateTextResult,
 } from 'ai';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { getAIModel } from './providers';
 
 // Output builder types
@@ -24,7 +24,7 @@ export interface OutputBuilder<T = any> {
 export type PartialOutputHandler<T> = (partial: Partial<T>) => void;
 
 // Output stream result with partial output support
-export interface OutputStreamResult<T> extends StreamTextResult<any> {
+export interface OutputStreamResult<T> extends Omit<StreamTextResult<any, any>, 'experimental_partialOutputStream'> {
   experimental_partialOutputStream?: AsyncIterable<Partial<T>>;
 }
 
@@ -97,7 +97,7 @@ export class StructuredOutputService {
       tools?: Record<string, any>;
       temperature?: number;
     }
-  ): Promise<GenerateTextResult<any> & { output?: T }> {
+  ): Promise<GenerateTextResult<any, any> & { output?: T }> {
     const model = getAIModel(options?.model);
 
     // Build the output configuration
@@ -135,10 +135,10 @@ export class StructuredOutputService {
       transformedOutput = outputBuilder.transform?.(result.text) ?? result.text as T;
     } else if ('object' in result && result.object) {
       if (outputBuilder.type === 'enum') {
-        const enumValue = 'value' in result.object ? result.object.value : undefined;
+        const enumValue = (result.object && typeof result.object === 'object' && result.object !== null && 'value' in result.object) ? (result.object as any).value : undefined;
         transformedOutput = outputBuilder.transform?.(enumValue) ?? (enumValue as T | undefined);
       } else if (outputBuilder.type === 'array') {
-        const arrayItems = 'items' in result.object ? result.object.items : undefined;
+        const arrayItems = (result.object && typeof result.object === 'object' && result.object !== null && 'items' in result.object) ? (result.object as any).items : undefined;
         transformedOutput = outputBuilder.transform?.(arrayItems) ?? (arrayItems as T | undefined);
       } else {
         transformedOutput = outputBuilder.transform?.(result.object) ?? (result.object as T);
@@ -190,11 +190,13 @@ export class StructuredOutputService {
     if (options?.onPartialOutput && 'experimental_partialOutputStream' in stream) {
       (async () => {
         try {
-          for await (const partial of stream.experimental_partialOutputStream!) {
-            const transformedPartial = outputBuilder.transform
-              ? outputBuilder.transform(partial)
-              : partial as T;
-            options.onPartialOutput(transformedPartial as Partial<T>);
+          if (stream.experimental_partialOutputStream) {
+            for await (const partial of stream.experimental_partialOutputStream) {
+              const transformedPartial = outputBuilder.transform
+                ? outputBuilder.transform(partial)
+                : partial as T;
+              options.onPartialOutput?.(transformedPartial as Partial<T>);
+            }
           }
         } catch (error) {
           console.error('Error in partial output stream:', error);
@@ -314,7 +316,7 @@ export class OutputValidator {
           }
           break;
 
-        case 'invalid_enum_value':
+        case 'invalid_value':
           // Set to first valid enum value
           if ('options' in issue && Array.isArray((issue as any).options) && (issue as any).options.length > 0) {
             this.setNestedValue(repaired, path, (issue as any).options[0]);
@@ -374,5 +376,4 @@ export class OutputValidator {
 // Export singleton instance
 export const structuredOutput = new StructuredOutputService();
 
-// Export utilities
-export { StructuredOutputBuilder as OutputBuilder };
+// StructuredOutputBuilder is already exported above via class declaration

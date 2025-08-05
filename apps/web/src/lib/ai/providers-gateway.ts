@@ -5,6 +5,7 @@ import {
   type GatewayConfig,
   getAIGateway,
   type ModelRequirements,
+  type SupportedModelId,
 } from './gateway';
 import {
   getGatewayMiddleware,
@@ -157,7 +158,7 @@ export const getModelWithFallback = async (
 ): Promise<LanguageModel> => {
   try {
     // Try to get preferred model from registry
-    const model = providerRegistry.languageModel(preferredModel);
+    const model = providerRegistry.languageModel(preferredModel as SupportedModelId);
 
     // Check if model is available through circuit breaker
     if (fallbackManager.isModelAvailable(preferredModel)) {

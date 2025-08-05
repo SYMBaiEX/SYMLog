@@ -57,7 +57,7 @@ export interface RealtimeAnalysisResult {
   transcriptSegment?: string;
 }
 
-// Stream event types
+// Stream event types with enhanced type safety
 export type StreamEvent =
   | { type: 'started'; streamId: string }
   | { type: 'stopped'; streamId: string }
@@ -65,6 +65,30 @@ export type StreamEvent =
   | { type: 'frame'; data: RealtimeAnalysisResult }
   | { type: 'quality'; metrics: StreamQuality }
   | { type: 'transcript'; text: string; timestamp: number };
+
+// Tool renderer signature for streaming tools
+export type StreamingToolRenderer<TParams = any, TResult = any> = (
+  params: TParams,
+  context: {
+    toolName: string;
+    toolCallId: string;
+    streamId: string;
+    timestamp: number;
+  }
+) => AsyncGenerator<any, TResult, void>;
+
+// Enhanced streaming tool definition
+export interface StreamingToolDefinition<TParams = any, TResult = any> {
+  description: string;
+  parameters: any; // Zod schema or parameter object
+  renderer: StreamingToolRenderer<TParams, TResult>;
+  metadata?: {
+    category?: string;
+    priority?: 'high' | 'medium' | 'low';
+    timeout?: number;
+    retryable?: boolean;
+  };
+}
 
 /**
  * Real-time Streaming Processor with WebRTC and MediaRecorder
@@ -291,6 +315,7 @@ export class RealtimeStreamingProcessor {
 
   /**
    * Process live stream frame for analysis with comprehensive error handling
+   * Enhanced with streaming tool renderer compatibility
    */
   async processLiveFrame(): Promise<RealtimeAnalysisResult | null> {
     try {
@@ -395,28 +420,90 @@ export class RealtimeStreamingProcessor {
   }
 
   /**
-   * Add event listener
+   * Add event listener with type safety
    */
-  addEventListener(
-    eventType: string,
-    callback: (event: StreamEvent) => void
+  addEventListener<T extends StreamEvent['type']>(
+    eventType: T,
+    callback: (event: Extract<StreamEvent, { type: T }>) => void
   ): void {
     if (!this.eventListeners.has(eventType)) {
       this.eventListeners.set(eventType, []);
     }
-    this.eventListeners.get(eventType)!.push(callback);
+    this.eventListeners.get(eventType)!.push(callback as (event: StreamEvent) => void);
   }
 
   /**
-   * Remove event listener
+   * Execute streaming tool with proper renderer signature
    */
-  removeEventListener(
-    eventType: string,
-    callback: (event: StreamEvent) => void
+  async executeStreamingTool<TParams, TResult>(
+    toolName: string,
+    params: TParams,
+    toolDefinition: StreamingToolDefinition<TParams, TResult>
+  ): Promise<TResult> {
+    const toolCallId = `call_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const context = {
+      toolName,
+      toolCallId,
+      streamId: this.streamId,
+      timestamp: Date.now()
+    };
+
+    this.emit({ 
+      type: 'frame', 
+      data: {
+        timestamp: context.timestamp,
+        frameData: '',
+        analysis: {
+          scene: `Executing tool: ${toolName}`,
+          objects: [],
+          motion: 'none',
+          confidence: 1.0
+        }
+      }
+    });
+
+    try {
+      const renderer = toolDefinition.renderer(params, context);
+      let finalResult: TResult;
+
+      for await (const partial of renderer) {
+        // Emit partial results as frame events
+        this.emit({
+          type: 'frame',
+          data: {
+            timestamp: Date.now(),
+            frameData: JSON.stringify(partial),
+            analysis: {
+              scene: `Tool ${toolName} progress`,
+              objects: [toolName],
+              motion: 'low',
+              confidence: 0.8
+            }
+          }
+        });
+        finalResult = partial;
+      }
+
+      return finalResult!;
+    } catch (error) {
+      this.emit({
+        type: 'error',
+        error: `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Remove event listener with type safety
+   */
+  removeEventListener<T extends StreamEvent['type']>(
+    eventType: T,
+    callback: (event: Extract<StreamEvent, { type: T }>) => void
   ): void {
     const listeners = this.eventListeners.get(eventType);
     if (listeners) {
-      const index = listeners.indexOf(callback);
+      const index = listeners.indexOf(callback as (event: StreamEvent) => void);
       if (index > -1) {
         listeners.splice(index, 1);
       }
@@ -477,7 +564,7 @@ export class RealtimeStreamingProcessor {
       };
 
       // Validate MediaRecorder support for the specified MIME type
-      if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+      if (options.mimeType && !MediaRecorder.isTypeSupported(options.mimeType)) {
         console.warn(
           `MIME type ${options.mimeType} not supported, falling back to default`
         );
@@ -553,7 +640,7 @@ export class RealtimeStreamingProcessor {
               },
               {
                 type: 'image',
-                image: frameData,
+                image: frameData || '',
               },
             ],
           },

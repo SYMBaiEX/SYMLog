@@ -1,5 +1,5 @@
 import { logError as logErrorToConsole } from '@/lib/logger';
-import type { ModelInfo, ModelRequirements, ProviderInfo } from './gateway';
+import type { ModelInfo, ModelRequirements, ProviderInfo, SupportedModelId } from './gateway';
 import { LoadBalancer, type LoadBalancingStrategy } from './load-balancing';
 import { ProviderMetricsService } from './provider-metrics';
 
@@ -32,13 +32,13 @@ export interface CapabilityRequirements {
 export interface RoutingDecision {
   primaryChoice: {
     providerId: string;
-    modelId: string;
+    modelId: SupportedModelId;
     reason: string;
     confidence: number;
   };
   alternatives: Array<{
     providerId: string;
-    modelId: string;
+    modelId: SupportedModelId;
     reason: string;
     confidence: number;
   }>;
@@ -468,7 +468,7 @@ export class IntelligentRoutingEngine {
     // Get alternatives (next 3 best)
     const alternatives = scoredModels.slice(1, 4).map((m) => ({
       providerId: m.provider.id,
-      modelId: m.model.id,
+      modelId: `${m.provider.id}:${m.model.id}` as SupportedModelId,
       reason: this.explainModelChoice(m),
       confidence: m.score,
     }));
@@ -476,7 +476,7 @@ export class IntelligentRoutingEngine {
     return {
       primaryChoice: {
         providerId: topModel.provider.id,
-        modelId: topModel.model.id,
+        modelId: `${topModel.provider.id}:${topModel.model.id}` as SupportedModelId,
         reason: this.explainModelChoice(topModel),
         confidence: topModel.score,
       },
@@ -541,7 +541,7 @@ export class IntelligentRoutingEngine {
     // Initialize known model capabilities
     // OpenAI models
     this.modelCapabilityCache.set(
-      'openai:gpt-4o-mini',
+      'openai:gpt-4o-mini' as SupportedModelId,
       new Set([
         'chat',
         'code',
@@ -555,7 +555,7 @@ export class IntelligentRoutingEngine {
     );
 
     this.modelCapabilityCache.set(
-      'openai:gpt-4.1-nano',
+      'openai:gpt-4.1-nano' as SupportedModelId,
       new Set([
         'chat',
         'code',
@@ -572,7 +572,7 @@ export class IntelligentRoutingEngine {
     );
 
     this.modelCapabilityCache.set(
-      'openai:gpt-4.1-2025-04-14',
+      'openai:gpt-4.1-2025-04-14' as SupportedModelId,
       new Set([
         'code',
         'analysis',
@@ -586,7 +586,7 @@ export class IntelligentRoutingEngine {
 
     // Anthropic models
     this.modelCapabilityCache.set(
-      'anthropic:claude-3-haiku-20240307',
+      'anthropic:claude-3-haiku-20240307' as SupportedModelId,
       new Set([
         'chat',
         'code',
@@ -599,7 +599,7 @@ export class IntelligentRoutingEngine {
     );
 
     this.modelCapabilityCache.set(
-      'anthropic:claude-3-5-sonnet-20241022',
+      'anthropic:claude-3-5-sonnet-20241022' as SupportedModelId,
       new Set([
         'chat',
         'code',
@@ -614,7 +614,7 @@ export class IntelligentRoutingEngine {
     );
 
     this.modelCapabilityCache.set(
-      'anthropic:claude-3-7-sonnet-20250219',
+      'anthropic:claude-3-7-sonnet-20250219' as SupportedModelId,
       new Set([
         'chat',
         'code',
@@ -628,7 +628,7 @@ export class IntelligentRoutingEngine {
     );
 
     this.modelCapabilityCache.set(
-      'anthropic:claude-3-opus-20240229',
+      'anthropic:claude-3-opus-20240229' as SupportedModelId,
       new Set([
         'chat',
         'code',

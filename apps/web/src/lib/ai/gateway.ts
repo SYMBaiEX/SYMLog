@@ -4,6 +4,34 @@ import type {
   LanguageModelResponseMetadata,
   Provider,
 } from 'ai';
+
+// AI SDK v5 Compatible Model ID Types
+export type OpenAIModelId = `openai:${string}`;
+export type AnthropicModelId = `anthropic:${string}`;
+export type SupportedModelId = OpenAIModelId | AnthropicModelId;
+
+// Model ID registry for type safety
+export type KnownOpenAIModels = 
+  | 'openai:gpt-4o-mini'
+  | 'openai:gpt-4.1-nano'
+  | 'openai:gpt-4.1-2025-04-14';
+
+export type KnownAnthropicModels = 
+  | 'anthropic:claude-3-haiku-20240307'
+  | 'anthropic:claude-3-5-sonnet-20241022'
+  | 'anthropic:claude-3-7-sonnet-20250219'
+  | 'anthropic:claude-3-opus-20240229';
+
+export type KnownModelIds = KnownOpenAIModels | KnownAnthropicModels;
+
+// Extended metadata interface that includes gateway-specific properties
+export interface GatewayRequestMetadata extends LanguageModelRequestMetadata {
+  gatewayRequestId?: string;
+  providerId?: string;
+  modelId?: string;
+  timestamp?: string;
+}
+
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { distributedTracing } from '../telemetry/distributed-tracing';
 import { LoadBalancer, type LoadBalancingStrategy } from './load-balancing';
@@ -88,13 +116,13 @@ export interface ProviderHealth {
   cooldownUntil?: Date;
 }
 
-// Model selection result
+// Model selection result with proper type constraints
 export interface ModelSelection {
   provider: string;
-  modelId: string;
+  modelId: SupportedModelId;
   model: LanguageModel;
   reason: string;
-  fallbackOptions: string[];
+  fallbackOptions: SupportedModelId[];
 }
 
 /**
@@ -382,7 +410,7 @@ export class AIGateway {
   async executeWithFailover<T>(
     modelSelection: ModelSelection,
     request: (model: LanguageModel) => Promise<T>,
-    metadata?: LanguageModelRequestMetadata
+    metadata?: GatewayRequestMetadata
   ): Promise<T> {
     const startTime = Date.now();
     let lastError: Error | undefined;
@@ -523,7 +551,7 @@ export class AIGateway {
       );
 
       // Set up event listeners for discovered providers
-      this.discoveryService.on('provider:discovered', (provider: ProviderInfo) => {
+      this.discoveryService.on('provider:discovered', (provider: DiscoveredProvider) => {
         if (this.config.autoRegisterDiscoveredProviders) {
           this.registerDiscoveredProvider(provider);
         }
@@ -727,7 +755,7 @@ export class AIGateway {
     );
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}`;
+    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -750,7 +778,7 @@ export class AIGateway {
     });
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}`;
+    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -771,7 +799,7 @@ export class AIGateway {
     );
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}`;
+    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -794,7 +822,7 @@ export class AIGateway {
     });
 
     const selected = sorted[0];
-    const modelId = `${selected.provider.id}:${selected.model.id}`;
+    const modelId = `${selected.provider.id}:${selected.model.id}` as SupportedModelId;
 
     return {
       provider: selected.provider.id,
@@ -821,11 +849,11 @@ export class AIGateway {
   private getFallbackOptions(
     selected: ModelSelection,
     allModels: Array<{ provider: ProviderInfo; model: ModelInfo }>
-  ): string[] {
+  ): SupportedModelId[] {
     // Get other suitable models as fallbacks
     return allModels
       .filter((m) => {
-        const modelId = `${m.provider.id}:${m.model.id}`;
+        const modelId = `${m.provider.id}:${m.model.id}` as SupportedModelId;
         return modelId !== selected.modelId;
       })
       .sort((a, b) => {
@@ -838,11 +866,11 @@ export class AIGateway {
         return a.model.costPerToken - b.model.costPerToken;
       })
       .slice(0, 3)
-      .map((m) => `${m.provider.id}:${m.model.id}`);
+      .map((m) => `${m.provider.id}:${m.model.id}` as SupportedModelId);
   }
 
   private getModelById(
-    modelId: string
+    modelId: SupportedModelId
   ): { provider: string; model: LanguageModel } | undefined {
     try {
       const [providerId] = modelId.split(':');
@@ -858,14 +886,14 @@ export class AIGateway {
     request: (model: LanguageModel) => Promise<T>,
     providerId: string,
     modelId: string,
-    metadata?: LanguageModelRequestMetadata
+    metadata?: GatewayRequestMetadata
   ): Promise<T> {
     const requestId = crypto.randomUUID();
     const startTime = Date.now();
 
     try {
       // Add request metadata
-      const enhancedMetadata: LanguageModelRequestMetadata = {
+      const enhancedMetadata: GatewayRequestMetadata = {
         ...metadata,
         gatewayRequestId: requestId,
         providerId,

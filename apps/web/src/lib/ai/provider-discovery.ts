@@ -59,8 +59,8 @@ export interface ProviderDiscoveryConfig {
 
 // Provider discovery event types
 export interface ProviderDiscoveryEvents {
-  'provider:discovered': (provider: ProviderInfo) => void;
-  'provider:updated': (provider: ProviderInfo) => void;
+  'provider:discovered': (provider: DiscoveredProvider) => void;
+  'provider:updated': (provider: DiscoveredProvider) => void;
   'provider:health:changed': (
     providerId: string,
     health: ProviderHealth
@@ -96,7 +96,7 @@ export interface ProviderCapabilities {
 }
 
 // Provider status with discovery metadata
-export interface DiscoveredProvider extends ProviderInfo {
+export interface DiscoveredProvider extends Omit<ProviderInfo, 'capabilities'> {
   discoveredAt: Date;
   lastUpdated: Date;
   discoverySource: 'static' | 'service-mesh' | 'api-discovery' | 'manual';
@@ -492,7 +492,6 @@ export class ProviderDiscoveryService extends EventEmitter {
           averageLatency: healthCheck.responseTime,
           lastHealthCheck: new Date(),
         },
-        capabilities: ['chat', 'code', 'analysis'], // Will be enhanced by capability detection
         costTier: this.determineProviderCostTier(capabilities),
         discoveredAt: new Date(),
         lastUpdated: new Date(),

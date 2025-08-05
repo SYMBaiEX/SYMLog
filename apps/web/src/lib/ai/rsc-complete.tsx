@@ -204,7 +204,7 @@ export async function streamingChat(
               </div>
             );
 
-            yield { status: 'creating' };
+            yield <StreamingIndicator message="Creating artifact..." />;
 
             // Create the artifact
             const artifactId = `artifact_${Date.now()}`;
@@ -222,7 +222,7 @@ export async function streamingChat(
               artifacts: [...state.artifacts, artifact]
             }));
 
-            yield { status: 'created', artifactId };
+            yield <StreamingIndicator message="Finalizing artifact..." />;
 
             // Show the artifact
             streamableUI.done(
@@ -293,7 +293,7 @@ export async function streamingChat(
                 </div>
               );
 
-              yield { step: index, status: 'running' }; 
+              yield <StreamingIndicator message={`Executing step: ${step.name}`} />; 
 
               // Simulate step execution
               await new Promise(resolve => setTimeout(resolve, 1000));
@@ -306,7 +306,7 @@ export async function streamingChat(
                 )
               }));
 
-              yield { step: index, status: 'completed' };
+              yield <StreamingIndicator message={`Completed step: ${step.name}`} />;
             }
 
             // Final workflow UI
@@ -476,7 +476,7 @@ export async function generateArtifact(
             metadata: z.any().optional()
           }),
           generate: async function* ({ title, content, metadata }: { title: string; content: any; metadata?: any }) {
-            yield { generating: true };
+            yield <StreamingIndicator message="Generating artifact..." />;
 
             const artifactId = `artifact_${Date.now()}`;
             const artifact = {
