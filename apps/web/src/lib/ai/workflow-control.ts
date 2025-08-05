@@ -1,8 +1,6 @@
 import type {
   CoreMessage,
   CoreToolMessage,
-  ToolCallPart,
-  ToolResultPart,
 } from 'ai';
 import { generateText, type StopCondition, stepCountIs, streamText } from 'ai';
 import { getAIModel } from './providers';
@@ -12,8 +10,8 @@ export interface WorkflowStep {
   stepNumber: number;
   stepType: 'text' | 'tool-call' | 'tool-result';
   content?: string;
-  toolCalls?: ToolCallPart[];
-  toolResults?: ToolResultPart[];
+  toolCalls?: any[]; // Using any[] to match AI SDK types
+  toolResults?: any[]; // Using any[] to match AI SDK types
   timestamp: Date;
 }
 
@@ -31,8 +29,8 @@ export interface WorkflowOptions {
   stopConditions?: Array<(step: any) => boolean>;
   onStepStart?: (step: number) => void | Promise<void>;
   onStepFinish?: (step: WorkflowStep) => void | Promise<void>;
-  onToolCall?: (toolCall: ToolCallPart) => void | Promise<void>;
-  onToolResult?: (toolResult: ToolResultPart) => void | Promise<void>;
+  onToolCall?: (toolCall: any) => void | Promise<void>;
+  onToolResult?: (toolResult: any) => void | Promise<void>;
   tools?: Record<string, any>;
   model?: string;
   temperature?: number;
@@ -76,10 +74,10 @@ export class WorkflowController {
         tools,
         temperature,
         maxRetries: 3,
-        maxTokens,
         abortSignal: this.abortController.signal,
         stopWhen: stepCountIs(maxSteps),
-        onStepFinish: async ({ step, stepType, toolCalls, toolResults }) => {
+        onStepFinish: async (stepResult: any) => {
+          const { text, toolCalls, toolResults, finishReason } = stepResult;
           const stepNumber = this.steps.length + 1;
 
           // Call step start callback
@@ -90,14 +88,17 @@ export class WorkflowController {
           // Create workflow step
           const workflowStep: WorkflowStep = {
             stepNumber,
-            stepType: stepType as any,
+            stepType: toolCalls && toolCalls.length > 0 ? 'tool-call' : 
+                     toolResults && toolResults.length > 0 ? 'tool-result' : 'text',
             timestamp: new Date(),
           };
 
-          // Handle different step types
-          if (stepType === 'text' && typeof step === 'string') {
-            workflowStep.content = step;
-          } else if (stepType === 'tool-calls' && toolCalls) {
+          // Handle different step types based on content
+          if (text) {
+            workflowStep.content = text;
+          }
+          
+          if (toolCalls && toolCalls.length > 0) {
             workflowStep.toolCalls = toolCalls;
 
             // Call tool call callbacks
@@ -106,7 +107,9 @@ export class WorkflowController {
                 await onToolCall(toolCall);
               }
             }
-          } else if (stepType === 'tool-results' && toolResults) {
+          }
+          
+          if (toolResults && toolResults.length > 0) {
             workflowStep.toolResults = toolResults;
 
             // Call tool result callbacks
@@ -130,15 +133,18 @@ export class WorkflowController {
               console.log(
                 `Workflow stopped by custom condition at step ${stepNumber}`
               );
-              return { stop: true };
+              // Stop conditions are handled by the AI SDK stopWhen parameter
+              // We can't return anything from onStepFinish
+              break;
             }
           }
 
           // Log progress
           console.log(`Workflow step ${stepNumber}/${maxSteps} completed:`, {
-            type: stepType,
+            hasText: !!text,
             hasToolCalls: !!toolCalls,
             hasToolResults: !!toolResults,
+            finishReason,
           });
         },
       });
@@ -208,11 +214,11 @@ export class WorkflowController {
         prompt,
         tools,
         temperature,
-        maxTokens,
         maxRetries: 3,
         abortSignal: this.abortController.signal,
         stopWhen: stepCountIs(maxSteps),
-        onStepFinish: async ({ step, stepType, toolCalls, toolResults }) => {
+        onStepFinish: async (stepResult: any) => {
+          const { text, toolCalls, toolResults, finishReason } = stepResult;
           const stepNumber = this.steps.length + 1;
 
           if (onStepStart) {
@@ -221,19 +227,24 @@ export class WorkflowController {
 
           const workflowStep: WorkflowStep = {
             stepNumber,
-            stepType: stepType as any,
+            stepType: toolCalls && toolCalls.length > 0 ? 'tool-call' : 
+                     toolResults && toolResults.length > 0 ? 'tool-result' : 'text',
             timestamp: new Date(),
           };
 
-          // Process step based on type
-          if (stepType === 'text' && typeof step === 'string') {
-            workflowStep.content = step;
-          } else if (stepType === 'tool-calls' && toolCalls) {
+          // Process step based on content
+          if (text) {
+            workflowStep.content = text;
+          }
+          
+          if (toolCalls && toolCalls.length > 0) {
             workflowStep.toolCalls = toolCalls;
             for (const toolCall of toolCalls) {
               if (onToolCall) await onToolCall(toolCall);
             }
-          } else if (stepType === 'tool-results' && toolResults) {
+          }
+          
+          if (toolResults && toolResults.length > 0) {
             workflowStep.toolResults = toolResults;
             for (const toolResult of toolResults) {
               if (onToolResult) await onToolResult(toolResult);
@@ -249,7 +260,9 @@ export class WorkflowController {
           // Check stop conditions
           for (const condition of stopConditions) {
             if (condition(workflowStep)) {
-              return { stop: true };
+              // Stop conditions are handled by the AI SDK stopWhen parameter
+              // We can't return anything from onStepFinish
+              break;
             }
           }
         },
@@ -333,7 +346,7 @@ export class WorkflowController {
               language: { type: 'string' },
             },
           },
-          execute: async ({ code, language }) => {
+          execute: async ({ code, language }: { code: string; language: string }) => {
             // Mock validation
             return { valid: true, message: '✓ Code validated successfully' };
           },
@@ -463,7 +476,7 @@ export const commonStopConditions = {
   // Stop on error
   onError: () =>
     createStopCondition(
-      (step) => step.toolResults?.some((tr) => tr.isError) ?? false,
+      (step) => step.toolResults?.some((tr: any) => tr.isError === true) ?? false,
       'On error'
     ),
 

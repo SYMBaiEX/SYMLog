@@ -89,7 +89,7 @@ export async function streamingArtifactGeneration<
   const streamableUI = createStreamableUI();
 
   // Show initial loading state
-  streamableUI.update(<LoadingIndicator message="Processing your request..." />)
+  streamableUI.update(<LoadingIndicator message="Processing your request..." />);
 
   // Create intelligent prepareStep function if enabled
   const prepareStepFunction =
@@ -124,12 +124,12 @@ export async function streamingArtifactGeneration<
       temperature: options.temperature,
       maxTokens: options.maxTokens,
       prepareStep: prepareStepFunction,
-      text: ({ content, done }) => {
+      text: ({ content, done }: { content: string; done: boolean }) => {
         if (!done) {
           streamableUI.update(
             <ArtifactPreview content={content} streaming={true} />
-          )
-          options.onPartial?.(content)
+          );
+          options.onPartial?.(content);
         }
       },
       tools: {
@@ -142,22 +142,22 @@ export async function streamingArtifactGeneration<
             language: z.string().optional(),
             metadata: z.record(z.any()).optional(),
           }),
-          async *generate({ type, title, content, language, metadata }) {
+          async *generate({ type, title, content, language, metadata }: { type: string; title: string; content: string; language?: string; metadata?: Record<string, any> }) {
             // Stream the artifact creation process
             streamableUI.update(
               <LoadingIndicator message={`Creating ${type} artifact: ${title}...`} />
-            )
+            );
             
             yield {
               status: 'processing',
               message: 'Validating content...'
-            }
+            };
 
             // Simulate processing steps
             yield {
               status: 'formatting',
               message: 'Formatting artifact...'
-            }
+            };
 
             // Final artifact
             streamableUI.done(
@@ -166,14 +166,14 @@ export async function streamingArtifactGeneration<
                 content={content}
                 metadata={{ ...metadata, title, language }}
               />
-            )
+            );
 
             return {
               artifactId: `artifact_${Date.now()}`,
               type,
               title,
               created: true
-            }
+            };
           }
         },
         updateArtifact: {
@@ -185,15 +185,15 @@ export async function streamingArtifactGeneration<
               metadata: z.record(z.any()).optional(),
             })
           }),
-          generate: async function* ({ artifactId, updates }) {
+          generate: async function* ({ artifactId, updates }: { artifactId: string; updates: { content?: string; metadata?: Record<string, any> } }) {
             streamableUI.update(
               <LoadingIndicator message="Updating artifact..." />
-            )
+            );
             
             yield {
               status: 'updating',
               artifactId
-            }
+            };
 
             // In a real implementation, this would update the actual artifact
             streamableUI.done(
@@ -202,20 +202,20 @@ export async function streamingArtifactGeneration<
                 content={updates.content || 'Updated content'}
                 metadata={{ artifactId, ...updates.metadata }}
               />
-            )
+            );
 
-            return { updated: true, artifactId }
+            return { updated: true, artifactId };
           }
         }
       }
-    })
+    });
 
-    return streamableUI.value
+    return streamableUI.value;
   } catch (error) {
     streamableUI.done(
       <ErrorDisplay error={error instanceof Error ? error.message : 'Unknown error'} />
-    )
-    throw error
+    );
+    throw error;
   }
 }
 
@@ -223,24 +223,24 @@ export async function streamingArtifactGeneration<
  * Create streamable values for progressive data loading
  */
 export function createProgressiveDataStream<T>() {
-  const stream = createStreamableValue<T>()
+  const stream = createStreamableValue<T>();
   
   return {
     stream,
     update: (value: Partial<T>) => {
-      stream.update(value as T)
+      stream.update(value as T);
     },
     append: (value: Partial<T>) => {
-      stream.append(value as T)
+      stream.append(value as T);
     },
     done: (finalValue?: T) => {
       if (finalValue) {
-        stream.update(finalValue)
+        stream.update(finalValue);
       }
-      stream.done()
+      stream.done();
     },
     error: (error: Error) => {
-      stream.error(error)
+      stream.error(error);
     }
   }
 }
@@ -465,7 +465,7 @@ export async function streamStructuredData<T>(
       model,
       prompt,
       temperature: options.temperature,
-      text: ({ content, done }) => {
+      text: ({ content, done }: { content: string; done: boolean }) => {
         if (!done) {
           try {
             // Try to parse partial JSON
@@ -787,7 +787,7 @@ export async function streamWithTools(
       prompt,
       temperature: options.temperature,
       maxTokens: options.maxTokens,
-      text: ({ content, done }) => {
+      text: ({ content, done }: { content: string; done: boolean }) => {
         if (!done) {
           uiStream.update(
             <ArtifactPreview content={content} streaming={true} />
@@ -835,9 +835,9 @@ export async function streamWithTools(
                   content={result}
                   metadata={{ tool: name, callId }}
                 />
-              )
+              );
 
-    return result
+    return result;
   } catch (error) {
     callInfo.status = 'failed';
     callInfo.error = error instanceof Error ? error.message : 'Unknown error';
@@ -845,32 +845,26 @@ export async function streamWithTools(
     throw error;
   }
 }
-}
-return acc
-},
-{
-}
-as;
-Record<string, any>;
-)
+        };
+        return acc;
+      }, {} as Record<string, any>)
     })
 
     // Final state
-    toolCallsStream.done()
+    toolCallsStream.done();
 
-return {
+    return {
       result,
       toolCalls: toolCallsStream.value,
       ui: uiStream.value
-    }
-} catch (error)
-{
-  toolCallsStream.error(error as Error);
-  uiStream.done(
+    };
+  } catch (error) {
+    toolCallsStream.error(error as Error);
+    uiStream.done(
       <ErrorDisplay error={error instanceof Error ? error.message : 'Stream failed'} />
-    )
-  throw error;
-}
+    );
+    throw error;
+  }
 }
 
 // Export RSC utilities

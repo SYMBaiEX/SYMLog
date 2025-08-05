@@ -2,14 +2,20 @@ import {
   APICallError,
   InvalidArgumentError,
   InvalidResponseDataError,
-  InvalidToolArgumentsError,
+  InvalidToolInputError,
   JSONParseError,
   type LanguageModelUsage,
   NoObjectGeneratedError,
-  TooManyEmbeddingValuesForCallError,
   TypeValidationError,
   UnsupportedFunctionalityError,
 } from 'ai';
+
+// Define TooManyEmbeddingValuesForCallError locally since it's not exported from 'ai'
+class TooManyEmbeddingValuesForCallError extends Error {
+  static isInstance(error: unknown): error is TooManyEmbeddingValuesForCallError {
+    return error instanceof TooManyEmbeddingValuesForCallError;
+  }
+}
 
 // Error severity levels
 export enum ErrorSeverity {
@@ -81,8 +87,8 @@ export class AIErrorHandler {
       errorInfo = AIErrorHandler.handleJSONParseError(error);
     } else if (error instanceof TypeValidationError) {
       errorInfo = AIErrorHandler.handleTypeValidationError(error);
-    } else if (error instanceof InvalidToolArgumentsError) {
-      errorInfo = AIErrorHandler.handleInvalidToolArgumentsError(error);
+    } else if (error instanceof InvalidToolInputError) {
+      errorInfo = AIErrorHandler.handleInvalidToolInputError(error);
     } else if (error instanceof InvalidResponseDataError) {
       errorInfo = AIErrorHandler.handleInvalidResponseDataError(error);
     } else if (error instanceof TooManyEmbeddingValuesForCallError) {
@@ -272,8 +278,8 @@ export class AIErrorHandler {
   /**
    * Handle invalid tool arguments errors
    */
-  private static handleInvalidToolArgumentsError(
-    error: InvalidToolArgumentsError
+  private static handleInvalidToolInputError(
+    error: InvalidToolInputError
   ): AIErrorInfo {
     return {
       message: error.message,
@@ -601,10 +607,5 @@ export async function executeWithRecovery<T>(
   }
 }
 
-// Export error types for external use
-export {
-  ErrorSeverity,
-  ErrorCategory,
-  type AIErrorInfo,
-  type RecoveryStrategy,
-};
+// Export additional types (enums are already exported above)
+export type { AIErrorInfo, RecoveryStrategy };

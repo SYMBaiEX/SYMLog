@@ -523,7 +523,7 @@ export class AIGateway {
       );
 
       // Set up event listeners for discovered providers
-      this.discoveryService.on('provider:discovered', (provider) => {
+      this.discoveryService.on('provider:discovered', (provider: ProviderInfo) => {
         if (this.config.autoRegisterDiscoveredProviders) {
           this.registerDiscoveredProvider(provider);
         }
@@ -536,7 +536,7 @@ export class AIGateway {
 
       this.discoveryService.on(
         'provider:health:changed',
-        (providerId, health) => {
+        (providerId: string, health: ProviderHealth) => {
           const provider = this.discoveredProviders.get(providerId);
           if (provider) {
             provider.health = health;
@@ -549,14 +549,14 @@ export class AIGateway {
         }
       );
 
-      this.discoveryService.on('provider:unavailable', (providerId, reason) => {
+      this.discoveryService.on('provider:unavailable', (providerId: string, reason: string) => {
         loggingService.warn('Provider became unavailable', {
           providerId,
           reason,
         });
       });
 
-      this.discoveryService.on('discovery:error', (error, providerId) => {
+      this.discoveryService.on('discovery:error', (error: Error, providerId?: string) => {
         loggingService.error('Provider discovery error', {
           providerId,
           error: error.message,

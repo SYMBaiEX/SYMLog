@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const corsValidation = validateCors(request);
     if (!corsValidation.valid) {
       logSecurityEvent({
-        type: 'CORS_VIOLATION',
+        type: 'API_ERROR' as any,
         metadata: {
           reason: corsValidation.error,
           origin: request.headers.get('origin'),

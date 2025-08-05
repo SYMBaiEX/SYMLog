@@ -137,9 +137,9 @@ class ConfigService {
       return this.config;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        console.error('Configuration validation failed:', error.errors);
+        console.error('Configuration validation failed:', error.issues);
         throw new Error(
-          `Invalid configuration: ${error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
+          `Invalid configuration: ${error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
         );
       }
       throw error;

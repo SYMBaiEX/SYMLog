@@ -244,7 +244,16 @@ function MessageListComponent({
             {messages[messages.length - 1].role === 'user'
               ? 'you'
               : 'assistant'}
-            :{messages[messages.length - 1].content || 'Message content'}
+            :{(() => {
+              const lastMessage = messages[messages.length - 1];
+              if ('parts' in lastMessage && lastMessage.parts) {
+                return lastMessage.parts
+                  .filter((part: any) => part.type === 'text')
+                  .map((part: any) => part.text)
+                  .join('') || 'Message content';
+              }
+              return 'Message content';
+            })()}
           </div>
         )}
       </div>

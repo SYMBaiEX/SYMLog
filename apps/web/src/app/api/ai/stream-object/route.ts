@@ -24,7 +24,7 @@ const streamObjectRequestSchema = z.object({
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).max(8192).optional(),
   mode: z.enum(['object', 'json']).optional(),
-  output: z.enum(['object', 'array', 'enum', 'no-schema']).optional(),
+  output: z.enum(['object', 'array', 'enum']).optional(),
   stream: z.boolean().default(true),
   arrayCount: z.number().min(1).max(20).optional(), // For array generation
 });
@@ -63,12 +63,12 @@ export async function POST(req: NextRequest) {
         userId: userSession.userId,
         metadata: {
           reason: 'Invalid request schema',
-          errors: validationResult.error.errors,
+          errors: validationResult.error.issues,
         },
         ...extractClientInfo(req),
       });
       return new Response(
-        `Invalid request: ${validationResult.error.errors[0]?.message}`,
+        `Invalid request: ${validationResult.error.issues[0]?.message}`,
         { status: 400 }
       );
     }
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       if (output === 'array' && arrayCount) {
         // Stream array generation
         streamResult = await streamStructuredArray({
-          schema: schemaRegistry[schema as SchemaType],
+          schema: schemaRegistry[schema as SchemaType] as z.ZodSchema<any>,
           prompt,
           count: arrayCount,
           model,
@@ -123,7 +123,7 @@ export async function POST(req: NextRequest) {
       } else {
         // Stream object generation
         streamResult = await streamStructuredData({
-          schema: schemaRegistry[schema as SchemaType],
+          schema: schemaRegistry[schema as SchemaType] as z.ZodSchema<any>,
           prompt,
           model,
           temperature,
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       if (error instanceof NoObjectGeneratedError) {
         logSecurityEvent({
-          type: 'AI_GENERATION_FAILED',
+          type: 'API_ERROR' as any,
           userId: userSession.userId,
           metadata: {
             reason: 'no_object_generated',

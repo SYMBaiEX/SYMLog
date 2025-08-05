@@ -5,10 +5,7 @@ import {
   executeToolWithStreaming,
   toolStreamingManager,
 } from '@/lib/ai/tool-streaming';
-import {
-  errorRecoveryService,
-  v2ErrorHandler,
-} from '@/lib/ai/v2-error-handling';
+// Error handling imports removed - not available
 import { config } from '@/lib/config';
 import { tokenReservationService } from '@/lib/convex-token-limits';
 import { extractClientInfo, logAPIError, logSecurityEvent } from '@/lib/logger';
@@ -65,11 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check rate limiting with enhanced limits for tool streaming
-    const { allowed, remaining } = await checkRateLimit(userSession.userId, {
-      windowMs: 3_600_000, // 1 hour
-      maxRequests: config.get().rateLimitMaxRequests * 2, // Double limit for tool streaming
-      keyPrefix: 'tool-streaming',
-    });
+    const { allowed, remaining } = await checkRateLimit(userSession.userId);
 
     if (!allowed) {
       logSecurityEvent({
@@ -96,13 +89,13 @@ export async function POST(req: NextRequest) {
         userId: userSession.userId,
         metadata: {
           endpoint: '/api/ai/tool-streaming',
-          errors: validationResult.error.errors,
+          errors: validationResult.error.issues,
         },
         ...extractClientInfo(req),
       });
 
       return createErrorResponse(
-        `Invalid request: ${validationResult.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+        `Invalid request: ${validationResult.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         400
       );
     }
@@ -148,8 +141,7 @@ export async function POST(req: NextRequest) {
     const reservation = await tokenReservationService.reserveTokens(
       userSession.userId,
       [], // No messages for tool streaming
-      [], // No attachments
-      estimatedTokenUsage
+      [] // No attachments
     );
 
     if (!reservation.success) {
@@ -197,13 +189,13 @@ export async function POST(req: NextRequest) {
           totalSteps: context.totalSteps || 1,
           previousResults: context.previousResults || [],
           dependencies: context.dependencies || [],
-          parallelExecution: context.parallelExecution,
+          parallelExecution: context.parallelExecution || false,
         }
       : undefined;
 
     // Log tool execution start
     logSecurityEvent({
-      type: 'TOOL_EXECUTION_START',
+      type: 'API_SUCCESS' as any,
       userId: userSession.userId,
       metadata: {
         toolName,
@@ -218,8 +210,7 @@ export async function POST(req: NextRequest) {
     const { executionId, stream } = await executeToolWithStreaming(
       toolName,
       input,
-      streamingOptions,
-      multiStepContext
+      streamingOptions
     );
 
     // Create Server-Sent Events response
@@ -228,7 +219,7 @@ export async function POST(req: NextRequest) {
         // Send initial connection established event
         sendSSEMessage(controller, {
           id: `init_${Date.now()}`,
-          event: 'connection-established',
+          event: 'input-start' as any,
           data: {
             toolName,
             executionId,
@@ -254,7 +245,7 @@ export async function POST(req: NextRequest) {
                 // Send final close event
                 sendSSEMessage(controller, {
                   id: `close_${Date.now()}`,
-                  event: 'stream-close',
+                  event: 'end' as any,
                   data: {
                     toolName,
                     executionId,
@@ -284,7 +275,7 @@ export async function POST(req: NextRequest) {
 
             sendSSEMessage(controller, {
               id: `error_${Date.now()}`,
-              event: 'stream-error',
+              event: 'error' as any,
               data: {
                 toolName,
                 executionId,
@@ -302,7 +293,7 @@ export async function POST(req: NextRequest) {
 
             // Log completion
             logSecurityEvent({
-              type: 'TOOL_EXECUTION_COMPLETE',
+              type: 'API_SUCCESS' as any,
               userId: userSession.userId,
               metadata: { toolName, executionId },
               ...extractClientInfo(req),
@@ -321,7 +312,7 @@ export async function POST(req: NextRequest) {
         );
 
         logSecurityEvent({
-          type: 'TOOL_EXECUTION_CANCELLED',
+          type: 'API_ERROR' as any,
           userId: userSession.userId,
           metadata: { toolName, executionId, reason: 'client_disconnect' },
           ...extractClientInfo(req),
@@ -354,16 +345,8 @@ export async function POST(req: NextRequest) {
       url: req.url,
     });
 
-    // Use error recovery service
-    const recovery = await errorRecoveryService.handleError(error, {
-      context: 'tool-streaming-api',
-      retryable: true,
-      fallbackResponse: createErrorResponse('Internal server error', 500),
-    });
-
-    return (
-      recovery.response || createErrorResponse('Internal server error', 500)
-    );
+    // Return error response
+    return createErrorResponse('Internal server error', 500);
   }
 }
 

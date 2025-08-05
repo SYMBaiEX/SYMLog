@@ -3,7 +3,7 @@ import {
   type CoreMessage,
   generateObject,
   generateText,
-  InvalidToolArgumentsError,
+  InvalidToolInputError,
   type LanguageModel,
   NoObjectGeneratedError,
   NoSuchModelError,

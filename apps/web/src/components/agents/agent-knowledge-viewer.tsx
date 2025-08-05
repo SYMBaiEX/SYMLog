@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from 'convex/react';
+import type { Id } from '../../../convex/_generated/dataModel';
 import {
   BookOpen,
   Brain,
@@ -24,7 +25,7 @@ import { api } from '../../../convex/_generated/api';
 
 interface AgentKnowledgeViewerProps {
   userId: string;
-  agentId: string;
+  agentId: Id<'agents'> | string;
   className?: string;
 }
 
@@ -40,17 +41,17 @@ export function AgentKnowledgeViewer({
   );
 
   // Fetch agent data
-  const agent = useQuery(api.agents.getAgentById, { userId, agentId });
+  const agent = useQuery(api.agents.getAgentById, { userId, agentId: agentId as Id<'agents'> });
   const knowledge = useQuery(api.agents.getAgentKnowledge, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
     category:
       selectedCategory === 'all' ? undefined : (selectedCategory as any),
     limit: 100,
   });
   const stats = useQuery(api.agents.getAgentKnowledgeStats, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
   });
 
   // Filter and sort knowledge

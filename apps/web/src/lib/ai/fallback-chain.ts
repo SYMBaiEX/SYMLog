@@ -283,7 +283,7 @@ export class FallbackChainManager {
         );
 
         this.recordSuccess(fallbackKey);
-        degraded = fallback.isDegraded;
+        degraded = fallback.isDegraded ?? false;
 
         loggingService.info('Fallback successful', {
           primary: primaryKey,

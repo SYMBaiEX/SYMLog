@@ -299,25 +299,28 @@ export class ModelOrchestrator {
 
   private async researchPipeline(query: string, context?: any) {
     // Step 1: Use embedding model for semantic search
-    const embeddingModel = this.selectOptimalModel({
+    const embeddingSuggestions = this.getModelSuggestions({
       type: 'embedding',
       complexity: 'low',
       budget: 'balanced',
     });
+    const embeddingModel = embeddingSuggestions.recommended[0];
 
     // Step 2: Use reasoning model for analysis
-    const reasoningModel = this.selectOptimalModel({
+    const reasoningSuggestions = this.getModelSuggestions({
       type: 'reasoning',
       complexity: 'high',
       budget: 'premium',
     });
+    const reasoningModel = reasoningSuggestions.recommended[0];
 
     // Step 3: Use conversation model for final synthesis
-    const conversationModel = this.selectOptimalModel({
+    const conversationModelSuggestions = this.getModelSuggestions({
       type: 'conversation',
       complexity: 'medium',
       budget: 'balanced',
     });
+    const conversationModel = conversationModelSuggestions.recommended[0];
 
     return {
       pipeline: [embeddingModel, reasoningModel, conversationModel],
@@ -327,19 +330,21 @@ export class ModelOrchestrator {
 
   private async codeReviewPipeline(code: string, context?: any) {
     // Step 1: Use coding model for technical analysis
-    const codingModel = this.selectOptimalModel({
+    const codingModelSuggestions = this.getModelSuggestions({
       type: 'coding',
       complexity: 'high',
       requiresFunctions: true,
       budget: 'balanced',
     });
+    const codingModel = codingModelSuggestions.recommended[0];
 
     // Step 2: Use reasoning model for logical review
-    const reasoningModel = this.selectOptimalModel({
+    const reasoningModelSuggestions = this.getModelSuggestions({
       type: 'reasoning',
       complexity: 'high',
       budget: 'premium',
     });
+    const reasoningModel = reasoningModelSuggestions.recommended[0];
 
     return {
       pipeline: [codingModel, reasoningModel],
@@ -349,11 +354,12 @@ export class ModelOrchestrator {
 
   private async contentCreationPipeline(prompt: string, context?: any) {
     // Use nano model for fast, cost-effective content generation
-    const conversationModel = this.selectOptimalModel({
+    const conversationModelSuggestions = this.getModelSuggestions({
       type: 'conversation',
       complexity: 'medium',
       budget: 'minimal',
     });
+    const conversationModel = conversationModelSuggestions.recommended[0];
 
     return {
       pipeline: [conversationModel],

@@ -20,21 +20,22 @@ export function logBundlePerformance(componentName: string, startTime: number) {
 export function preloadCriticalChunks(route: string) {
   if (typeof window === 'undefined') return;
 
-  const criticalChunks: Record<string, () => Promise<any>[]> = {
+  const criticalChunks: Record<string, (() => Promise<any>)[] | (() => (() => Promise<any>)[])> = {
     '/chat': [
       () => import('@/components/chat/tree-visualization'),
       () => import('@/components/chat/chat-settings-modal'),
     ],
-    '/blog': [() => import('@/app/blog/page')],
-    '/research': [() => import('@/app/research/page')],
-    '/contact': [() => import('@/app/contact/page')],
+    '/blog': () => [() => import('@/app/blog/page')],
+    '/research': () => [() => import('@/app/research/page')],
+    '/contact': () => [() => import('@/app/contact/page')],
   };
 
-  const chunks = criticalChunks[route];
-  if (chunks) {
+  const chunksFactory = criticalChunks[route];
+  if (chunksFactory) {
     // Preload with a small delay to not block initial render
     setTimeout(() => {
-      chunks.forEach((chunk) => {
+      const chunks = Array.isArray(chunksFactory) ? chunksFactory : chunksFactory();
+      chunks.forEach((chunk: () => Promise<any>) => {
         chunk().catch(() => {
           // Silent fail for preloading
         });
@@ -131,7 +132,8 @@ export function trackBundleVitals() {
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
       if (entry.entryType === 'first-input') {
-        const fid = entry.processingStart - entry.startTime;
+        const processingStart = (entry as any).processingStart ?? entry.startTime;
+        const fid = processingStart - entry.startTime;
         if (process.env.NODE_ENV === 'development') {
           console.log(`📏 First Input Delay: ${fid.toFixed(2)}ms`);
         }
@@ -157,8 +159,9 @@ export function trackBundleVitals() {
   let clsValue = 0;
   new PerformanceObserver((list) => {
     for (const entry of list.getEntries()) {
-      if (!entry.hadRecentInput) {
-        clsValue += (entry as any).value;
+      const hadRecentInput = (entry as any).hadRecentInput ?? false;
+      if (!hadRecentInput) {
+        clsValue += (entry as any).value ?? 0;
       }
     }
     if (process.env.NODE_ENV === 'development') {

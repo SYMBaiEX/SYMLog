@@ -28,7 +28,7 @@ export function useApiCache<T = any>(
 ): ApiResponse<T> {
   const { data, error, isLoading, isValidating, mutate } = useSWR<T>(
     key,
-    config?.fetcher,
+    config?.fetcher || null,
     {
       // Default cache options
       revalidateOnFocus: false,
@@ -109,7 +109,13 @@ export function usePrefetch() {
   const { mutate } = useSWR(() => null); // Get SWR mutate function
 
   const prefetch = (key: string, fetcher?: () => Promise<any>) => {
-    return mutate(key, fetcher, { revalidate: false });
+    if (fetcher) {
+      // For prefetching, we call the fetcher and ignore the result
+      fetcher().catch(() => {
+        // Silent fail for prefetching
+      });
+    }
+    return mutate(key);
   };
 
   return { prefetch };

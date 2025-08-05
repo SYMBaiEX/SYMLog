@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import * as React from 'react';
 import { CrossmintWalletAuth } from '@/components/crossmint-wallet-auth';
+import { WebAuthFlow } from '@/components/dynamic';
 import { ModeToggle } from '@/components/mode-toggle';
 import { GlassButton } from '@/components/ui/glass-button';
 import {

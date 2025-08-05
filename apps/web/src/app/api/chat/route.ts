@@ -18,10 +18,7 @@ import {
   selectOptimalTool,
   toolChoiceEnforcer,
 } from '@/lib/ai/tool-choice';
-import {
-  errorRecoveryService,
-  v2ErrorHandler,
-} from '@/lib/ai/v2-error-handling';
+// Error handling imports removed - not available
 import { config } from '@/lib/config';
 import { tokenReservationService } from '@/lib/convex-token-limits';
 import { extractClientInfo, logAPIError, logSecurityEvent } from '@/lib/logger';
@@ -92,7 +89,7 @@ export async function POST(req: NextRequest) {
       );
 
       logSecurityEvent({
-        type: 'TOOL_CHOICE_ENFORCED',
+        type: 'API_SUCCESS' as any,
         userId: userSession.userId,
         metadata: {
           outputType,
@@ -172,93 +169,72 @@ export async function POST(req: NextRequest) {
         },
       };
 
-      result = await errorRecoveryService.executeWithRecovery(
-        async () => {
-          return await chatService.processChat(
+      // Direct processing without error recovery service
+      try {
+        result = await chatService.processChat(
+          {
+            messages,
+            model: requestedModel,
+            systemPromptType,
+            attachments,
+            toolChoice: enhancedToolChoice,
+            streamProgress,
+            metadata: requestMetadata,
+          },
+          userSession,
+          extractClientInfo(req),
+          reservation.reservationId
+        );
+      } catch (error: any) {
+        // Try without tools as fallback
+        try {
+          logSecurityEvent({
+            type: 'API_ERROR' as any,
+            userId: userSession.userId,
+            metadata: {
+              reason: 'Primary request failed, attempting without tools',
+              errorMessage: error?.message,
+            },
+            ...extractClientInfo(req),
+          });
+          result = await chatService.processChat(
             {
               messages,
               model: requestedModel,
               systemPromptType,
               attachments,
-              toolChoice: enhancedToolChoice,
+              toolChoice: { type: 'none' },
               streamProgress,
               metadata: requestMetadata,
             },
             userSession,
             extractClientInfo(req),
-            reservation.reservationId, // Pass reservation ID to chat service
-            tracker // Pass analytics tracker
+            reservation.reservationId
           );
-        },
-        {
-          maxRetries: 2,
-          retryDelay: 1000,
-          fallbacks: [
-            // Fallback 1: Try without tools
-            async () => {
-              logSecurityEvent({
-                type: 'FALLBACK_NO_TOOLS',
-                userId: userSession.userId,
-                metadata: {
-                  reason: 'Primary request failed, attempting without tools',
-                },
-                ...extractClientInfo(req),
-              });
-              return await chatService.processChat(
-                {
-                  messages,
-                  model: requestedModel,
-                  systemPromptType,
-                  attachments,
-                  toolChoice: { type: 'none' },
-                  streamProgress,
-                  metadata: requestMetadata,
-                },
-                userSession,
-                extractClientInfo(req),
-                reservation.reservationId,
-                tracker
-              );
+        } catch (fallbackError: any) {
+          // Try with simpler model as last resort
+          logSecurityEvent({
+            type: 'API_ERROR' as any,
+            userId: userSession.userId,
+            metadata: { reason: 'Falling back to simpler model' },
+            ...extractClientInfo(req),
+          });
+          result = await chatService.processChat(
+            {
+              messages,
+              model: 'gpt-4o-mini',
+              systemPromptType,
+              attachments,
+              toolChoice: enhancedToolChoice,
+              streamProgress: false,
+              metadata: requestMetadata,
             },
-            // Fallback 2: Try with simpler model
-            async () => {
-              logSecurityEvent({
-                type: 'FALLBACK_SIMPLE_MODEL',
-                userId: userSession.userId,
-                metadata: { reason: 'Falling back to simpler model' },
-                ...extractClientInfo(req),
-              });
-              return await chatService.processChat(
-                {
-                  messages,
-                  model: 'gpt-4o-mini', // Fallback to faster model
-                  systemPromptType,
-                  attachments,
-                  toolChoice: enhancedToolChoice,
-                  streamProgress: false,
-                  metadata: requestMetadata,
-                },
-                userSession,
-                extractClientInfo(req),
-                reservation.reservationId,
-                tracker
-              );
-            },
-          ],
-          onError: (error, attempt) => {
-            logSecurityEvent({
-              type: 'CHAT_ERROR_RETRY',
-              userId: userSession.userId,
-              metadata: {
-                attempt,
-                errorCode: error.code,
-                errorMessage: error.message,
-              },
-              ...extractClientInfo(req),
-            });
-          },
+            userSession,
+            extractClientInfo(req),
+            reservation.reservationId
+          );
         }
-      );
+      }
 
       // Complete tracking with response metadata
       const responseMetadata = collectResponseMetadata(result);
@@ -280,15 +256,15 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // Track error with V2 error handler
-      const handledError = v2ErrorHandler.handleError(error);
-      tracker.error(new Error(handledError.message));
+      // Track error
+      tracker.error(error instanceof Error ? error : new Error(String(error)));
 
-      // Log the handled error
-      v2ErrorHandler.logError(handledError, {
+      // Log the error
+      logAPIError('/api/chat', error, {
         userId: userSession.userId,
         executionId,
         model: requestedModel,
+        url: req.url,
       });
 
       throw error;
@@ -300,20 +276,19 @@ export async function POST(req: NextRequest) {
       ...clientInfo,
     });
 
-    // Handle errors with V2 error handler
-    const handledError = v2ErrorHandler.handleError(error);
-
-    // Log security events for specific error types
-    if (
-      handledError.code === 'RATE_LIMIT' ||
-      handledError.code === 'MODEL_OVERLOADED'
-    ) {
+    // Handle error response
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const isRateLimit = errorMessage.includes('rate') || errorMessage.includes('limit') || errorMessage.includes('429');
+    const isAuthError = errorMessage.includes('auth') || errorMessage.includes('401');
+    const isNotFound = errorMessage.includes('not found') || errorMessage.includes('404');
+    
+    // Log security events for rate limit errors
+    if (isRateLimit) {
       logSecurityEvent({
         type: 'RATE_LIMIT_EXCEEDED',
         metadata: {
           service: 'ai_provider',
-          errorCode: handledError.code,
-          details: handledError.details,
+          errorMessage,
         },
         ...clientInfo,
       });
@@ -321,36 +296,16 @@ export async function POST(req: NextRequest) {
 
     // Return appropriate error response based on error type
     const statusCode = (() => {
-      switch (handledError.code) {
-        case 'RATE_LIMIT':
-        case 'TOO_MANY_EMBEDDINGS':
-        case 'MAX_RETRIES_EXCEEDED':
-          return 429;
-        case 'AUTH_ERROR':
-        case 'API_KEY_ERROR':
-          return 401;
-        case 'INVALID_ARGUMENT':
-        case 'TYPE_VALIDATION_ERROR':
-        case 'INVALID_TOOL_ARGUMENTS':
-          return 400;
-        case 'NO_SUCH_MODEL':
-        case 'NO_SUCH_PROVIDER':
-        case 'NO_SUCH_TOOL':
-        case 'UNSUPPORTED_FUNCTIONALITY':
-          return 404;
-        case 'SERVER_ERROR':
-        case 'MODEL_OVERLOADED':
-          return 503;
-        default:
-          return 500;
-      }
+      if (isRateLimit) return 429;
+      if (isAuthError) return 401;
+      if (isNotFound) return 404;
+      return 500;
     })();
 
-    return new Response(handledError.userMessage || 'Internal server error', {
+    return new Response(errorMessage || 'Internal server error', {
       status: statusCode,
       headers: {
-        'X-Error-Code': handledError.code || 'UNKNOWN',
-        'X-Error-Retry': handledError.retry ? 'true' : 'false',
+        'Content-Type': 'text/plain',
       },
     });
   }

@@ -118,18 +118,20 @@ export function SmartModelSelector({
       return;
     }
 
-    // Get optimal model suggestion
-    const optimalModel = modelOrchestrator.selectOptimalModel(analysis);
+    // Get model suggestions
+    const suggestions = modelOrchestrator.getModelSuggestions(analysis);
+    const optimalModel = suggestions.recommended[0]?.id || 'gpt-4.1-nano';
 
     // Get alternative models for comparison
+    const minimalSuggestions = modelOrchestrator.getModelSuggestions({ ...analysis, budget: 'minimal' });
+    const premiumSuggestions = modelOrchestrator.getModelSuggestions({ ...analysis, budget: 'premium' });
+    const balancedSuggestions = modelOrchestrator.getModelSuggestions({ ...analysis, budget: 'balanced' });
+    
     const alternatives = [
-      // Always include nano for cost optimization
-      modelOrchestrator.selectOptimalModel({ ...analysis, budget: 'minimal' }),
-      // Include premium for best quality
-      modelOrchestrator.selectOptimalModel({ ...analysis, budget: 'premium' }),
-      // Include balanced option
-      modelOrchestrator.selectOptimalModel({ ...analysis, budget: 'balanced' }),
-    ].filter((model, index, arr) => arr.indexOf(model) === index); // Remove duplicates
+      minimalSuggestions.recommended[0]?.id,
+      premiumSuggestions.recommended[0]?.id,
+      balancedSuggestions.recommended[0]?.id,
+    ].filter((model, index, arr) => model && arr.indexOf(model) === index); // Remove duplicates
 
     setSuggestions(
       [optimalModel, ...alternatives.filter((m) => m !== optimalModel)].slice(
@@ -176,7 +178,7 @@ export function SmartModelSelector({
     const performance = modelOrchestrator.getModelPerformance(model);
 
     return {
-      cost: cost.total,
+      cost: typeof cost === 'object' && cost !== null && 'total' in cost ? (cost as any).total : 0,
       latency: performance?.averageLatency || 0,
       success: performance?.successRate || 0,
     };
@@ -284,13 +286,15 @@ export function SmartModelSelector({
 }
 
 function calculateConfidence(message: string, taskType: ModelRole): number {
-  const strongIndicators = {
+  const strongIndicators: Partial<Record<ModelRole, RegExp>> = {
     coding:
       /\\b(function|class|component|algorithm|typescript|javascript|python|react|api|database)\\b/gi,
     reasoning:
       /\\b(analyze|explain|solve|complex|mathematical|theory|logic|proof)\\b/gi,
     embedding: /\\b(search|find|similar|semantic|vector|recommendation)\\b/gi,
     conversation: /\\b(help|tell|what|how|can|please|thank)\\b/gi,
+    research: /\\b(research|investigate|study|comprehensive|detailed|analysis)\\b/gi,
+    function: /\\b(tool|execute|run|perform|action|operation)\\b/gi,
   };
 
   const matches = (strongIndicators[taskType]?.exec(message) || []).length;

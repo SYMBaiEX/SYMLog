@@ -165,7 +165,12 @@ export class MultiModalCompleteSystem {
         throw new Error(`Unsupported file type: ${type}`);
       }
 
-      const processedResult = {
+      const processedResult: {
+        type: string;
+        originalName: string;
+        processedData: any;
+        crossModalInsights?: any;
+      } = {
         type: type.split('/')[0],
         originalName: name,
         processedData: result,
@@ -717,24 +722,24 @@ export class MultiModalCompleteSystem {
   private extractTextFromModalData(type: string, data: any): string {
     switch (type) {
       case 'image':
-        return data.text || '';
+        return data.text ?? '';
       case 'video':
-        return data.summary?.overallDescription || '';
+        return data.summary?.overallDescription ?? '';
       case 'audio':
-        return data.transcription || '';
+        return data.transcription ?? '';
       case 'document':
-        return data.content || '';
+        return data.content ?? '';
       default:
         return '';
     }
   }
 
   private extractMoodFromModalData(type: string, data: any): string {
-    return data.mood || data.sentiment || 'neutral';
+    return data.mood ?? data.sentiment ?? 'neutral';
   }
 
   private extractTopicsFromModalData(type: string, data: any): string[] {
-    return data.topics || data.keyTopics || [];
+    return data.topics ?? data.keyTopics ?? [];
   }
 
   private calculateTextSimilarity(text1: string, text2: string): number {

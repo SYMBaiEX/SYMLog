@@ -75,7 +75,7 @@ export const getAgentMemories = query({
       query = ctx.db
         .query('agentMemories')
         .withIndex('by_agent_type', (q) =>
-          q.eq('agentId', args.agentId).eq('type', args.type)
+          q.eq('agentId', args.agentId).eq('type', args.type as "conversation" | "learning" | "reflection" | "context" | "preference")
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -167,7 +167,7 @@ export const getAgentKnowledge = query({
       query = ctx.db
         .query('agentKnowledge')
         .withIndex('by_agent_category', (q) =>
-          q.eq('agentId', args.agentId).eq('category', args.category)
+          q.eq('agentId', args.agentId).eq('category', args.category as "facts" | "skills" | "preferences" | "relationships" | "procedures" | "concepts")
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }
@@ -339,7 +339,7 @@ export const getAgentLearningEvents = query({
       query = ctx.db
         .query('agentLearningEvents')
         .withIndex('by_agent_type', (q) =>
-          q.eq('agentId', args.agentId).eq('eventType', args.eventType)
+          q.eq('agentId', args.agentId).eq('eventType', args.eventType as "knowledge_gained" | "memory_created" | "skill_improved" | "preference_learned" | "mistake_corrected")
         )
         .filter((q) => q.eq(q.field('userId'), args.userId));
     }

@@ -538,7 +538,7 @@ export class AdvancedMultiModal {
       duration: video.duration,
       width: video.videoWidth,
       height: video.videoHeight,
-      hasAudio: video.audioTracks?.length > 0,
+      hasAudio: (video as any).audioTracks?.length > 0 || (video as any).webkitAudioDecodedByteCount > 0,
       frameRate: 30, // Default, could be calculated more precisely
     };
   }
@@ -721,7 +721,7 @@ export class AdvancedMultiModal {
       // This is a simplified approach - in production you'd want to use Web Audio API
       // or a library like ffmpeg.wasm for proper audio extraction
 
-      if (!video.audioTracks || video.audioTracks.length === 0) {
+      if (!(video as any).audioTracks || (video as any).audioTracks.length === 0) {
         return null;
       }
 

@@ -4,7 +4,7 @@ import {
   InvalidArgumentError,
   InvalidDataContentError,
   InvalidResponseDataError,
-  InvalidToolArgumentsError,
+  InvalidArgumentError as InvalidToolInputError,
   JSONParseError,
   type LanguageModelUsage,
   LoadAPIKeyError,
@@ -12,13 +12,36 @@ import {
   NoObjectGeneratedError,
   NoSuchModelError,
   NoSuchToolError,
-  NoTranscriptGeneratedError,
   ToolCallRepairError,
-  ToolExecutionError,
-  TooManyEmbeddingValuesForCallError,
   TypeValidationError,
 } from 'ai';
 import { logError as logErrorToConsole } from '@/lib/logger';
+
+// Define missing error types that are not exported from 'ai'
+class NoTranscriptGeneratedError extends Error {
+  cause?: Error;
+  responses?: any[];
+  static isInstance(error: unknown): error is NoTranscriptGeneratedError {
+    return error instanceof NoTranscriptGeneratedError;
+  }
+}
+
+class ToolExecutionError extends Error {
+  toolName?: string;
+  toolArgs?: any;
+  cause?: Error;
+  static isInstance(error: unknown): error is ToolExecutionError {
+    return error instanceof ToolExecutionError;
+  }
+}
+
+class TooManyEmbeddingValuesForCallError extends Error {
+  values?: number;
+  maxValuesPerCall?: number;
+  static isInstance(error: unknown): error is TooManyEmbeddingValuesForCallError {
+    return error instanceof TooManyEmbeddingValuesForCallError;
+  }
+}
 
 // Create a logger wrapper
 const loggingService = {
@@ -182,10 +205,10 @@ export class AdvancedErrorHandler {
       return this.handleToolError(error, 'NoSuchToolError', errorId, timestamp);
     }
 
-    if (InvalidToolArgumentsError.isInstance(error)) {
+    if (InvalidToolInputError.isInstance(error)) {
       return this.handleToolError(
         error,
-        'InvalidToolArgumentsError',
+        'InvalidToolInputError',
         errorId,
         timestamp
       );
@@ -315,19 +338,19 @@ export class AdvancedErrorHandler {
     timestamp: Date
   ): EnhancedErrorInfo {
     const isRateLimitError = error.statusCode === 429;
-    const isServerError = error.statusCode >= 500;
+    const isServerError = (error.statusCode ?? 0) >= 500;
 
     const errorInfo: EnhancedErrorInfo = {
       message: isRateLimitError
         ? 'Rate limit exceeded. Please wait before retrying.'
-        : `API call failed with status ${error.statusCode}: ${error.statusText || 'Unknown error'}`,
+        : `API call failed with status ${error.statusCode}: ${(error as any).statusText || 'Unknown error'}`,
       severity: isServerError ? ErrorSeverity.HIGH : ErrorSeverity.MEDIUM,
       category: ErrorCategory.API,
       retry: error.isRetryable || isServerError || isRateLimitError,
       fallback: 'Switch to backup model or reduce request frequency',
       details: {
         statusCode: error.statusCode,
-        statusText: error.statusText,
+        statusText: (error as any).statusText,
         url: error.url,
         responseHeaders: error.responseHeaders,
         isRetryable: error.isRetryable,
@@ -502,7 +525,7 @@ export class AdvancedErrorHandler {
   private handleToolError(
     error:
       | NoSuchToolError
-      | InvalidToolArgumentsError
+      | InvalidToolInputError
       | ToolExecutionError
       | ToolCallRepairError,
     errorType: string,
@@ -742,7 +765,7 @@ export class AdvancedErrorHandler {
           'Check available tools',
           'Register missing tool',
         ];
-      case 'InvalidToolArgumentsError':
+      case 'InvalidToolInputError':
         return [
           'Check tool parameter schema',
           'Validate input data',

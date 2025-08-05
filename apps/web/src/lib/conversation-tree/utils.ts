@@ -4,9 +4,11 @@ import { generateSecureId } from '@/lib/utils/id-generator';
 import type {
   ConversationNode,
   ConversationTree,
-  TreeMetadata,
   TreeStateChange,
 } from '@/types/conversation-tree';
+
+// Define TreeMetadata as it's used but not exported
+type TreeMetadata = ConversationTree['metadata'];
 
 export class TreeUtils {
   static generateId(): string {
@@ -14,12 +16,24 @@ export class TreeUtils {
   }
 
   static getMessageContent(message: UIMessage): string {
-    if (message.content) return message.content;
+    // Handle different content formats from UIMessage
+    if ('content' in message && typeof message.content === 'string') {
+      return message.content;
+    }
 
-    if (message.parts) {
+    // Handle array content format
+    if ('content' in message && Array.isArray(message.content)) {
+      return message.content
+        .filter((part: any) => part.type === 'text')
+        .map((part: any) => part.text || '')
+        .join('\n');
+    }
+
+    // Handle parts format
+    if ('parts' in message && Array.isArray(message.parts)) {
       return message.parts
-        .filter((part) => part.type === 'text')
-        .map((part) => part.text)
+        .filter((part: any) => part.type === 'text')
+        .map((part: any) => part.text || '')
         .join('\n');
     }
 
@@ -80,8 +94,8 @@ export class TreeUtils {
       branches: tree.branches,
       metadata: tree.metadata,
       nodes: Array.from(tree.nodes.entries()).map(([id, node]) => ({
-        id,
         ...node,
+        id, // Explicitly set id to override any id from node spread
         // Ensure message is serializable
         message: {
           ...node.message,
@@ -98,10 +112,11 @@ export class TreeUtils {
 
     // Reconstruct nodes Map
     const nodes = new Map<string, ConversationNode>();
-    data.nodes.forEach((node: any) => {
-      nodes.set(node.id, {
-        ...node,
-        id: node.id, // Ensure id is preserved
+    data.nodes.forEach((nodeData: any) => {
+      const { id, ...nodeWithoutId } = nodeData;
+      nodes.set(id, {
+        ...nodeWithoutId,
+        id, // Add id back as a single property
       });
     });
 

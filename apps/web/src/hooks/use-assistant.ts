@@ -1,9 +1,16 @@
 'use client';
 
-import type { ChatRequestOptions, Message } from 'ai';
+import type { ChatRequestOptions, UIMessage } from 'ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useChatEnhanced } from './use-chat-enhanced';
+
+// Use UIMessage for compatibility with use-chat-enhanced
+type EnhancedUIMessage = UIMessage & {
+  content?: string; // For backward compatibility
+};
+
+type Message = EnhancedUIMessage;
 
 export interface AssistantThread {
   id: string;
@@ -504,8 +511,10 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
             `Updated: ${new Date(thread.updatedAt).toLocaleString()}`,
             '',
             ...thread.messages.map(
-              (msg) =>
-                `## ${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}\n\n${msg.content}\n`
+              (msg) => {
+                const content = msg.content ?? msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') ?? '';
+                return `## ${msg.role.charAt(0).toUpperCase() + msg.role.slice(1)}\n\n${content}\n`;
+              }
             ),
           ].join('\n');
 
@@ -516,7 +525,10 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
             `Updated: ${new Date(thread.updatedAt).toLocaleString()}`,
             '',
             ...thread.messages.map(
-              (msg) => `${msg.role.toUpperCase()}: ${msg.content}`
+              (msg) => {
+                const content = msg.content ?? msg.parts?.filter((p: any) => p.type === 'text').map((p: any) => p.text).join('') ?? '';
+                return `${msg.role.toUpperCase()}: ${content}`;
+              }
             ),
           ].join('\n\n');
 
@@ -532,9 +544,20 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
     (query: string): Message[] => {
       const searchTerm = query.toLowerCase();
       return chat.messages.filter(
-        (msg) =>
-          msg.content?.toLowerCase().includes(searchTerm) ||
-          msg.role.toLowerCase().includes(searchTerm)
+        (msg) => {
+          // Handle UIMessage content structure
+          let content = '';
+          if (msg.content) {
+            content = msg.content;
+          } else if (msg.parts) {
+            content = msg.parts
+              .filter((part: any) => part.type === 'text')
+              .map((part: any) => part.text)
+              .join(' ');
+          }
+          return content.toLowerCase().includes(searchTerm) ||
+                 msg.role.toLowerCase().includes(searchTerm);
+        }
       );
     },
     [chat.messages]
@@ -561,7 +584,7 @@ export function useAssistant(options: UseAssistantOptions): UseAssistantReturn {
     // Actions
     submitMessage,
     appendMessage,
-    regenerateLastMessage: chat.reload,
+    regenerateLastMessage: async () => { await chat.reload(); },
     stop: chat.stop,
     clearMessages: () => chat.setMessages([]),
 

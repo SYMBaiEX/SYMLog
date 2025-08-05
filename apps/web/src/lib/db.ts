@@ -126,7 +126,7 @@ class DatabaseConnection {
     }
   }
 
-  async query<T = any>(
+  async query<T extends Record<string, any> = Record<string, any>>(
     text: string,
     params?: any[]
   ): Promise<{ rows: T[]; rowCount: number }> {
@@ -221,7 +221,7 @@ class DatabaseConnection {
   }
 
   // Helper methods for common queries
-  async findOne<T>(
+  async findOne<T extends Record<string, any>>(
     table: string,
     conditions: Record<string, any>
   ): Promise<T | null> {
@@ -237,7 +237,7 @@ class DatabaseConnection {
     return result.rows[0] || null;
   }
 
-  async findMany<T>(
+  async findMany<T extends Record<string, any>>(
     table: string,
     conditions: Record<string, any> = {},
     options: {
@@ -273,7 +273,7 @@ class DatabaseConnection {
     return result.rows;
   }
 
-  async insert<T>(table: string, data: Record<string, any>): Promise<T> {
+  async insert<T extends Record<string, any>>(table: string, data: Record<string, any>): Promise<T> {
     const keys = Object.keys(data);
     const values = Object.values(data);
     const placeholders = keys.map((_, index) => `$${index + 1}`).join(', ');
@@ -285,7 +285,7 @@ class DatabaseConnection {
     return result.rows[0];
   }
 
-  async update<T>(
+  async update<T extends Record<string, any>>(
     table: string,
     conditions: Record<string, any>,
     data: Record<string, any>

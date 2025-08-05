@@ -356,6 +356,7 @@ export async function extractAudioFromVideo(videoFile: File): Promise<Blob> {
   // Web Audio API or a library to extract audio track
   // TODO: Implement audio extraction using Web Audio API
   throw new Error('Audio extraction from video not yet implemented - pending Web Audio API integration')
+}
 
 /**
  * Split long audio into chunks for transcription
@@ -371,6 +372,7 @@ export async function splitAudioIntoChunks(
   // Web Audio API to split audio into time-based chunks
   // TODO: Implement audio splitting using Web Audio API
   throw new Error('Audio splitting not yet implemented - pending Web Audio API integration')
+}
 
 /**
  * Merge transcription results from multiple chunks
@@ -439,16 +441,17 @@ export function generateSubtitles(
       })
       .join('\n')
   }
-    // VTT format
-    let vtt = 'WEBVTT\n\n'
-    vtt += result.segments
-      .map(segment => {
-        const start = formatTimeVTT(segment.start)
-        const end = formatTimeVTT(segment.end)
-        return `${start} --> ${end}\n${segment.text.trim()}\n`
-      })
-      .join('\n')
-    return vtt
+  
+  // VTT format
+  let vtt = 'WEBVTT\n\n'
+  vtt += result.segments
+    .map(segment => {
+      const start = formatTimeVTT(segment.start)
+      const end = formatTimeVTT(segment.end)
+      return `${start} --> ${end}\n${segment.text.trim()}\n`
+    })
+    .join('\n')
+  return vtt
 }
 
 // Helper functions for time formatting

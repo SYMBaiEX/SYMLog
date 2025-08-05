@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid workflow request: ${validation.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          error: `Invalid workflow request: ${validation.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         },
         { status: 400 }
       );
@@ -125,7 +125,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     const response: WorkflowExecutionResponse = {
       success: result.success,
-      result: result.success ? result.data : undefined,
+      result: result.success && result.data ? result.data as {
+        workflowName: string;
+        totalSteps: number;
+        completedSteps: number;
+        results: any[];
+        errors?: string[];
+        executedAt: number;
+      } : undefined,
       executionId,
     };
 
@@ -156,9 +163,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * DELETE /api/ai/enhanced-tools/workflow - Cancel workflow execution
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  let executionId: string | null = null;
+  
   try {
     const { searchParams } = new URL(request.url);
-    const executionId = searchParams.get('executionId');
+    executionId = searchParams.get('executionId');
 
     if (!executionId) {
       return NextResponse.json(

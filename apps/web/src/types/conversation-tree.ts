@@ -6,9 +6,14 @@ export interface BranchMetadata {
   description?: string;
   model?: string;
   temperature?: number;
-  createdBy: 'user' | 'ai' | 'system';
+  createdBy: 'user' | 'ai' | 'system' | 'user_edit';
   editedFromMessageId?: string;
   regeneratedFromMessageId?: string;
+  mergedFrom?: string[];
+  mergeStrategy?: string;
+  reason?: string;
+  color?: string;
+  editedFrom?: string;
 }
 
 export interface ConversationNode {
@@ -23,6 +28,7 @@ export interface ConversationNode {
   metadata: BranchMetadata;
   isEdited?: boolean;
   originalContent?: string;
+  isBranchPoint?: boolean;
 }
 
 export interface Branch {
@@ -33,8 +39,11 @@ export interface Branch {
   leafNodeId: string;
   messageCount: number;
   createdAt: number;
+  updatedAt: number;
   isFavorite?: boolean;
   color?: string;
+  metadata?: BranchMetadata;
+  isActive?: boolean;
 }
 
 export interface ConversationTree {
@@ -80,6 +89,7 @@ export interface MessageEdit {
 }
 
 export interface BranchComparison {
+  branches: [Branch, Branch];
   branchA: Branch;
   branchB: Branch;
   differences: Array<{
@@ -88,6 +98,13 @@ export interface BranchComparison {
     content: string;
     branch?: 'A' | 'B';
   }>;
+  commonAncestor?: string;
+  metrics: {
+    totalDifferences: number;
+    messagesInA: number;
+    messagesInB: number;
+    divergencePoint: number;
+  };
 }
 
 export interface ConversationTreeOptions {
@@ -113,9 +130,10 @@ export interface TreeStateChange {
     | 'branch_switched'
     | 'branch_edited'
     | 'branch_deleted'
-    | 'branch_merged';
+    | 'branch_merged'
+    | 'message_edited';
   nodeId: string;
   branchId?: string;
   timestamp: number;
-  data?: any;
+  data?: Record<string, unknown>;
 }

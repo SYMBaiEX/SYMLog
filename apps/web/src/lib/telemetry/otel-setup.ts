@@ -16,6 +16,7 @@ import { FsInstrumentation } from '@opentelemetry/instrumentation-fs';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { B3InjectEncoding, B3Propagator } from '@opentelemetry/propagator-b3';
 import { JaegerPropagator } from '@opentelemetry/propagator-jaeger';
+// @ts-ignore - Resource import conflicts with verbatimModuleSyntax
 import { Resource } from '@opentelemetry/resources';
 import {
   ConsoleMetricExporter,
@@ -278,7 +279,7 @@ export class OpenTelemetryManager {
    * Get circuit breaker status
    */
   getCircuitBreakerStatus(): {
-    state: typeof this.circuitBreakerState;
+    state: 'open' | 'half-open' | 'closed';
     failures: number;
     lastFailure: number;
   } {
@@ -327,6 +328,7 @@ export class OpenTelemetryManager {
       'telemetry.sdk.version': '1.0.0',
     };
 
+    // @ts-ignore - Resource constructor conflicts with verbatimModuleSyntax
     return new Resource(resourceAttributes);
   }
 

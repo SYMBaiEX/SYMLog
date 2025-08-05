@@ -55,43 +55,43 @@ export class AITelemetryMetrics {
   private metricsCache = new Map<string, any>();
 
   // Core AI Operation Metrics
-  private aiCallsCounter: Counter;
-  private aiCallDuration: Histogram;
-  private aiTokensUsed: Histogram;
-  private aiCallsActive: UpDownCounter;
-  private aiErrorsCounter: Counter;
-  private aiCostCounter: Counter;
+  private aiCallsCounter!: Counter;
+  private aiCallDuration!: Histogram;
+  private aiTokensUsed!: Histogram;
+  private aiCallsActive!: UpDownCounter;
+  private aiErrorsCounter!: Counter;
+  private aiCostCounter!: Counter;
 
   // Tool Execution Metrics
-  private toolExecutionsCounter: Counter;
-  private toolExecutionDuration: Histogram;
-  private toolErrorsCounter: Counter;
+  private toolExecutionsCounter!: Counter;
+  private toolExecutionDuration!: Histogram;
+  private toolErrorsCounter!: Counter;
 
   // Streaming Metrics
-  private streamingSessionsCounter: Counter;
-  private streamingDuration: Histogram;
-  private streamingChunksCounter: Counter;
-  private streamingLatency: Histogram;
+  private streamingSessionsCounter!: Counter;
+  private streamingDuration!: Histogram;
+  private streamingChunksCounter!: Counter;
+  private streamingLatency!: Histogram;
 
   // Cache Metrics
-  private cacheHitsCounter: Counter;
-  private cacheMissesCounter: Counter;
-  private cacheSize: UpDownCounter;
+  private cacheHitsCounter!: Counter;
+  private cacheMissesCounter!: Counter;
+  private cacheSize!: UpDownCounter;
 
   // Model Performance Metrics
-  private modelLatencyGauge: Gauge;
-  private modelThroughputGauge: Gauge;
-  private modelAccuracyGauge: Gauge;
+  private modelLatencyGauge!: Gauge;
+  private modelThroughputGauge!: Gauge;
+  private modelAccuracyGauge!: Gauge;
 
   // Business Metrics
-  private userInteractionsCounter: Counter;
-  private sessionDuration: Histogram;
-  private userSatisfactionGauge: Gauge;
+  private userInteractionsCounter!: Counter;
+  private sessionDuration!: Histogram;
+  private userSatisfactionGauge!: Gauge;
 
   // Resource Utilization Metrics
-  private memoryUsageGauge: Gauge;
-  private cpuUsageGauge: Gauge;
-  private diskUsageGauge: Gauge;
+  private memoryUsageGauge!: Gauge;
+  private cpuUsageGauge!: Gauge;
+  private diskUsageGauge!: Gauge;
 
   constructor(config?: Partial<AIMetricConfig>) {
     this.config = {

@@ -7,17 +7,42 @@ import {
   type LanguageModelRequestMetadata,
   type LanguageModelResponseMetadata,
   type LanguageModelV2,
-  type LanguageModelV2CallSettings,
   type LanguageModelV2Middleware,
   simulateStreamingMiddleware,
   wrapLanguageModel,
 } from 'ai';
 
+// Define middleware parameter types
+interface TransformParamsOptions {
+  params: any;
+}
+
+interface WrapGenerateOptions {
+  doGenerate: () => Promise<any>;
+  params?: any;
+}
+
+interface WrapStreamOptions {
+  doStream: () => Promise<any>;
+  params?: any;
+}
+
+// Define LanguageModelV2CallSettings locally since it's not exported from 'ai'
+interface LanguageModelV2CallSettings {
+  maxTokens?: number;
+  temperature?: number;
+  topP?: number;
+  topK?: number;
+  frequencyPenalty?: number;
+  presencePenalty?: number;
+  seed?: number;
+}
+
 /**
  * Logging middleware for debugging and monitoring
  */
 export const loggingMiddleware: LanguageModelV2Middleware = {
-  transformParams: async ({ params }) => {
+  transformParams: async ({ params }: TransformParamsOptions) => {
     console.log('[AI Request]', {
       model: params.model,
       promptTokens: params.prompt?.length,
@@ -26,7 +51,7 @@ export const loggingMiddleware: LanguageModelV2Middleware = {
     });
     return params;
   },
-  wrapGenerate: async ({ doGenerate }) => {
+  wrapGenerate: async ({ doGenerate }: WrapGenerateOptions) => {
     const start = Date.now();
     try {
       const result = await doGenerate();
@@ -46,7 +71,7 @@ export const loggingMiddleware: LanguageModelV2Middleware = {
       throw error;
     }
   },
-  wrapStream: async ({ doStream }) => {
+  wrapStream: async ({ doStream }: WrapStreamOptions) => {
     const start = Date.now();
     let tokenCount = 0;
 
@@ -85,7 +110,7 @@ export const loggingMiddleware: LanguageModelV2Middleware = {
  * Performance monitoring middleware
  */
 export const performanceMiddleware: LanguageModelV2Middleware = {
-  transformParams: async ({ params }) => {
+  transformParams: async ({ params }: TransformParamsOptions) => {
     // Add performance tracking headers
     return {
       ...params,
@@ -96,7 +121,7 @@ export const performanceMiddleware: LanguageModelV2Middleware = {
       },
     };
   },
-  wrapGenerate: async ({ doGenerate }) => {
+  wrapGenerate: async ({ doGenerate }: WrapGenerateOptions) => {
     const metrics = {
       startTime: Date.now(),
       firstTokenTime: 0,
@@ -119,7 +144,7 @@ export const performanceMiddleware: LanguageModelV2Middleware = {
  * Security middleware for input/output sanitization
  */
 export const securityMiddleware: LanguageModelV2Middleware = {
-  transformParams: async ({ params }) => {
+  transformParams: async ({ params }: TransformParamsOptions) => {
     // Enhanced prompt sanitization to prevent injection attacks
     if (params.prompt && typeof params.prompt === 'string') {
       let sanitized = params.prompt;
@@ -177,7 +202,7 @@ export const securityMiddleware: LanguageModelV2Middleware = {
 
     return params;
   },
-  wrapGenerate: async ({ doGenerate, params }) => {
+  wrapGenerate: async ({ doGenerate, params }: WrapGenerateOptions) => {
     try {
       const result = await doGenerate();
 
@@ -213,7 +238,7 @@ export function createCachingMiddleware(
   ttl: number = 5 * 60 * 1000 // 5 minutes
 ): LanguageModelV2Middleware {
   return {
-    wrapGenerate: async ({ doGenerate, params }) => {
+    wrapGenerate: async ({ doGenerate, params }: WrapGenerateOptions) => {
       // Create cache key from params
       const cacheKey = JSON.stringify({
         model: params.model,
@@ -359,7 +384,7 @@ export const createEnhancedProvider = () => {
           }),
           // Custom middleware for blockchain context
           {
-            transformParams: async ({ params }) => {
+            transformParams: async ({ params }: TransformParamsOptions) => {
               // Add blockchain-specific context
               const blockchainContext = `
 You are a blockchain and Web3 expert with deep knowledge of:
@@ -390,7 +415,7 @@ export function composeMiddleware(
   ...middlewares: LanguageModelV2Middleware[]
 ): LanguageModelV2Middleware {
   return {
-    transformParams: async (options) => {
+    transformParams: async (options: { params: any }) => {
       let params = options.params;
       for (const middleware of middlewares) {
         if (middleware.transformParams) {
@@ -399,7 +424,7 @@ export function composeMiddleware(
       }
       return params;
     },
-    wrapGenerate: async (options) => {
+    wrapGenerate: async (options: { doGenerate: () => any }) => {
       let doGenerate = options.doGenerate;
 
       // Apply middleware in reverse order (last one is innermost)
@@ -416,7 +441,7 @@ export function composeMiddleware(
 
       return doGenerate();
     },
-    wrapStream: async (options) => {
+    wrapStream: async (options: { doStream: () => any }) => {
       let doStream = options.doStream;
 
       // Apply middleware in reverse order
@@ -446,7 +471,7 @@ export function createRateLimitMiddleware(
   const requests = new Map<string, number[]>();
 
   return {
-    transformParams: async ({ params }) => {
+    transformParams: async ({ params }: TransformParamsOptions) => {
       const key = params.userId || 'anonymous';
       const now = Date.now();
       const userRequests = requests.get(key) || [];
@@ -478,7 +503,7 @@ export function createRetryMiddleware(
   initialDelay = 1000
 ): LanguageModelV2Middleware {
   return {
-    wrapGenerate: async ({ doGenerate }) => {
+    wrapGenerate: async ({ doGenerate }: WrapGenerateOptions) => {
       let lastError: Error | undefined;
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {

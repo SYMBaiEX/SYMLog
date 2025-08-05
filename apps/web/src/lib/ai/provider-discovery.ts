@@ -352,7 +352,7 @@ export class ProviderDiscoveryService extends EventEmitter<ProviderDiscoveryEven
    * Setup event handlers for telemetry integration
    */
   private setupEventHandlers(): void {
-    this.on('provider:health:changed', (providerId, health) => {
+    this.on('provider:health:changed', (providerId: string, health: ProviderHealth) => {
       aiTelemetry.trackUserInteraction(
         'system',
         'provider-discovery',
@@ -366,7 +366,7 @@ export class ProviderDiscoveryService extends EventEmitter<ProviderDiscoveryEven
       );
     });
 
-    this.on('discovery:error', (error, providerId) => {
+    this.on('discovery:error', (error: Error, providerId?: string) => {
       aiTelemetry.trackUserInteraction(
         'system',
         'provider-discovery',

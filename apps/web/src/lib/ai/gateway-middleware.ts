@@ -178,16 +178,17 @@ export class GatewayMiddleware {
   async processRequest<T>(
     requirements: ModelRequirements,
     executor: (model: LanguageModel, context: RequestContext) => Promise<T>,
-    metadata?: LanguageModelRequestMetadata
+    metadata?: LanguageModelRequestMetadata,
+    options?: { sessionId?: string; userId?: string; tags?: string[] }
   ): Promise<T> {
     const context: RequestContext = {
       requestId: crypto.randomUUID(),
       timestamp: new Date(),
       requirements,
       metadata,
-      sessionId: metadata?.sessionId,
-      userId: metadata?.userId,
-      tags: metadata?.tags,
+      sessionId: options?.sessionId,
+      userId: options?.userId,
+      tags: options?.tags,
     };
 
     // Check cache first
@@ -426,10 +427,9 @@ export class GatewayMiddleware {
     // Circuit breaker interceptor
     if (this.config.enableCircuitBreaker) {
       this.addErrorInterceptor(async (error, context, next) => {
-        const modelId = context.metadata?.modelId;
-        if (modelId) {
-          this.recordCircuitBreakerFailure(modelId);
-        }
+        // Use task-based identification since model property doesn't exist
+        const taskId = `${context.requirements.task}-${context.requirements.priority}`;
+        this.recordCircuitBreakerFailure(taskId);
         throw error;
       });
     }
@@ -538,8 +538,8 @@ export class GatewayMiddleware {
       ttl: this.config.cacheTTL || DEFAULT_CONFIG.cacheTTL!,
       hits: 0,
       metadata: {
-        providerId: context.metadata?.providerId || 'unknown',
-        modelId: context.metadata?.modelId || 'unknown',
+        providerId: 'unknown', // Provider ID not available in AI SDK v5 metadata
+        modelId: `${context.requirements.task}-${context.requirements.priority}`,
         requirements: context.requirements,
       },
     });

@@ -114,13 +114,18 @@ export class ConversationTreeManager {
       node.isEdited = true;
     }
 
-    node.message.content = newContent;
-    node.message.parts = [{ type: 'text', text: newContent }];
+    // Update message content properly based on structure
+    if ('content' in node.message) {
+      (node.message as any).content = newContent;
+    }
+    if ('parts' in node.message) {
+      (node.message as any).parts = [{ type: 'text', text: newContent }];
+    }
     node.updatedAt = Date.now();
 
     this.updateMetadata();
     this.emit({
-      type: 'message_edited',
+      type: 'node_edited',
       nodeId,
       timestamp: Date.now(),
     });
@@ -185,7 +190,7 @@ export class ConversationTreeManager {
       });
 
       this.emit({
-        type: 'response_regenerated',
+        type: 'branch_created',
         nodeId: userNodeId,
         branchId,
         timestamp: Date.now(),
@@ -205,7 +210,7 @@ export class ConversationTreeManager {
   switchToNode(nodeId: string): void {
     this.navigationManager.switchToNode(nodeId);
     this.emit({
-      type: 'navigation_changed',
+      type: 'branch_switched',
       nodeId,
       timestamp: Date.now(),
     });
@@ -282,6 +287,10 @@ export class ConversationTreeManager {
   }
 
   // Tree state methods
+  getTree(): ConversationTree {
+    return this.tree;
+  }
+
   getTreeId(): string {
     return this.tree.id;
   }
@@ -292,12 +301,18 @@ export class ConversationTreeManager {
 
   getNavigationState(): TreeNavigationState {
     return {
-      currentNodeId: this.tree.currentNodeId,
-      currentPath: [...this.tree.currentPath],
+      currentBranch: this.getCurrentBranchId() || 'main',
+      availableBranches: this.getBranchNames().map(branch => branch.name),
       canGoBack: this.tree.currentPath.length > 1,
       canGoForward: this.hasChildren(this.tree.currentNodeId),
-      branches: this.getBranchNames(),
-      currentBranchId: this.getCurrentBranchId(),
+      breadcrumbs: this.tree.currentPath.map(nodeId => {
+        const node = this.tree.nodes.get(nodeId);
+        return {
+          nodeId,
+          branchName: this.getCurrentBranchId(),
+          messagePreview: node ? TreeUtils.getMessageContent(node.message).substring(0, 50) : ''
+        };
+      }),
     };
   }
 

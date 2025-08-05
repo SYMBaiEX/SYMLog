@@ -23,6 +23,9 @@ interface ChatRequest {
   model?: string;
   systemPromptType?: string;
   attachments?: FileAttachment[];
+  toolChoice?: any;
+  streamProgress?: boolean;
+  metadata?: any;
 }
 
 interface ChatSession {
@@ -191,7 +194,7 @@ export class ChatService {
       model: getAIModel(selectedModel),
       system: contextualSystemPrompt,
       messages: processedMessages,
-      maxTokens: Math.min(
+      maxOutputTokens: Math.min(
         modelConfig.capabilities.maxOutput,
         config.get().aiMaxTokensPerRequest
       ),
@@ -211,29 +214,28 @@ export class ChatService {
           if (tokenReservationId) {
             await tokenReservationService.completeReservation(
               tokenReservationId,
-              usage.totalTokens
+              usage?.totalTokens ?? 0
             );
           }
 
           // Calculate estimated cost
           const cost = modelOrchestrator.estimateCost(
             selectedModel,
-            usage.promptTokens,
-            usage.completionTokens
+            (usage as any).promptTokens ?? 0,
+            (usage as any).completionTokens ?? 0
           );
 
           await this.recordMetrics({
             userId: session.userId,
             conversationId,
-            totalTokens: usage.totalTokens,
-            promptTokens: usage.promptTokens,
-            completionTokens: usage.completionTokens,
+            totalTokens: usage?.totalTokens ?? 0,
+            promptTokens: (usage as any).promptTokens ?? 0,
+            completionTokens: (usage as any).completionTokens ?? 0,
             finishReason,
             selectedModel,
-            modelType: modelConfig.role,
-            modelTier: modelConfig.capabilities.costTier,
+            taskType: modelConfig.role,
             latency,
-            estimatedCost: cost.total,
+            estimatedCost: typeof cost === 'object' && cost !== null ? cost.total : 0,
           });
 
           logSecurityEvent({
@@ -242,12 +244,12 @@ export class ChatService {
             metadata: {
               action: 'chat_completion',
               model: selectedModel,
-              modelType: modelConfig.role,
+              taskType: modelConfig.role,
               modelTier: modelConfig.capabilities.costTier,
-              totalTokens: usage.totalTokens,
-              promptTokens: usage.promptTokens,
-              completionTokens: usage.completionTokens,
-              estimatedCost: cost.total,
+              totalTokens: usage?.totalTokens ?? 0,
+              promptTokens: (usage as any).promptTokens ?? 0,
+              completionTokens: (usage as any).completionTokens ?? 0,
+              estimatedCost: typeof cost === 'object' && cost !== null && 'total' in cost ? (cost as any).total : 0,
               latency,
               finishReason,
             },
@@ -315,7 +317,7 @@ export class ChatService {
       });
     } catch (error) {
       logAPIError('chatService.recordConversationMetrics', error, {
-        conversationId,
+        conversationId: data.conversationId,
       });
     }
   }

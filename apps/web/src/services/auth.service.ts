@@ -158,8 +158,8 @@ export class AuthService {
         'users',
         { id: data.userId },
         {
-          email: data.email || existingUser.email,
-          wallet_address: data.walletAddress || existingUser.wallet_address,
+          email: data.email || (existingUser as any).email,
+          wallet_address: data.walletAddress || (existingUser as any).wallet_address,
           updated_at: new Date(),
         }
       );
@@ -193,7 +193,7 @@ export class AuthService {
         session_token: sessionToken,
       });
 
-      if (session && new Date(session.expires_at) < new Date()) {
+      if (session && new Date((session as any).expires_at) < new Date()) {
         // Session expired
         await db.delete('user_sessions', { session_token: sessionToken });
         return null;

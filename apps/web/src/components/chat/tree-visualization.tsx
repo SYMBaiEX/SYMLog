@@ -119,7 +119,7 @@ function TreeVisualizationComponent({
       const branch =
         branchMap.get(
           branches.find(
-            (b) => b.leafNodeId === node.id || b.nodeIds?.includes(node.id)
+            (b) => b.leafNodeId === node.id || (b as any).nodeIds?.includes(node.id)
           )?.id || ''
         ) || branches[0];
 
@@ -197,7 +197,7 @@ function TreeVisualizationComponent({
     const node = nodes.find((n) => n.id === nodeId);
     if (node) {
       const branch = branches.find(
-        (b) => b.leafNodeId === nodeId || b.nodeIds?.includes(nodeId)
+        (b) => b.leafNodeId === nodeId || (b as any).nodeIds?.includes(nodeId)
       );
       if (branch) {
         switchToBranch(branch.id);

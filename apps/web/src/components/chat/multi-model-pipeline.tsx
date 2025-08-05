@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { GlassButton } from '@/components/ui/glass-button';
 import { GlassCard } from '@/components/ui/glass-card';
-import { modelOrchestrator } from '@/lib/ai/model-orchestration';
+import { modelOrchestrator, type ModelConfig } from '@/lib/ai/model-orchestration';
 import { cn } from '@/lib/utils';
 
 interface PipelineStep {
@@ -64,9 +64,9 @@ export function MultiModelPipeline({
     });
 
     const steps: PipelineStep[] = pipelineConfig.pipeline.map(
-      (modelId, index) => ({
-        model: modelId,
-        role: getRoleForModel(modelId, taskType, index),
+      (modelConfig, index) => ({
+        model: modelConfig.id,
+        role: getRoleForModel(modelConfig.id, taskType, index),
         status: 'pending',
       })
     );
@@ -264,7 +264,7 @@ export function MultiModelPipeline({
     input: string
   ): string => {
     // Generate contextual mock outputs based on model and role
-    const outputs = {
+    const outputs: Record<string, string> = {
       'Information Gathering': `Based on the query "${input.slice(0, 50)}...", I've identified key research areas and gathered relevant information from multiple sources.`,
       'Deep Analysis':
         'Performing comprehensive analysis of the gathered information, identifying patterns, relationships, and key insights.',

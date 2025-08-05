@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from 'convex/react';
+import type { Id } from '../../../convex/_generated/dataModel';
 import {
   Activity,
   Award,
@@ -23,7 +24,7 @@ import { api } from '../../../convex/_generated/api';
 
 interface AgentLearningAnalyticsProps {
   userId: string;
-  agentId: string;
+  agentId: Id<'agents'> | string;
   className?: string;
 }
 
@@ -35,20 +36,20 @@ export function AgentLearningAnalytics({
   const [timeRange, setTimeRange] = useState<7 | 30 | 90>(30);
 
   // Fetch analytics data
-  const agent = useQuery(api.agents.getAgentById, { userId, agentId });
+  const agent = useQuery(api.agents.getAgentById, { userId, agentId: agentId as Id<'agents'> });
   const learningProgress = useQuery(api.agents.getAgentLearningProgress, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
     days: timeRange,
   });
   const learningEvents = useQuery(api.agents.getAgentLearningEvents, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
     limit: 20,
   });
   const stats = useQuery(api.agents.getAgentKnowledgeStats, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
   });
 
   const getEventTypeIcon = (eventType: string) => {
@@ -145,7 +146,7 @@ export function AgentLearningAnalytics({
           {[7, 30, 90].map((days) => (
             <GlassButton
               key={days}
-              onClick={() => setTimeRange(days)}
+              onClick={() => setTimeRange(days as 7 | 30 | 90)}
               size="sm"
               variant={timeRange === days ? 'default' : 'ghost'}
             >

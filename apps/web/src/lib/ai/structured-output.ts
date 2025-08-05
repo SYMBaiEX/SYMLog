@@ -305,12 +305,12 @@ export async function generateStructuredData<T>(params: {
 
     return {
       object: result.object,
-      finishReason: result.finishReason,
+      finishReason: (result as any).finishReason || 'stop',
       usage: {
-        promptTokens: result.usage?.promptTokens || 0,
-        completionTokens: result.usage?.completionTokens || 0,
+        promptTokens: result.usage?.inputTokens || 0,
+        completionTokens: result.usage?.outputTokens || 0,
         totalTokens: result.usage?.totalTokens || 0,
-        cost: result.usage?.cost,
+        cost: (result.usage as any)?.cost,
       },
       success: true,
     };
@@ -374,8 +374,8 @@ export async function streamStructuredData<T>(params: {
       onFinish: ({ object, finishReason, usage }) => {
         // Provide proper typing for usage and call user callback if provided
         const typedUsage: AIUsageStats = {
-          promptTokens: usage?.promptTokens || 0,
-          completionTokens: usage?.completionTokens || 0,
+          promptTokens: usage?.inputTokens || 0,
+          completionTokens: usage?.outputTokens || 0,
           totalTokens: usage?.totalTokens || 0,
           cost: usage?.cost,
         };
@@ -546,7 +546,7 @@ export function validateStructuredData<T>(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation failed: ${error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+        error: `Validation failed: ${error.errors.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
       };
     }
     return { success: false, error: 'Unknown validation error' };

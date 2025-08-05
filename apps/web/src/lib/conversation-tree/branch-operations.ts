@@ -29,9 +29,13 @@ export class BranchOperations {
       rootNodeId: nodeId,
       leafNodeId: nodeId,
       name: metadata?.name || `Branch ${this.tree.branches.length + 1}`,
+      messageCount: 1,
       createdAt: Date.now(),
       updatedAt: Date.now(),
-      metadata: metadata || {},
+      metadata: {
+        createdBy: 'user',
+        ...metadata,
+      },
       isActive: true,
       isFavorite: false,
       color: metadata?.color,
@@ -62,7 +66,6 @@ export class BranchOperations {
     // Create new node with edited content
     const editedMessage: UIMessage = {
       ...originalNode.message,
-      content: newContent,
       parts: [{ type: 'text', text: newContent }],
     };
 
@@ -79,7 +82,7 @@ export class BranchOperations {
       metadata: {
         createdBy: 'user_edit',
         branchId,
-      },
+      } as BranchMetadata,
     };
 
     // Update parent to point to new node
@@ -98,7 +101,7 @@ export class BranchOperations {
 
     // Update branch metadata
     const branch = this.tree.branches.find((b) => b.id === branchId);
-    if (branch) {
+    if (branch && branch.metadata) {
       branch.leafNodeId = newNodeId;
       branch.name = 'Edited Branch';
       branch.metadata.editedFrom = nodeId;
@@ -217,6 +220,8 @@ export class BranchOperations {
 
     return {
       branches: [branchA, branchB],
+      branchA,
+      branchB,
       differences,
       commonAncestor: commonAncestorId,
       metrics: {
@@ -254,9 +259,11 @@ export class BranchOperations {
       rootNodeId: targetBranch.rootNodeId,
       leafNodeId: '',
       name: `Merge: ${sourceBranch.name} → ${targetBranch.name}`,
+      messageCount: 0,
       createdAt: timestamp,
       updatedAt: timestamp,
       metadata: {
+        createdBy: 'system',
         mergedFrom: [sourceBranchId, targetBranchId],
         mergeStrategy: strategy,
       },
@@ -323,7 +330,7 @@ export class BranchOperations {
     this.updateMetadata();
 
     this.emit({
-      type: 'branches_merged',
+      type: 'branch_merged',
       nodeId: mergeBranch.leafNodeId,
       branchId: newBranchId,
       timestamp,
@@ -341,7 +348,7 @@ export class BranchOperations {
     return this.tree.branches.map((branch) => ({
       id: branch.id,
       name: branch.name,
-      isFavorite: branch.isFavorite,
+      isFavorite: branch.isFavorite ?? false,
     }));
   }
 

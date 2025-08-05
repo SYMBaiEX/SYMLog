@@ -1,4 +1,4 @@
-import type { ToolInvocation } from 'ai';
+// ToolInvocation type is not exported from 'ai' - using local definition
 import type { z } from 'zod';
 
 // Tool streaming state types
@@ -276,7 +276,10 @@ export type ToolStreamingEventMap = {
   'execution-start': { toolName: string; executionId: string; input: any };
   'execution-progress': ToolExecutionProgress;
   'execution-complete': { result: any; metadata: ToolExecutionMetadata };
-  'execution-error': ToolStreamingError;
-  'stream-end': { executionId: string; finalState: ToolStreamingState };
-  'stream-cancel': { executionId: string; reason: string };
+  'error': ToolStreamingError;
+  'end': { executionId: string; finalState: ToolStreamingState };
+  // Additional events for connection state
+  'connection-established': { connectionId: string; timestamp: number };
+  'stream-close': { executionId: string; reason: string };
+  'stream-error': { executionId: string; error: string };
 };

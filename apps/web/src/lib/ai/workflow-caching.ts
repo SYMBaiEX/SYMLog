@@ -750,7 +750,7 @@ export class WorkflowCachingEngine {
   }
 
   private async getChainCacheResult(key: string): Promise<any> {
-    return this.chainCache.get(key) || null;
+    return this.chainCache.get(key) ?? null;
   }
 
   private async cacheStepResult(
@@ -842,12 +842,5 @@ export function clearWorkflowCaches(): void {
   workflowCachingEngine.clearCaches();
 }
 
-// Export types and singleton
-export type {
-  WorkflowStep,
-  WorkflowDefinition,
-  WorkflowContext,
-  WorkflowResult,
-  WorkflowExecutionTrace,
-};
+// Export singleton
 export { workflowCachingEngine };

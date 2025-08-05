@@ -15,7 +15,7 @@ import {
   PauseIcon,
   PlayIcon,
   RefreshCwIcon,
-  StopIcon,
+  StopCircleIcon,
   TableIcon,
   XCircleIcon,
 } from 'lucide-react';
@@ -76,7 +76,7 @@ const STATE_ICONS: Record<
   'tool-progress': LoaderIcon,
   'tool-complete': CheckCircleIcon,
   error: XCircleIcon,
-  cancelled: StopIcon,
+  cancelled: StopCircleIcon,
 };
 
 function formatDuration(ms: number): string {
@@ -416,7 +416,7 @@ export function ToolStreamingDisplay({
 
             {enableCancel && onCancel && isActive && (
               <Button onClick={onCancel} size="sm" variant="outline">
-                <StopIcon className="mr-1 h-4 w-4" />
+                <StopCircleIcon className="mr-1 h-4 w-4" />
                 Cancel
               </Button>
             )}
@@ -427,7 +427,7 @@ export function ToolStreamingDisplay({
       <CardContent className="space-y-4 pt-0">
         {/* Progress Display */}
         {showProgress && (
-          <ProgressDisplay progress={session.progress} state={session.state} />
+          <ProgressDisplay progress={session.progress ?? null} state={session.state} />
         )}
 
         {/* Error Display */}
@@ -559,7 +559,7 @@ export function ToolStreamingCompact({
 
         {onCancel && isActive && (
           <Button onClick={onCancel} size="sm" variant="ghost">
-            <StopIcon className="h-3 w-3" />
+            <StopCircleIcon className="h-3 w-3" />
           </Button>
         )}
 

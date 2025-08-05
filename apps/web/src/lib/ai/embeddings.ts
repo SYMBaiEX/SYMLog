@@ -643,7 +643,7 @@ export async function embed(options: EmbedOptions): Promise<EmbedResult> {
       ...(providerOptions && { providerOptions }),
     });
 
-    return result;
+    return result as EmbedResult;
   } catch (error) {
     console.error('Failed to generate embedding:', error);
     throw new Error(
@@ -744,7 +744,7 @@ export async function embedMany(
       values: sanitizedValues,
       embeddings: allEmbeddings,
       usage: totalUsage,
-      response: batchResults[batchResults.length - 1].response,
+      responses: batchResults.map(result => result.response),
       providerMetadata: batchResults[batchResults.length - 1].providerMetadata,
     };
   }

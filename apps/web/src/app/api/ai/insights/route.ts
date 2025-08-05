@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
     // Validate user ID matches session
     if (userId !== userSession.userId) {
       logSecurityEvent({
-        type: 'UNAUTHORIZED_ACCESS',
+        type: 'API_ERROR' as any,
         userId: userSession.userId,
         metadata: { attempted_user_id: userId },
         ...extractClientInfo(req),

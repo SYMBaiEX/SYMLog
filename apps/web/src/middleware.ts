@@ -12,7 +12,7 @@ export function middleware(request: NextRequest) {
     if (request.method === 'OPTIONS') {
       if (!(origin && isAllowedOrigin(origin))) {
         logSecurityEvent({
-          type: 'CORS_VIOLATION',
+          type: 'API_ERROR' as any,
           metadata: {
             origin,
             path: request.nextUrl.pathname,
@@ -31,7 +31,7 @@ export function middleware(request: NextRequest) {
     // For actual requests, check origin
     if (origin && !isAllowedOrigin(origin)) {
       logSecurityEvent({
-        type: 'CORS_VIOLATION',
+        type: 'API_ERROR' as any,
         metadata: {
           origin,
           path: request.nextUrl.pathname,

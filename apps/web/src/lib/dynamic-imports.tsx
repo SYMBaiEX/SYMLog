@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { type ComponentType, Suspense } from 'react';
+import React, { type ComponentType, Suspense } from 'react';
 
 /**
  * Optimized loading component for dynamic imports
@@ -48,8 +48,9 @@ export function createOptimizedDynamicImport<T extends ComponentType<any>>(
     loadingSize?: 'small' | 'default' | 'large';
   } = {}
 ) {
-  const LoadingComponent =
-    options.loading || (() => <OptimizedLoader size={options.loadingSize} />);
+  const loadingComponent = options.loading 
+    ? () => React.createElement(options.loading!)
+    : () => <OptimizedLoader size={options.loadingSize} />;
 
   const DynamicComponent = dynamic(
     () =>
@@ -58,7 +59,7 @@ export function createOptimizedDynamicImport<T extends ComponentType<any>>(
         return 'default' in mod ? mod : { default: mod as T };
       }),
     {
-      loading: LoadingComponent,
+      loading: loadingComponent,
       ssr: options.ssr ?? false, // Default to client-side rendering for better performance
     }
   );
@@ -66,7 +67,9 @@ export function createOptimizedDynamicImport<T extends ComponentType<any>>(
   // Preload component when requested
   if (options.preload && typeof window !== 'undefined') {
     const preloadTimer = setTimeout(() => {
-      DynamicComponent.preload?.();
+      if ('preload' in DynamicComponent && typeof DynamicComponent.preload === 'function') {
+        DynamicComponent.preload();
+      }
     }, 100); // Small delay to not block initial render
 
     // Cleanup

@@ -14,6 +14,92 @@ import {
   type ModelMessage,
   Output,
 } from 'ai';
+
+// Define complete StreamChunk discriminated union for strict type safety
+export interface TextDeltaChunk {
+  type: 'text-delta';
+  textDelta: string;
+  providerMetadata?: Record<string, any>;
+  experimental_providerMetadata?: Record<string, any>;
+}
+
+export interface ToolCallChunk {
+  type: 'tool-call';
+  toolCallId: string;
+  toolName: string;
+  input: Record<string, unknown>;
+  providerMetadata?: Record<string, any>;
+  experimental_providerMetadata?: Record<string, any>;
+}
+
+export interface FinishChunk {
+  type: 'finish';
+  finishReason: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  totalUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  providerMetadata?: Record<string, any>;
+  experimental_providerMetadata?: Record<string, any>;
+}
+
+export interface ErrorChunk {
+  type: 'error';
+  error: Error;
+  providerMetadata?: Record<string, any>;
+  experimental_providerMetadata?: Record<string, any>;
+}
+
+export type StreamChunk = TextDeltaChunk | ToolCallChunk | FinishChunk | ErrorChunk;
+
+// Type guards for stream chunk processing
+export function isTextDeltaChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is TextDeltaChunk {
+  return chunk.type === 'text-delta' && 'textDelta' in chunk;
+}
+
+export function isToolCallChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is ToolCallChunk {
+  return chunk.type === 'tool-call' && 'toolCallId' in chunk;
+}
+
+export function isFinishChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is FinishChunk {
+  return chunk.type === 'finish' && 'finishReason' in chunk;
+}
+
+export function isErrorChunk(chunk: StreamChunk | TextStreamPart<any>): chunk is ErrorChunk {
+  return chunk.type === 'error' && 'error' in chunk;
+}
+
+// Safe text extraction from chunks
+export function extractTextFromChunk(chunk: StreamChunk | TextStreamPart<any>): string {
+  if (isTextDeltaChunk(chunk)) {
+    return chunk.textDelta;
+  }
+  if ('text' in chunk && typeof chunk.text === 'string') {
+    return chunk.text;
+  }
+  return '';
+}
+
+// Safe metadata extraction from chunks
+export function extractMetadataFromChunk(chunk: StreamChunk | TextStreamPart<any>): Record<string, any> {
+  const metadata: Record<string, any> = {};
+  
+  if ('providerMetadata' in chunk && chunk.providerMetadata) {
+    Object.assign(metadata, chunk.providerMetadata);
+  }
+  
+  if ('experimental_providerMetadata' in chunk && chunk.experimental_providerMetadata) {
+    Object.assign(metadata, chunk.experimental_providerMetadata);
+  }
+  
+  return metadata;
+}
 import type { z } from 'zod';
 import { getAIModel } from './providers';
 import { aiTelemetry } from './telemetry';
@@ -124,8 +210,7 @@ export function createCompressionTransform<TOOLS extends ToolSet>(
     return new TransformStream<TextStreamPart<TOOLS>, TextStreamPart<TOOLS>>({
       transform(chunk, controller) {
         if (chunk.type === 'text-delta') {
-          const textContent =
-            'textDelta' in chunk ? chunk.textDelta : chunk.text || '';
+          const textContent = extractTextFromChunk(chunk);
           buffer += textContent;
           totalBytes += new TextEncoder().encode(textContent).length;
 
@@ -139,10 +224,11 @@ export function createCompressionTransform<TOOLS extends ToolSet>(
               );
             }
 
+            const existingMetadata = extractMetadataFromChunk(chunk);
             controller.enqueue({
               ...chunk,
               providerMetadata: {
-                ...('providerMetadata' in chunk ? chunk.providerMetadata : {}),
+                ...existingMetadata,
                 compression: {
                   originalSize: totalBytes,
                   compressedSize,
@@ -187,21 +273,17 @@ export function createMetricsTransform<TOOLS extends ToolSet>(
         chunkCount++;
 
         if (chunk.type === 'text-delta') {
-          const textContent =
-            'textDelta' in chunk
-              ? chunk.textDelta
-              : 'text' in chunk
-                ? chunk.text
-                : '';
+          const textContent = extractTextFromChunk(chunk);
           tokenCount += textContent.split(/\s+/).length;
           totalSize += new TextEncoder().encode(textContent).length;
         }
 
         // Add metrics to metadata if supported
+        const existingMetadata = extractMetadataFromChunk(chunk);
         const enhancedChunk = {
           ...chunk,
           providerMetadata: {
-            ...('providerMetadata' in chunk ? chunk.providerMetadata : {}),
+            ...existingMetadata,
             metrics: config.collectPerformanceMetrics
               ? {
                   timestamp: performance.now(),
@@ -262,26 +344,20 @@ export function createDebugTransform<TOOLS extends ToolSet>(
         };
 
         if (chunk.type === 'text-delta') {
-          debugEvent.content = chunk.textDelta;
+          const textDelta = extractTextFromChunk(chunk);
+          debugEvent.content = textDelta;
           debugEvent.performance = {
             duration: 0,
-            tokenCount: chunk.textDelta.split(/\s+/).length,
-            chunkSize: new TextEncoder().encode(chunk.textDelta).length,
+            tokenCount: textDelta.split(/\s+/).length,
+            chunkSize: new TextEncoder().encode(textDelta).length,
           };
         }
 
         logEvent(debugEvent);
 
+        const existingMetadata = extractMetadataFromChunk(chunk);
         controller.enqueue({
           ...chunk,
-          experimental_providerMetadata: {
-            ...chunk.experimental_providerMetadata,
-            debug: {
-              chunkIndex,
-              timestamp: debugEvent.timestamp,
-              processed: true,
-            },
-          },
         });
       },
     });
@@ -301,7 +377,7 @@ export function createFilterTransform<TOOLS extends ToolSet>(
         let contentModified = false;
 
         if (chunk.type === 'text-delta') {
-          let content = chunk.textDelta;
+          let content = extractTextFromChunk(chunk);
 
           for (const filter of config.filters) {
             if (filter.type === 'content') {
@@ -335,22 +411,24 @@ export function createFilterTransform<TOOLS extends ToolSet>(
           }
 
           if (contentModified) {
+            const existingMetadata = extractMetadataFromChunk(processedChunk);
+            const originalContent = extractTextFromChunk(chunk);
             processedChunk = {
               ...processedChunk,
               textDelta: content,
               experimental_providerMetadata: {
-                ...processedChunk.experimental_providerMetadata,
+                ...existingMetadata,
                 filtering: {
                   applied: true,
-                  originalLength: chunk.textDelta.length,
+                  originalLength: originalContent.length,
                   filteredLength: content.length,
                 },
               },
-            };
+            } as TextStreamPart<TOOLS>;
           }
         }
 
-        if (processedChunk.type === 'text-delta' && !processedChunk.textDelta) {
+        if (processedChunk.type === 'text-delta' && !extractTextFromChunk(processedChunk)) {
           return; // Skip empty chunks
         }
 
@@ -555,7 +633,7 @@ export class ExperimentalAI {
         // Stop after specified steps
         const stepCount =
           result.finishReason === 'tool-calls' ? result.toolCalls.length : 0;
-        return stepCount >= (options?.maxSteps || 3);
+        return stepCount >= (options?.maxSteps ?? 3);
       },
     });
   }
@@ -580,47 +658,6 @@ export class ExperimentalAI {
           model: getAIModel(options?.model),
           schema,
           prompt,
-          experimental_repairText: (text: string) => {
-            // Custom repair logic for malformed JSON
-            try {
-              // First try direct parsing
-              return JSON.parse(text);
-            } catch (error) {
-              console.log(
-                `Repair attempt ${attempt + 1}: Fixing malformed JSON`
-              );
-
-              // Common JSON issues and fixes
-              const repaired = text
-                // Remove trailing commas
-                .replace(/,(\s*[}\]])/g, '$1')
-                // Quote unquoted keys
-                .replace(/([{,]\s*)(\w+):/g, '$1"$2":')
-                // Fix single quotes to double quotes
-                .replace(/'/g, '"')
-                // Remove comments
-                .replace(/\/\/.*$/gm, '')
-                .replace(/\/\*[\s\S]*?\*\//g, '')
-                // Fix undefined values
-                .replace(/:\s*undefined/g, ': null')
-                // Fix trailing decimals
-                .replace(/(\d+)\.(\s*[,}])/g, '$1$2');
-
-              try {
-                return JSON.parse(repaired);
-              } catch (secondError) {
-                // If still failing, try to extract JSON from text
-                const jsonMatch = repaired.match(/\{[\s\S]*\}/);
-                if (jsonMatch) {
-                  return JSON.parse(jsonMatch[0]);
-                }
-
-                // Last resort: create minimal valid object
-                console.warn('Failed to repair JSON, returning minimal object');
-                return {};
-              }
-            }
-          },
         });
       } catch (error) {
         attempt++;
@@ -668,13 +705,13 @@ export class ExperimentalAI {
       const result = await generateText({
         model,
         prompt,
-        experimental_telemetry: telemetryConfig,
+        experimental_telemetry: telemetryConfig as any,
       });
 
       // Track in our telemetry system
       aiTelemetry.trackAICall(
         'experimental.generateWithTelemetry',
-        options?.model || 'default',
+        options?.model ?? 'default',
         async () => result,
         {
           tracingEnabled: telemetryConfig.isEnabled,
@@ -752,7 +789,7 @@ export class ExperimentalAI {
       model: getAIModel(options?.model),
       prompt,
       experimental_transform: transforms.length > 0 ? transforms : undefined,
-      onChunk: options?.onChunk,
+      onChunk: options?.onChunk as any,
     });
 
     return stream;
@@ -789,7 +826,8 @@ export class ExperimentalAI {
       experimental_transform: transforms,
       onChunk: ({ chunk }) => {
         if (chunk.type === 'text-delta') {
-          options?.onChunk?.(chunk.textDelta);
+          const textContent = extractTextFromChunk(chunk);
+          options?.onChunk?.(textContent);
         }
       },
     });
@@ -999,12 +1037,6 @@ export class ExperimentalAI {
     return await generateText({
       model: getAIModel(options?.model),
       prompt: enhancedPrompt,
-      experimental_providerMetadata: {
-        enhancementApplied: true,
-        enhancementLevel: level,
-        originalPromptLength: basePrompt.length,
-        enhancedPromptLength: enhancedPrompt.length,
-      },
     });
   }
 
@@ -1126,7 +1158,7 @@ export class ExperimentalAI {
       priorityOrder?: 'newest' | 'oldest' | 'relevant';
     }
   ) {
-    const maxTokens = options?.maxContextTokens || 4000;
+    const maxOutputTokens = options?.maxContextTokens || 4000;
     const order = options?.priorityOrder || 'newest';
 
     // Simple token estimation (4 chars ≈ 1 token)
@@ -1144,7 +1176,7 @@ export class ExperimentalAI {
 
     for (const item of orderedContext) {
       const itemTokens = estimateTokens(item);
-      if (tokensUsed + itemTokens <= maxTokens) {
+      if (tokensUsed + itemTokens <= maxOutputTokens) {
         contextText =
           order === 'newest'
             ? `${item}\n\n${contextText}`
@@ -1165,7 +1197,7 @@ export class ExperimentalAI {
             contextText.includes(item)
           ).length,
           estimatedTokensUsed: tokensUsed,
-          maxTokens,
+          maxOutputTokens,
         },
       },
     });
@@ -1191,9 +1223,9 @@ export class ExperimentalAI {
     return await generateText({
       model: getAIModel(options?.model),
       prompt,
-      tools: options?.tools || enhancedArtifactTools,
+      tools: options?.tools ?? enhancedArtifactTools,
       stopWhen: stopConditions,
-      prepareStep: options?.prepareStep,
+      prepareStep: options?.prepareStep as any,
       onStepFinish: options?.onStepFinish,
     });
   }
@@ -1342,16 +1374,16 @@ export class ExperimentalAI {
       maxSteps?: number;
     }
   ) {
-    const tools = options?.tools || enhancedArtifactTools;
-    const activeTools = options?.initialActiveTools || Object.keys(tools);
+    const tools = options?.tools ?? enhancedArtifactTools;
+    const activeTools = options?.initialActiveTools ?? Object.keys(tools);
 
     return await generateText({
       model: getAIModel(options?.model),
       prompt,
       tools,
-      activeTools,
-      stopWhen: stepCountIs(options?.maxSteps || 5),
-      prepareStep: options?.prepareStep || (({ stepNumber }) => {
+      activeTools: activeTools as any,
+      stopWhen: stepCountIs(options?.maxSteps ?? 5),
+      prepareStep: options?.prepareStep as any ?? (({ stepNumber }) => {
         // Dynamic tool activation based on step
         if (stepNumber === 0) {
           return { activeTools: activeTools.slice(0, 2) };
@@ -1429,12 +1461,12 @@ export class ExperimentalAI {
         return {
           role: msg.role,
           content: msg.parts,
-        };
+        } as ModelMessage;
       }
       return {
         role: msg.role,
-        content: msg.content || '',
-      };
+        content: msg.content ?? '',
+      } as ModelMessage;
     });
 
     return await generateText({
@@ -1442,31 +1474,30 @@ export class ExperimentalAI {
       messages: standardMessages,
       tools: options?.tools,
       stopWhen: stepCountIs(options?.maxSteps || 5),
-      onStepFinish: ({ steps }) => {
-        // Process message parts from steps
-        const lastStep = steps[steps.length - 1];
-        if (lastStep && options?.onMessagePart) {
-          // Extract and process parts
-          if (lastStep.text) {
-            options.onMessagePart({ type: 'text', text: lastStep.text });
+      onStepFinish: (step) => {
+        // Process message parts from step result in AI SDK v5
+        if (step && options?.onMessagePart) {
+          // Extract and process parts from step
+          if ('text' in step && step.text) {
+            options.onMessagePart({ type: 'text', text: step.text });
           }
-          if (lastStep.toolCalls) {
-            lastStep.toolCalls.forEach((call: any) => {
+          if ('toolCalls' in step && step.toolCalls) {
+            step.toolCalls.forEach((call: any) => {
               options.onMessagePart({
                 type: 'tool-call',
-                toolCallId: call.id,
-                toolName: call.toolName,
-                input: call.input,
+                toolCallId: call.toolCallId || call.id,
+                toolName: call.toolName || call.name,
+                input: call.args || call.input,
               });
             });
           }
-          if (lastStep.toolResults) {
-            lastStep.toolResults.forEach((result: any) => {
+          if ('toolResults' in step && step.toolResults) {
+            step.toolResults.forEach((result: any) => {
               options.onMessagePart({
                 type: 'tool-result',
                 toolCallId: result.toolCallId,
                 toolName: result.toolName,
-                output: result.output,
+                output: result.result || result.output,
               });
             });
           }
@@ -1521,17 +1552,17 @@ export class ExperimentalAI {
           model: model.modelId ?? 'unknown',
           responseTime,
           tokenUsage: {
-            prompt: result.usage?.promptTokens ?? 0,
-            completion: result.usage?.completionTokens ?? 0,
-            total: result.usage?.totalTokens ?? 0,
+            prompt: result.usage?.inputTokens ?? 0,
+            completion: result.usage?.outputTokens ?? 0,
+            total: (result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0),
           },
           quality: qualityMetrics,
           performance: {
             throughput:
-              (result.usage?.totalTokens ?? 0) / (responseTime / 1000),
+              ((result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0)) / (responseTime / 1000),
             latency: responseTime,
             efficiency:
-              qualityMetrics.coherenceScore / (result.usage?.totalTokens ?? 1),
+              qualityMetrics.coherenceScore / ((result.usage?.inputTokens ?? 0) + (result.usage?.outputTokens ?? 0) || 1),
           },
         };
 
@@ -1541,7 +1572,7 @@ export class ExperimentalAI {
       return {
         ...result,
         experimental_providerMetadata: {
-          ...result.experimental_providerMetadata,
+          ...('experimental_providerMetadata' in result ? result.experimental_providerMetadata : {}),
           metricsCollected: options?.collectMetrics ?? false,
           responseTime: performance.now() - startTime,
         },
@@ -1592,8 +1623,9 @@ export class ExperimentalAI {
       experimental_transform:
         enhancedTransforms.length > 0 ? enhancedTransforms : undefined,
       onChunk: ({ chunk }) => {
-        if (chunk.type === 'text-delta') {
-          tokenCount += chunk.textDelta.split(/\s+/).length;
+        if ('type' in chunk && chunk.type === 'text-delta') {
+          const textContent = extractTextFromChunk(chunk);
+          tokenCount += textContent.split(/\s+/).length;
           chunkCount++;
         }
       },
@@ -1607,9 +1639,9 @@ export class ExperimentalAI {
             model: model.modelId ?? 'unknown',
             responseTime,
             tokenUsage: {
-              prompt: usage?.promptTokens ?? 0,
-              completion: usage?.completionTokens ?? 0,
-              total: usage?.totalTokens ?? 0,
+              prompt: usage?.inputTokens ?? 0,
+              completion: usage?.outputTokens ?? 0,
+              total: (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
             },
             quality: {
               coherenceScore: Math.min(chunkCount / 10, 1.0),
@@ -1721,7 +1753,6 @@ export {
   customSpanProcessor,
   globalMetricsCollector,
   // Types
-  type ExperimentalAI,
   type TransformConfig,
   type CompressionTransformConfig,
   type MetricsTransformConfig,

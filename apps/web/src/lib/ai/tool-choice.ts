@@ -1,4 +1,14 @@
-import type { CoreTool, ToolChoice } from 'ai';
+import type { ToolChoice } from 'ai';
+
+// Define CoreTool locally since it's not exported from 'ai'
+interface CoreTool {
+  type: 'function';
+  function: {
+    name: string;
+    description?: string;
+    parameters: object;
+  };
+}
 import { z } from 'zod';
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { standardErrorHandler, type ToolError } from './error-handler';
@@ -6,11 +16,11 @@ import { enhancedArtifactTools } from './tools/enhanced-tools';
 
 // Create a logger wrapper
 const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
+  info: (message: string, data?: unknown) => console.log(`[INFO] ${message}`, data),
+  warn: (message: string, data?: unknown) =>
     console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
+  error: (message: string, data?: unknown) => logErrorToConsole(message, data),
+  debug: (message: string, data?: unknown) =>
     console.debug(`[DEBUG] ${message}`, data),
 };
 
@@ -399,7 +409,7 @@ export class ToolChoiceEnforcer {
   /**
    * Get tool performance metrics
    */
-  getToolMetrics(toolName?: string): Map<string, any> | any {
+  getToolMetrics(toolName?: string): Map<string, unknown> | unknown {
     if (toolName) {
       return this.toolMetrics.get(toolName);
     }
@@ -589,7 +599,7 @@ export function recommendToolForContent(
  */
 export function selectOptimalTool(
   userMessage: string,
-  previousContext?: any[]
+  previousContext?: unknown[]
 ): string {
   const outputType = inferOutputType(userMessage);
   return toolChoiceEnforcer.selectToolForOutput(outputType, userMessage);

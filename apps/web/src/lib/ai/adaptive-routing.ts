@@ -17,11 +17,11 @@ import {
 
 // Logger wrapper
 const loggingService = {
-  info: (message: string, data?: any) => console.log(`[INFO] ${message}`, data),
-  warn: (message: string, data?: any) =>
+  info: (message: string, data?: unknown) => console.log(`[INFO] ${message}`, data),
+  warn: (message: string, data?: unknown) =>
     console.warn(`[WARN] ${message}`, data),
-  error: (message: string, data?: any) => logErrorToConsole(message, data),
-  debug: (message: string, data?: any) =>
+  error: (message: string, data?: unknown) => logErrorToConsole(message, data),
+  debug: (message: string, data?: unknown) =>
     console.debug(`[DEBUG] ${message}`, data),
 };
 
@@ -41,7 +41,7 @@ export interface RouteConfig {
 // Routing context extends request context with routing-specific data
 export interface RoutingContext extends RequestContext {
   routeId?: string;
-  originalRequest?: any;
+  originalRequest?: Record<string, unknown>;
   retryCount?: number;
   previousProviders?: string[];
   circuitBreakerState?: CircuitBreakerState;
@@ -70,7 +70,7 @@ export interface RoutingDecision {
       | 'fallback';
     reason: string;
     confidence: number;
-    metadata: Record<string, any>;
+    metadata: Record<string, unknown>;
   };
 }
 
@@ -142,7 +142,7 @@ export class AdaptiveRoutingSystem {
   /**
    * Main routing decision method
    */
-  async route(request: any, context: RoutingContext): Promise<RoutingDecision> {
+  async route(request: Record<string, unknown>, context: RoutingContext): Promise<RoutingDecision> {
     const startTime = Date.now();
 
     try {
@@ -515,7 +515,7 @@ export class AdaptiveRoutingSystem {
       );
 
       // Fallback to load balancing
-      const selection = this.loadBalancer.selectProvider(providers, context);
+      const selection = await this.loadBalancer.selectProvider(providers, context);
 
       return {
         selectedProvider: selection.providerId,
@@ -762,7 +762,7 @@ export class AdaptiveRoutingSystem {
         routeId: 'completion',
         pattern: 'completion',
         providers: ['openai', 'anthropic'],
-        defaultStrategy: 'performance-first',
+        defaultStrategy: 'least-latency',
         timeout: 20_000,
         retryAttempts: 1,
         circuitBreakerThreshold: 3,

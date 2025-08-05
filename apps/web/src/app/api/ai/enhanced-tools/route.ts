@@ -66,6 +66,8 @@ interface WorkflowExecutionResponse {
  * POST /api/ai/enhanced-tools - Execute a single enhanced tool
  */
 export async function POST(request: NextRequest): Promise<NextResponse> {
+  let toolName: string | undefined;
+  
   try {
     const body = await request.json();
     const validation = executeToolRequestSchema.safeParse(body);
@@ -74,13 +76,14 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid request: ${validation.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          error: `Invalid request: ${validation.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         },
         { status: 400 }
       );
     }
 
-    const { toolName, parameters, options = {} } = validation.data;
+    const { toolName: tool, parameters, options = {} } = validation.data;
+    toolName = tool;
 
     // Check if tool exists
     if (!(toolName in enhancedArtifactTools)) {
@@ -136,9 +139,11 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
  * DELETE /api/ai/enhanced-tools - Cancel tool execution
  */
 export async function DELETE(request: NextRequest): Promise<NextResponse> {
+  let executionId: string | null = null;
+  
   try {
     const { searchParams } = new URL(request.url);
-    const executionId = searchParams.get('executionId');
+    executionId = searchParams.get('executionId');
 
     if (!executionId) {
       return NextResponse.json(

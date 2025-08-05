@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from 'convex/react';
+import type { Id } from '../../../convex/_generated/dataModel';
 import {
   Brain,
   Calendar,
@@ -53,15 +54,15 @@ export function AgentMemoryTimeline({
   };
 
   // Fetch memory data
-  const agent = useQuery(api.agents.getAgentById, { userId, agentId });
+  const agent = useQuery(api.agents.getAgentById, { userId, agentId: agentId as Id<'agents'> });
   const memories = useQuery(api.agents.getAgentMemoryTimeline, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
     ...getTimeRange(),
   });
   const stats = useQuery(api.agents.getAgentKnowledgeStats, {
     userId,
-    agentId,
+    agentId: agentId as Id<'agents'>,
   });
 
   // Filter memories by type

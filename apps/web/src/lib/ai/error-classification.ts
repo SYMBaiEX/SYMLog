@@ -5,8 +5,14 @@ import {
   NoObjectGeneratedError,
   NoSuchModelError,
   NoSuchToolError,
-  ToolExecutionError,
 } from 'ai';
+
+// Define ToolExecutionError locally since it's not exported from 'ai'
+class ToolExecutionError extends Error {
+  static isInstance(error: unknown): error is ToolExecutionError {
+    return error instanceof ToolExecutionError;
+  }
+}
 import { logError as logErrorToConsole } from '@/lib/logger';
 import { ErrorCategory, ErrorSeverity } from './advanced-error-handling';
 
@@ -575,7 +581,7 @@ export class ErrorClassifier {
 
     if (APICallError.isInstance(error)) {
       metadata.statusCode = error.statusCode;
-      metadata.statusText = error.statusText;
+      metadata.statusText = (error as any).statusText;
       metadata.url = error.url;
       metadata.isRetryable = error.isRetryable;
     }

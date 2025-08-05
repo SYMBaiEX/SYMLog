@@ -204,7 +204,7 @@ export class MessageManager {
         role: message.role,
         content: message.parts.map((part) => this.convertPartToContent(part)),
       };
-    });
+    }) as ModelMessage[];
   }
 
   /**

@@ -338,7 +338,7 @@ export function useWorkflow(options: WorkflowOptions = {}) {
           "toolName": "optional - for tool steps",
           "toolParams": {} // optional - for tool steps
         }`,
-          maxTokens: 1000,
+          // maxTokens: 1000, // Remove unsupported option
         });
 
         const steps = JSON.parse(result.text) as WorkflowStep[];

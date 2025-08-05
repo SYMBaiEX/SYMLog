@@ -1,7 +1,7 @@
 'use client';
 
 import { useCompletion as useBaseCompletion } from '@ai-sdk/react';
-import type { StreamTextTransform, Tool, ToolSet } from 'ai';
+import type { Tool } from 'ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import {
@@ -40,8 +40,8 @@ export interface UseCompletionOptions<
   enableIntelligentStepping?: boolean;
   stepAnalysisDebug?: boolean;
 
-  // Experimental transform features
-  experimental_transform?: StreamTextTransform<TOOLS>[];
+  // Note: experimental_transform is not supported in AI SDK v5
+  // experimental_transform?: StreamTextTransform<TOOLS>[];
   transformPreset?: 'performance' | 'development' | 'production' | 'smooth';
   collectProviderMetrics?: boolean;
   onProviderMetrics?: (metrics: ProviderMetricsData) => void;
@@ -131,9 +131,9 @@ export function useCompletion<
   const [isPaused, setIsPaused] = useState(false);
 
   // Performance tracking
-  const startTimeRef = useRef<number>();
+  const startTimeRef = useRef<number>(0);
   const tokenCountRef = useRef<number>(0);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const lastPromptRef = useRef<string>('');
 
   // PrepareStep integration for multi-step completions
@@ -145,7 +145,7 @@ export function useCompletion<
 
   const prepareStepFunction =
     customPrepareStep ??
-    (enableIntelligentStepping ? prepareStepHook.configs.precise : undefined);
+    (enableIntelligentStepping ? (prepareStepHook.configs as any).precise : undefined);
 
   // Base completion hook with enhanced error handling
   const {
@@ -159,21 +159,11 @@ export function useCompletion<
     setCompletion,
     stop: baseStop,
     complete: baseComplete,
-    data,
   } = useBaseCompletion({
     ...baseOptions,
-    experimental_throttle,
-    prepareStep: prepareStepFunction,
-    onResponse: async (response) => {
-      setStatus('loading');
-      startTimeRef.current = Date.now();
-
-      try {
-        await onResponse?.(response);
-      } catch (error) {
-        console.error('onResponse error:', error);
-      }
-    },
+    // Note: experimental_throttle is not supported in AI SDK v5
+    // experimental_throttle,
+    // onResponse callback not supported by useCompletion in v5
     onFinish: (prompt, completion) => {
       const endTime = Date.now();
       const responseTime = startTimeRef.current
@@ -332,7 +322,7 @@ export function useCompletion<
         return;
       }
 
-      baseHandleInputChange(event);
+      baseHandleInputChange(event as any);
     },
     [baseHandleInputChange]
   );
@@ -352,7 +342,7 @@ export function useCompletion<
     isLoading,
     error: baseError,
     input,
-    data: data ?? [],
+    data: [],
     status,
     retryCount,
     canRetry: retryCount < maxRetries,

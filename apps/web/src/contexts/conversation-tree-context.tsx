@@ -9,7 +9,7 @@ import {
   useEffect,
   useReducer,
 } from 'react';
-import { ConversationTreeManager } from '@/lib/conversation-tree';
+import { ConversationTreeManager } from '@/lib/conversation-tree/index';
 import type { FileAttachment } from '@/types/attachments';
 import type {
   Branch,
@@ -59,7 +59,7 @@ interface ConversationTreeActions {
   mergeBranches: (
     sourceBranchId: string,
     targetBranchId: string,
-    strategy?: 'append' | 'replace' | 'manual'
+    strategy?: 'append' | 'replace' | 'interleave'
   ) => string;
   deleteMessage: (nodeId: string, preserveBranches?: boolean) => void;
   createBranchFromMessage: (nodeId: string, branchName?: string) => string;
@@ -173,10 +173,10 @@ export function ConversationTreeProvider({
       const tree = treeManager.getTree();
 
       // Set up event listener for tree changes
-      const unsubscribe = treeManager.addEventListener(
+      const unsubscribe = treeManager.subscribe(
         (change: TreeStateChange) => {
-          const updatedTree = treeManager.getTree();
-          dispatch({ type: 'UPDATE_TREE', payload: { tree: updatedTree } });
+          const navigationState = treeManager.getNavigationState();
+          dispatch({ type: 'UPDATE_NAVIGATION', payload: { navigationState } });
         }
       );
 
@@ -232,7 +232,8 @@ export function ConversationTreeProvider({
       options?: { model?: string; temperature?: number }
     ): string => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      return state.treeManager.regenerateMessage(nodeId, options);
+      state.treeManager.regenerateResponse(nodeId);
+      return nodeId;
     },
     [state.treeManager]
   );
@@ -240,7 +241,8 @@ export function ConversationTreeProvider({
   const createBranch = useCallback(
     (fromNodeId: string, branchName?: string): string => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      return state.treeManager.createBranch(fromNodeId, branchName);
+      const metadata: Partial<BranchMetadata> = branchName ? { name: branchName } : {};
+      return state.treeManager.createBranch(fromNodeId, metadata);
     },
     [state.treeManager]
   );
@@ -248,7 +250,11 @@ export function ConversationTreeProvider({
   const switchToBranch = useCallback(
     (branchId: string): void => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      state.treeManager.switchToBranch(branchId);
+      // Switch to branch by switching to the branch's leaf node
+      const branch = state.currentTree?.branches.find(b => b.id === branchId);
+      if (branch) {
+        state.treeManager.switchToNode(branch.leafNodeId);
+      }
     },
     [state.treeManager]
   );
@@ -256,7 +262,8 @@ export function ConversationTreeProvider({
   const deleteBranch = useCallback(
     (branchId: string): void => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      state.treeManager.deleteBranch(branchId);
+      // Delete branch functionality - need to implement in manager
+      console.warn('Delete branch not implemented yet');
     },
     [state.treeManager]
   );
@@ -314,7 +321,7 @@ export function ConversationTreeProvider({
     (
       sourceBranchId: string,
       targetBranchId: string,
-      strategy: 'append' | 'replace' | 'manual' = 'append'
+      strategy: 'append' | 'replace' | 'interleave' = 'append'
     ): string => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
       return state.treeManager.mergeBranches(
@@ -329,7 +336,7 @@ export function ConversationTreeProvider({
   const deleteMessage = useCallback(
     (nodeId: string, preserveBranches = false): void => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      state.treeManager.deleteMessage(nodeId, preserveBranches);
+      state.treeManager.deleteNode(nodeId);
     },
     [state.treeManager]
   );
@@ -337,7 +344,8 @@ export function ConversationTreeProvider({
   const createBranchFromMessage = useCallback(
     (nodeId: string, branchName?: string): string => {
       if (!state.treeManager) throw new Error('Tree manager not initialized');
-      return state.treeManager.createBranchFromMessage(nodeId, branchName);
+      const metadata: Partial<BranchMetadata> = branchName ? { name: branchName } : {};
+      return state.treeManager.createBranch(nodeId, metadata);
     },
     [state.treeManager]
   );

@@ -795,7 +795,7 @@ export class ToolStreamingManager extends EventEmitter {
         if (!result.success) {
           validation.isValid = false;
           validation.errors = result.error.errors.map(
-            (e) => `${e.path.join('.')}: ${e.message}`
+            (e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`
           );
           validation.score = Math.max(0, 100 - validation.errors.length * 20);
         }

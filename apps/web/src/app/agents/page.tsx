@@ -62,7 +62,7 @@ export default function AgentsPage() {
       {/* Agent Dashboard Component */}
       <AgentDashboard
         className="mx-auto max-w-7xl"
-        userId={auth.user?.id || auth.user?.userId || 'anonymous'}
+        userId={auth.user?.id || 'anonymous'}
       />
     </div>
   );

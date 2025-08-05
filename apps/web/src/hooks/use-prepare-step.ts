@@ -19,12 +19,12 @@ export interface StepResult<
   toolCalls?: Array<{
     toolCallId: string;
     toolName: keyof TOOLS;
-    args: any;
+    args: Record<string, unknown>;
   }>;
   toolResults?: Array<{
     toolCallId: string;
     toolName: keyof TOOLS;
-    result: any;
+    result: unknown;
   }>;
   finishReason?:
     | 'stop'
@@ -43,7 +43,7 @@ export interface StepResult<
     type: 'unsupported-setting' | 'tool-call-unsupported' | 'other';
     message: string;
   }>;
-  experimental_providerMetadata?: Record<string, any>;
+  experimental_providerMetadata?: Record<string, unknown>;
 }
 
 export interface PrepareStepResult<
@@ -94,7 +94,7 @@ export interface UsePrepareStepOptions<
 }
 
 // Predefined model configurations for different use cases
-export interface ModelConfig {
+export interface PrepareStepModelConfig {
   model: LanguageModel;
   temperature: number;
   maxTokens: number;
@@ -339,7 +339,7 @@ export function usePrepareStep<
       customConfig?: Partial<PrepareStepResult<T>>
     ): PrepareStepFunction<T> => {
       return ({ steps, stepNumber, model, messages }) => {
-        const complexity = analyzeStepComplexity(messages, stepNumber, steps);
+        const complexity = analyzeStepComplexity(messages, stepNumber, steps as StepResult<TOOLS>[]);
         const selectedConfig = selectModelConfig(complexity);
         const compressedMessages = compressMessages(messages, maxContextWindow);
         const activeTools = selectActiveTools(
@@ -373,7 +373,7 @@ export function usePrepareStep<
           toolChoice:
             customConfig?.toolChoice ??
             (complexity.hasToolInteraction && stepNumber > 0
-              ? { type: 'auto' }
+              ? 'auto'
               : undefined),
 
           // Message and context management
@@ -515,10 +515,5 @@ export function usePrepareStep<
 
 // Export types for external use
 export type {
-  PrepareStepOptions,
-  PrepareStepResult,
-  PrepareStepFunction,
-  StepResult,
-  UsePrepareStepOptions,
-  ModelConfig,
+  PrepareStepModelConfig as ModelConfig,
 };

@@ -24,7 +24,7 @@ export interface AgentConfig {
   /** Temperature for generation */
   temperature?: number;
   /** Maximum tokens per response */
-  maxTokens?: number;
+  maxOutputTokens?: number;
   /** Agent name for logging */
   name?: string;
 }
@@ -72,7 +72,7 @@ export class SYMLogAgent {
       tools: config.tools || artifactTools,
       maxSteps: config.maxSteps || DEFAULT_MAX_STEPS,
       temperature: config.temperature || DEFAULT_TEMPERATURE,
-      maxTokens: config.maxTokens || DEFAULT_MAX_TOKENS,
+      maxOutputTokens: config.maxOutputTokens || DEFAULT_MAX_TOKENS,
       name: config.name || 'SYMLogAgent',
     };
   }
@@ -93,10 +93,9 @@ export class SYMLogAgent {
         prompt: this.sanitizePrompt(currentInput),
         tools: this.config.tools,
         temperature: this.config.temperature,
-        maxTokens: this.config.maxTokens,
+        maxOutputTokens: this.config.maxOutputTokens,
         onStepFinish: ({
-          step,
-          stepType,
+          text,
           toolCalls,
           toolResults,
           finishReason,
@@ -104,16 +103,16 @@ export class SYMLogAgent {
           this.currentStep++;
 
           // Update current input for next step tracking
-          const stepInput = step?.text || currentInput;
+          const stepInput = text || currentInput;
 
           const agentStep: AgentStep = {
             stepNumber: this.currentStep,
-            stepType: stepType || 'text',
+            stepType: 'text',
             input: stepInput,
-            output: step?.text || '',
+            output: text || '',
             toolCalls,
             toolResults,
-            reasoning: step?.reasoning,
+            reasoning: undefined,
             timestamp: new Date(),
           };
 
@@ -124,18 +123,19 @@ export class SYMLogAgent {
             currentInput = stepInput;
           }
 
-          // Check if we should stop
+          // Check if we should stop - just track state, don't return
           if (this.currentStep >= this.config.maxSteps) {
-            return { stop: true };
+            // Stop will be handled by maxSteps config
+            return;
           }
 
-          // Check if we have a completion condition or step is null
+          // Check completion conditions
           if (
-            !step ||
             finishReason === 'stop' ||
             this.isWorkflowComplete(agentStep)
           ) {
-            return { stop: true };
+            // Stop will be handled by finish reason
+            return;
           }
         },
       });
@@ -146,9 +146,9 @@ export class SYMLogAgent {
         totalSteps: this.currentStep,
         finishReason: result.finishReason,
         usage: {
-          promptTokens: result.usage?.promptTokens || 0,
-          completionTokens: result.usage?.completionTokens || 0,
-          totalTokens: result.usage?.totalTokens || 0,
+          promptTokens: (result.usage as any)?.promptTokens || 0,
+          completionTokens: (result.usage as any)?.completionTokens || 0,
+          totalTokens: (result.usage as any)?.totalTokens || 0,
         },
         success: true,
       };
@@ -190,10 +190,9 @@ export class SYMLogAgent {
       prompt: this.sanitizePrompt(currentInput),
       tools: this.config.tools,
       temperature: this.config.temperature,
-      maxTokens: this.config.maxTokens,
+      maxOutputTokens: this.config.maxOutputTokens,
       onStepFinish: ({
-        step,
-        stepType,
+        text,
         toolCalls,
         toolResults,
         finishReason,
@@ -201,16 +200,16 @@ export class SYMLogAgent {
         this.currentStep++;
 
         // Update current input for step tracking
-        const stepInput = step?.text || currentInput;
+        const stepInput = text || currentInput;
 
         const agentStep: AgentStep = {
           stepNumber: this.currentStep,
-          stepType: stepType || 'text',
+          stepType: 'text',
           input: stepInput,
-          output: step?.text || '',
+          output: text || '',
           toolCalls,
           toolResults,
-          reasoning: step?.reasoning,
+          reasoning: undefined,
           timestamp: new Date(),
         };
 
@@ -221,17 +220,18 @@ export class SYMLogAgent {
           currentInput = stepInput;
         }
 
-        // Check stop conditions
+        // Check stop conditions - just track state for streaming
         if (this.currentStep >= this.config.maxSteps) {
-          return { stop: true };
+          // Stop will be handled by maxSteps config
+          return;
         }
 
         if (
-          !step ||
           finishReason === 'stop' ||
           this.isWorkflowComplete(agentStep)
         ) {
-          return { stop: true };
+          // Stop will be handled by finish reason
+          return;
         }
       },
     });
@@ -273,7 +273,7 @@ export class SYMLogAgent {
         result.type === 'complete' ||
         result.status === 'completed' ||
         result.done === true
-    );
+    ) ?? false;
   }
 
   /**

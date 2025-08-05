@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from 'convex/react';
+import type { Id } from '../../../convex/_generated/dataModel';
 import {
   Activity,
   BarChart3,
@@ -35,18 +36,18 @@ type DashboardView =
   | 'conversations';
 
 export function AgentDashboard({ userId, className }: AgentDashboardProps) {
-  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
+  const [selectedAgentId, setSelectedAgentId] = useState<Id<'agents'> | ''>('');
   const [currentView, setCurrentView] = useState<DashboardView>('overview');
 
   // Fetch user's agents
   const agents = useQuery(api.agents.getActiveAgents, { userId });
   const selectedAgent = useQuery(
     api.agents.getAgentById,
-    selectedAgentId ? { userId, agentId: selectedAgentId } : undefined
+    selectedAgentId ? { userId, agentId: selectedAgentId } : 'skip'
   );
   const stats = useQuery(
     api.agents.getAgentKnowledgeStats,
-    selectedAgentId ? { userId, agentId: selectedAgentId } : undefined
+    selectedAgentId ? { userId, agentId: selectedAgentId } : 'skip'
   );
 
   const viewOptions = [
@@ -73,7 +74,7 @@ export function AgentDashboard({ userId, className }: AgentDashboardProps) {
 
   // Auto-select first agent if none selected
   if (agents.length > 0 && !selectedAgentId) {
-    setSelectedAgentId(agents[0]._id);
+    setSelectedAgentId(agents[0]._id as Id<'agents'>);
   }
 
   if (agents.length === 0) {
@@ -281,7 +282,7 @@ export function AgentDashboard({ userId, className }: AgentDashboardProps) {
           <div className="relative">
             <select
               className="appearance-none rounded-lg border border-white/20 bg-white/10 px-3 py-2 pr-8 text-sm focus:border-periwinkle/50 focus:outline-none"
-              onChange={(e) => setSelectedAgentId(e.target.value)}
+              onChange={(e) => setSelectedAgentId(e.target.value as Id<'agents'>)}
               value={selectedAgentId}
             >
               {agents.map((agent) => (

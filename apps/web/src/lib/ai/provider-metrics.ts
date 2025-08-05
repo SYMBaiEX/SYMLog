@@ -690,7 +690,7 @@ export class ProviderMetricsService {
       const metrics = this.getProviderMetrics(providerId);
 
       const latencyScore = this.calculateLatencyScore(metrics.averageLatency);
-      const costScore = this.calculateCostScore(metrics);
+      const costScore = this.calculateCostEfficiencyScore(metrics);
       const qualityScore = metrics.qualityMetrics.responseQuality * 100;
       const reliabilityScore = metrics.reliabilityMetrics.stabilityScore * 100;
       const optimizationScore =
@@ -1318,6 +1318,18 @@ export class ProviderMetricsService {
     }
 
     return { strengths, weaknesses, opportunities, threats };
+  }
+
+  private calculateCostEfficiencyScore(metrics: ProviderMetrics): number {
+    // Calculate cost efficiency score based on cost per successful request
+    if (metrics.successCount === 0) return 0;
+    
+    const costPerSuccess = metrics.totalCost / metrics.successCount;
+    // Lower cost per success = higher score
+    // $0.01 per success = 100, $0.10 per success = 0
+    if (costPerSuccess <= 0.01) return 100;
+    if (costPerSuccess >= 0.10) return 0;
+    return Math.round(100 - ((costPerSuccess - 0.01) / 0.09) * 100);
   }
 
   private generateComparisonInsights(

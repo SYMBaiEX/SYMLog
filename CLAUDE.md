@@ -136,6 +136,17 @@ export function Component({ ...props }: ComponentProps) {
 5. **Code Style**: 2 spaces indentation, single quotes, trailing commas
 6. **Commit Format**: `<type>(<scope>): <subject>` (feat, fix, docs, etc.)
 
+### Code Style
+
+- Use TypeScript strict mode
+- Prefer interfaces over types for objects
+- Use `satisfies` operator for type-safe constants
+- Keep components focused and under 200 lines
+- Never use "any" types unless 100% necessary
+- Always define types, always follow strict type rules
+- Do not worry about just getting it working, if it works but has poor type safety we don't want it
+- Always generate code with strict type safety as a forethought
+
 ### Web3 Integration
 
 - Solana wallet support with Phantom and Crossmint
@@ -155,3 +166,21 @@ export function Component({ ...props }: ComponentProps) {
 - Integration tests for API endpoints
 - E2E tests for critical user paths
 - Aim for ≥80% unit test coverage
+
+## OpenAI Models
+
+- gpt-4.1-nano
+- text-embedding-3-large
+- gpt-4.1-nano-2025-04-14
+- gpt-4.1-mini-2025-04-14
+- gpt-4o-mini
+- o4-mini
+
+## Vercel AI SDK Types
+
+- Correct SDK v5 types for AI integration
+  - `AIStream` for streaming AI responses
+  - `createStreamDataTransformer()` for data transformation
+  - `OpenAIStream` for OpenAI specific stream handling
+  - `StreamingTextResponse` for consistent streaming responses
+  - `experimental_StreamData` for advanced streaming data management

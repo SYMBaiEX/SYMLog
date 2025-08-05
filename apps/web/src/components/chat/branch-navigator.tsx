@@ -30,7 +30,7 @@ import {
   useTreeOperations,
 } from '@/contexts/conversation-tree-context';
 import { cn } from '@/lib/utils';
-import type { Branch } from '@/types/conversation-tree';
+import type { Branch, ConversationNode } from '@/types/conversation-tree';
 import { BranchRenameDialog } from './branch-rename-dialog';
 
 interface BranchNavigatorProps {
@@ -124,14 +124,14 @@ export function BranchNavigator({
 
   const getBranchPreview = (branch: Branch) => {
     // Get the last few characters of the branch for preview
-    const node = Array.from(tree.nodes.values()).find(
+    const node: ConversationNode | undefined = Array.from(tree.nodes.values()).find(
       (n) => n.id === branch.leafNodeId
     );
     if (!node) return branch.name;
 
     const content = node.message.parts
-      .filter((part) => part.type === 'text')
-      .map((part) => part.text)
+      .filter((part: any) => part.type === 'text')
+      .map((part: any) => part.text)
       .join('');
 
     return content.length > 30 ? content.substring(0, 30) + '...' : content;

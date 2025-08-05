@@ -258,7 +258,7 @@ export class ProviderOptimizationEngine {
       loggingService.error('Provider optimization failed', error);
 
       // Fallback to simple load balancing
-      const fallbackSelection = this.loadBalancer.selectProvider(
+      const fallbackSelection = await this.loadBalancer.selectProvider(
         availableProviders,
         requestContext
       );

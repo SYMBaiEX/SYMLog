@@ -695,7 +695,7 @@ Provide insights about the video content, main themes, and key moments.`,
           duration: video.duration,
           width: video.videoWidth,
           height: video.videoHeight,
-          frameRate: VIDEO_PROCESSING_CONSTANTS.DEFAULT_FRAME_RATE
+          frameRate: VIDEO_PROCESSING_CONSTANTS.DEFAULT_FRAME_RATE,
           hasAudio: video.audioTracks?.length > 0,
           audioTracks: video.audioTracks?.length || 0,
           videoTracks: video.videoTracks?.length || 1

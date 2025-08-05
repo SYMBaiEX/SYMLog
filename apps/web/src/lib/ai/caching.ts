@@ -526,5 +526,4 @@ export function cached(options?: {
   };
 }
 
-// Export types and utilities
-export type { CacheConfig, CacheEntryMetadata, CacheStats };
+// Types are already exported as interfaces above

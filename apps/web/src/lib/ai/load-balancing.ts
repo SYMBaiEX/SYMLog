@@ -1423,7 +1423,13 @@ export class LoadBalancer {
     winner: string;
     recommendations: string[];
   }> {
-    const results = [];
+    const results: Array<{
+      strategy: string;
+      averageConfidence: number;
+      providerDistribution: Record<string, number>;
+      averageLatency: number;
+      errorRate: number;
+    }> = [];
 
     for (const strategy of strategies) {
       try {
@@ -1464,21 +1470,21 @@ export class LoadBalancer {
     }
 
     // Determine winner (highest confidence with low error rate)
-    const winner =
-      results
-        .filter((r) => r.errorRate < 0.1) // Filter out high error rate strategies
-        .sort((a, b) => b.averageConfidence - a.averageConfidence)[0]
-        ?.strategy || strategies[0];
+    const lowErrorResults = results.filter((r) => r.errorRate < 0.1);
+    const winner = lowErrorResults.length > 0
+      ? lowErrorResults.sort((a, b) => b.averageConfidence - a.averageConfidence)[0].strategy
+      : strategies[0];
 
     // Generate recommendations
     const recommendations = [];
-    const bestPerforming = results.sort(
+    const sortedByConfidence = results.sort(
       (a, b) => b.averageConfidence - a.averageConfidence
-    )[0];
-    const fastestResponse = results.sort(
-      (a, b) => a.averageLatency - b.averageLatency
-    )[0];
-    const mostReliable = results.sort((a, b) => a.errorRate - b.errorRate)[0];
+    );
+    const bestPerforming = sortedByConfidence.length > 0 ? sortedByConfidence[0] : null;
+    const sortedByLatency = results.sort((a, b) => a.averageLatency - b.averageLatency);
+    const fastestResponse = sortedByLatency.length > 0 ? sortedByLatency[0] : null;
+    const sortedByReliability = results.sort((a, b) => a.errorRate - b.errorRate);
+    const mostReliable = sortedByReliability.length > 0 ? sortedByReliability[0] : null;
 
     if (bestPerforming) {
       recommendations.push(

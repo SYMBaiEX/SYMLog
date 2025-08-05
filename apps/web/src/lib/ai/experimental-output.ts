@@ -137,11 +137,13 @@ export class StructuredOutputService {
       transformedOutput = outputBuilder.transform?.(result.text) ?? result.text as T;
     } else if ('object' in result && result.object) {
       if (outputBuilder.type === 'enum') {
-        transformedOutput = outputBuilder.transform?.(result.object.value) ?? result.object.value;
+        const enumValue = 'value' in result.object ? result.object.value : undefined;
+        transformedOutput = outputBuilder.transform?.(enumValue) ?? (enumValue as T | undefined);
       } else if (outputBuilder.type === 'array') {
-        transformedOutput = outputBuilder.transform?.(result.object.items) ?? result.object.items;
+        const arrayItems = 'items' in result.object ? result.object.items : undefined;
+        transformedOutput = outputBuilder.transform?.(arrayItems) ?? (arrayItems as T | undefined);
       } else {
-        transformedOutput = outputBuilder.transform?.(result.object) ?? result.object;
+        transformedOutput = outputBuilder.transform?.(result.object) ?? (result.object as T);
       }
     }
 
@@ -318,16 +320,16 @@ export class OutputValidator {
 
         case 'invalid_enum_value':
           // Set to first valid enum value
-          if (issue.options && issue.options.length > 0) {
-            this.setNestedValue(repaired, path, issue.options[0]);
+          if ('options' in issue && Array.isArray((issue as any).options) && (issue as any).options.length > 0) {
+            this.setNestedValue(repaired, path, (issue as any).options[0]);
           }
           break;
 
         case 'too_small':
           // Set minimum value
-          if (issue.type === 'string') {
+          if ('type' in issue && issue.type === 'string' && 'minimum' in issue) {
             this.setNestedValue(repaired, path, 'a'.repeat(issue.minimum as number));
-          } else if (issue.type === 'array') {
+          } else if ('type' in issue && issue.type === 'array') {
             this.setNestedValue(repaired, path, []);
           }
           break;

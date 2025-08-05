@@ -7,8 +7,14 @@ import {
   type LanguageModel,
   NoObjectGeneratedError,
   streamText,
-  TooManyEmbeddingValuesForCallError,
 } from 'ai';
+
+// Define TooManyEmbeddingValuesForCallError locally since it's not exported from 'ai'
+class TooManyEmbeddingValuesForCallError extends Error {
+  static isInstance(error: unknown): error is TooManyEmbeddingValuesForCallError {
+    return error instanceof TooManyEmbeddingValuesForCallError;
+  }
+}
 import { responseCache } from './caching';
 import {
   type AIErrorInfo,
@@ -437,7 +443,7 @@ export class ResilientAIService {
 
         // Combine results
         return {
-          embeddings: results.flatMap((r) => r.embeddings),
+          embedding: results.map((r) => r.embedding).flat(),
           usage: results.reduce(
             (acc, r) => ({
               tokens: acc.tokens + (r.usage?.tokens || 0),

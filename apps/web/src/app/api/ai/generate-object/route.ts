@@ -13,6 +13,7 @@ import {
   type SchemaType,
   schemaRegistry,
   validateStructuredData,
+  type StructuredResult,
 } from '@/lib/ai/structured-output';
 import { config } from '@/lib/config';
 import { extractClientInfo, logAPIError, logSecurityEvent } from '@/lib/logger';
@@ -73,15 +74,15 @@ export async function POST(req: NextRequest) {
         userId: userSession.userId,
         metadata: {
           reason: 'Invalid request schema',
-          errors: validationResult.error.errors,
+          errors: validationResult.error.issues,
         },
         ...extractClientInfo(req),
       });
 
       // Safely handle error message with fallback
       const errorMessage =
-        validationResult.error.errors.length > 0
-          ? `Invalid request: ${validationResult.error.errors[0].message}`
+        validationResult.error.issues.length > 0
+          ? `Invalid request: ${validationResult.error.issues[0].message}`
           : 'Invalid request format';
 
       return new Response(errorMessage, { status: 400 });
@@ -132,16 +133,15 @@ export async function POST(req: NextRequest) {
           model,
           temperature,
           maxTokens,
-          mode: responseFormat,
           output: outputType,
         }
       );
 
-      const result = await Promise.race([generationPromise, timeoutPromise]);
+      const result = await Promise.race([generationPromise, timeoutPromise]) as StructuredResult<any>;
 
       // Log successful generation
       logSecurityEvent({
-        type: 'AUTH_SUCCESS',
+        type: 'API_SUCCESS' as any,
         userId: userSession.userId,
         metadata: {
           action: 'generate_object',
@@ -174,7 +174,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       if (error instanceof NoObjectGeneratedError) {
         logSecurityEvent({
-          type: 'AI_GENERATION_FAILED',
+          type: 'API_ERROR' as any,
           userId: userSession.userId,
           metadata: {
             reason: 'no_object_generated',

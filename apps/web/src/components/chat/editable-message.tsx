@@ -390,7 +390,7 @@ export const EditableMessage = memo(
     return (
       prevProps.nodeId === nextProps.nodeId &&
       prevProps.message.id === nextProps.message.id &&
-      prevProps.message.content === nextProps.message.content &&
+      JSON.stringify(prevProps.message.parts) === JSON.stringify(nextProps.message.parts) &&
       prevProps.isEditing === nextProps.isEditing &&
       prevProps.canEdit === nextProps.canEdit &&
       prevProps.canRegenerate === nextProps.canRegenerate
