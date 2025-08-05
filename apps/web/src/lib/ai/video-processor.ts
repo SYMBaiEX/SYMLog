@@ -138,6 +138,8 @@ export class AdvancedVideoProcessor {
   private worker?: Worker;
   private supportsWebCodecs = false;
   private supportsOffscreenCanvas = false;
+  private performanceObserver?: PerformanceObserver;
+  private frameBuffer: any[] = [];
 
   constructor(config?: Partial<VideoProcessingConfig>) {
     this.config = {
@@ -696,14 +698,14 @@ Provide insights about the video content, main themes, and key moments.`,
           width: video.videoWidth,
           height: video.videoHeight,
           frameRate: VIDEO_PROCESSING_CONSTANTS.DEFAULT_FRAME_RATE,
-          hasAudio: video.audioTracks?.length > 0,
-          audioTracks: video.audioTracks?.length || 0,
-          videoTracks: video.videoTracks?.length || 1
+          hasAudio: (video as any).audioTracks?.length > 0 || false,
+          audioTracks: (video as any).audioTracks?.length || 0,
+          videoTracks: (video as any).videoTracks?.length || 1
         }
 
         // Try to extract additional metadata if available
-        if (video.mozHasAudio !== undefined) {
-          metadata.hasAudio = video.mozHasAudio;
+        if ((video as any).mozHasAudio !== undefined) {
+          metadata.hasAudio = (video as any).mozHasAudio;
         }
 
         resolve(metadata);

@@ -408,6 +408,16 @@ export class AIResponseCache {
     await Promise.allSettled(promises);
   }
 
+  /**
+   * Clear all cache entries
+   */
+  clear(): void {
+    this.cache.clear();
+    this.metadata.clear();
+    this.stats.size = 0;
+    this.responseTimes = [];
+  }
+
   // Private helper methods
 
   private updateMetadata(key: string, action: 'access' | 'update') {

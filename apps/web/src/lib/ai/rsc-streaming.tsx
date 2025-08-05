@@ -805,7 +805,9 @@ export async function streamWithTools(
               tool: name,
               args,
               timestamp: Date.now(),
-              status: 'executing'
+              status: 'executing' as const,
+              result: undefined as any,
+              error: undefined as string | undefined
             }
             
             toolCalls.push(callInfo)

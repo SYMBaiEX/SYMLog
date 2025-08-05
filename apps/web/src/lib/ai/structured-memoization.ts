@@ -141,7 +141,7 @@ export class StructuredMemoizer {
     const resultKey =
       options?.customKey ||
       this.generateResultKey({
-        model: model.modelId,
+        model: typeof model === 'string' ? model : (model as any).modelId || (model as any).specificationVersion || 'unknown',
         prompt,
         schemaKey,
         temperature: options?.temperature,
@@ -228,7 +228,7 @@ export class StructuredMemoizer {
     const resultKey =
       options?.customKey ||
       this.generateResultKey({
-        model: model.modelId,
+        model: typeof model === 'string' ? model : (model as any).modelId || (model as any).specificationVersion || 'unknown',
         prompt,
         schemaKey: this.generateSchemaKey(schema),
         temperature: options?.temperature,

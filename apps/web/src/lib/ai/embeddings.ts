@@ -744,7 +744,7 @@ export async function embedMany(
       values: sanitizedValues,
       embeddings: allEmbeddings,
       usage: totalUsage,
-      responses: batchResults.map(result => result.response),
+      response: result.response,
       providerMetadata: batchResults[batchResults.length - 1].providerMetadata,
     };
   }

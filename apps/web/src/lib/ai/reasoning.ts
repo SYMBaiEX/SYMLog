@@ -330,8 +330,8 @@ Think through each option against each criterion, then make a recommendation.`;
               sections[currentSection as keyof typeof sections] as string[]
             ).push(trimmed);
           } else {
-            sections[currentSection as keyof typeof sections] =
-              sections[currentSection as keyof typeof sections] + ' ' + trimmed;
+            (sections[currentSection as keyof typeof sections] as string) =
+              (sections[currentSection as keyof typeof sections] as string) + ' ' + trimmed;
           }
         }
       }

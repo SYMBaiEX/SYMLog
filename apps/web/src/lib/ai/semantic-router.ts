@@ -291,7 +291,7 @@ export const chatRouter = new SemanticRouter({
         systemPrompt: systemPrompts.default,
         tools: {
           ...artifactTools,
-          createChartArtifact: enhancedArtifactTools.createChartArtifact,
+          createCodeArtifact: enhancedArtifactTools.createCodeArtifact,
         },
         temperature: 0.5,
       },

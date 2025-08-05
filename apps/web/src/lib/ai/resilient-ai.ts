@@ -438,7 +438,7 @@ export class ResilientAIService {
       if (Array.isArray(value) && value.length > 100) {
         const chunks = this.chunkArray(value, 100);
         const results = await Promise.all(
-          chunks.map((chunk) => embed({ model: provider, value: chunk }))
+          chunks.map((chunk) => embed({ model: provider, value: chunk.join(' ') }))
         );
 
         // Combine results

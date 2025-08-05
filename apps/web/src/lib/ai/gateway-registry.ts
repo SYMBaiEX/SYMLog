@@ -324,14 +324,14 @@ export class GatewayRegistry {
     // Create a wrapped model that includes gateway features
     return wrapLanguageModel({
       model: modelSelection.model as any,
-      middleware: async (params: any, options: any, doGenerate: any) => {
+      middleware: (async (params: any, options: any, doGenerate: any) => {
         // Process through middleware
         return this.middleware.processRequest(
           requirements,
           async (model) => doGenerate(params, options),
           config.metadata
         );
-      } as any,
+      }) as any,
     });
   }
 

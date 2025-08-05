@@ -464,7 +464,6 @@ export function ToolStreamingDisplay({
                 .map((part, index) => (
                   <ToolPartDisplay
                     isLatest={index === parts.length - 1}
-                    key={part.id}
                     part={part}
                   />
                 ))}

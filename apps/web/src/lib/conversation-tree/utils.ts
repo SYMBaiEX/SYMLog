@@ -57,7 +57,7 @@ export class TreeUtils {
     // Set title from first user message if not set
     if (!tree.metadata.title && tree.nodes.size > 0) {
       const firstUserNode = Array.from(tree.nodes.values()).find(
-        (node) => node.message.role === 'user'
+        (node): node is ConversationNode => node.message.role === 'user'
       );
 
       if (firstUserNode) {

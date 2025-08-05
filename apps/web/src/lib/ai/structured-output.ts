@@ -299,13 +299,13 @@ export async function generateStructuredData<T>(params: {
       prompt: sanitizedPrompt,
       temperature,
       maxTokens,
-      mode: validatedMode,
-      output: validatedOutput,
+      mode: validatedMode as any,
+      output: validatedOutput as any,
     });
 
     return {
-      object: result.object,
-      finishReason: (result as any).finishReason || 'stop',
+      object: result.object as T,
+      finishReason: (result as any).finishReason ?? 'stop',
       usage: {
         promptTokens: result.usage?.inputTokens || 0,
         completionTokens: result.usage?.outputTokens || 0,
@@ -369,18 +369,18 @@ export async function streamStructuredData<T>(params: {
       prompt: sanitizedPrompt,
       temperature,
       maxTokens,
-      mode: validatedMode,
-      output: validatedOutput,
-      onFinish: ({ object, finishReason, usage }) => {
+      mode: validatedMode as any,
+      output: validatedOutput as any,
+      onFinish: (result) => {
         // Provide proper typing for usage and call user callback if provided
         const typedUsage: AIUsageStats = {
-          promptTokens: usage?.inputTokens || 0,
-          completionTokens: usage?.outputTokens || 0,
-          totalTokens: usage?.totalTokens || 0,
-          cost: usage?.cost,
+          promptTokens: result.usage?.inputTokens || 0,
+          completionTokens: result.usage?.outputTokens || 0,
+          totalTokens: result.usage?.totalTokens || 0,
+          cost: undefined, // cost is not available in LanguageModelV2Usage
         };
 
-        onFinish?.({ object, finishReason, usage: typedUsage, success: true });
+        onFinish?.({ object: result.object as T, finishReason: 'stop', usage: typedUsage, success: true });
       },
     });
 
@@ -546,7 +546,7 @@ export function validateStructuredData<T>(
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: `Validation failed: ${error.errors.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+        error: `Validation failed: ${error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
       };
     }
     return { success: false, error: 'Unknown validation error' };
@@ -611,10 +611,10 @@ export async function generateBySchemaName<T extends SchemaType>(
   const schema = getSchema(schemaName);
 
   return generateStructuredData({
-    schema,
+    schema: schema as any,
     prompt,
     ...options,
-  });
+  }) as Promise<StructuredResult<SchemaData<T>>>;
 }
 
 // Enhanced error information interface

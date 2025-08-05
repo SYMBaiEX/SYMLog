@@ -156,7 +156,7 @@ export class SYMLogMCPClient {
 
         // Namespace tools by client name to avoid conflicts
         for (const [toolName, tool] of Object.entries(tools)) {
-          allTools[`${name}:${toolName}`] = tool;
+          allTools[`${name}:${toolName}`] = tool as MCPTool;
         }
       } catch (error) {
         console.warn(`Failed to get tools from ${name}:`, error);

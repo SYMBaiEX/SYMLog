@@ -86,7 +86,7 @@ export async function addAttachmentsToMessage(
     return {
       ...message,
       content: `${message.content}\n\n[Attachment Error: ${validation.error}]`,
-    };
+    } as ModelMessage;
   }
 
   const safeAttachments = validation.sanitizedAttachments!;

@@ -163,6 +163,7 @@ export interface ToolStreamingSession {
   error?: ToolStreamingError;
   metadata: ToolExecutionMetadata;
   options: ToolStreamingOptions;
+  executionId: string;
 }
 
 // Tool streaming manager configuration

@@ -247,13 +247,13 @@ export const rateLimitConfig = {
 // Provider metadata helpers
 export const providerMetadata: Record<string, ProviderMetadata> = {
   openai: {
-    provider: 'openai',
+    provider: { name: 'openai' },
     headers: {
       'X-Custom-Header': 'SYMLog-AI',
     },
   },
   anthropic: {
-    provider: 'anthropic',
+    provider: { name: 'anthropic' },
     headers: {
       'X-Custom-Header': 'SYMLog-AI',
     },
