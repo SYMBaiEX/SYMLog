@@ -9,6 +9,8 @@ import type {
   ChartArtifact,
   DataArtifact 
 } from '@/types/artifacts'
+import { codeValidator } from '../code-validator'
+import { executeToolWithProgress, type ProgressStreamController } from '../streaming-progress'
 
 // Enhanced constants for tool system
 const TOOL_EXECUTION_TIMEOUT = 30000 // 30 seconds
@@ -205,9 +207,15 @@ export const enhancedArtifactTools = {
       validation: z.boolean().optional().default(true).describe('Enable validation checks'),
     }),
     execute: async (input, context = {}) => {
-      return executeWithRetry('createCodeArtifact', async () => {
+      const executionId = `createCodeArtifact_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+      
+      return executeToolWithProgress('createCodeArtifact', async (updateProgress) => {
+        updateProgress({ stage: 'initializing', progress: 0, message: 'Starting code artifact creation...' })
+
         // Validate input if requested
         if (input.validation !== false) {
+          updateProgress({ stage: 'validating', progress: 20, message: 'Validating code input...' })
+          
           const validation = ToolValidator.validateCodeArtifact(input)
           if (!validation.isValid) {
             throw new ToolExecutionError(
@@ -215,7 +223,38 @@ export const enhancedArtifactTools = {
               'createCodeArtifact'
             )
           }
+
+          // Additional code validation using the advanced validator
+          if (input.language === 'javascript' || input.language === 'typescript') {
+            updateProgress({ stage: 'validating', progress: 40, message: 'Running advanced code analysis...' })
+            
+            const codeValidation = await codeValidator.validateCode(
+              input.content,
+              input.language === 'typescript' ? 'typescript' : 'javascript',
+              {
+                enableSecurityChecks: true,
+                enablePerformanceChecks: true,
+                enableModernizationSuggestions: true,
+                strictMode: false
+              }
+            )
+
+            // Add validation warnings as metadata
+            if (codeValidation.warnings.length > 0 || codeValidation.suggestions.length > 0) {
+              updateProgress({ 
+                stage: 'validating', 
+                progress: 60, 
+                message: `Found ${codeValidation.warnings.length} warnings, ${codeValidation.suggestions.length} suggestions`,
+                metadata: {
+                  warnings: codeValidation.warnings.slice(0, 5), // Limit to first 5
+                  suggestions: codeValidation.suggestions.slice(0, 5)
+                }
+              })
+            }
+          }
         }
+
+        updateProgress({ stage: 'generating', progress: 80, message: 'Creating code artifact...' })
 
         const artifact: CodeArtifact = {
           id: generateSecureArtifactId(),
@@ -230,8 +269,14 @@ export const enhancedArtifactTools = {
           version: 1,
         }
 
+        updateProgress({ stage: 'finalizing', progress: 95, message: 'Finalizing artifact...' })
+
         return artifact
-      }, context as ToolExecutionContext)
+      }, {
+        executionId,
+        stages: ['initializing', 'validating', 'generating', 'finalizing', 'complete'],
+        context: context as ToolExecutionContext
+      })
     },
   }),
 

@@ -297,9 +297,10 @@ export function downloadAudio(speechResult: SpeechResult, filename?: string): vo
 }
 
 /**
- * Batch speech generation for multiple texts
+ * Batch speech generation for multiple texts with memory-efficient processing
  * @param texts Array of texts to convert
  * @param options Speech generation options
+ * @param concurrency Concurrent generations (limited to prevent memory exhaustion)
  * @returns Promise resolving to array of speech results
  */
 export async function generateSpeechBatch(
@@ -319,9 +320,14 @@ export async function generateSpeechBatch(
     throw new Error(`Concurrency must be between 1 and ${MAX_CONCURRENT_GENERATIONS}`)
   }
 
+  // Use streaming approach for large batches to prevent memory exhaustion
+  if (texts.length > 5) {
+    return generateSpeechBatchStreaming(texts, options, concurrency)
+  }
+
   const results: SpeechResult[] = []
   
-  // Process in batches with controlled concurrency
+  // Process in controlled batches to prevent memory exhaustion
   for (let i = 0; i < texts.length; i += concurrency) {
     const batch = texts.slice(i, i + concurrency)
     
@@ -351,9 +357,101 @@ export async function generateSpeechBatch(
     
     const batchResults = await Promise.all(batchPromises)
     results.push(...batchResults)
+    
+    // Force garbage collection hint between batches for memory management
+    if (typeof process !== 'undefined' && process.versions?.node && global.gc && i + concurrency < texts.length) {
+      global.gc()
+    }
   }
   
   return results
+}
+
+/**
+ * Memory-efficient streaming batch generation for large text arrays
+ * @param texts Array of texts to convert
+ * @param options Speech generation options
+ * @param concurrency Concurrent generations
+ * @returns Promise resolving to array of speech results
+ */
+async function generateSpeechBatchStreaming(
+  texts: string[],
+  options: SpeechOptions = {},
+  concurrency: number = MAX_CONCURRENT_GENERATIONS
+): Promise<SpeechResult[]> {
+  const results: SpeechResult[] = new Array(texts.length)
+  const semaphore = new SpeechSemaphore(concurrency)
+  
+  // Process all texts with controlled concurrency and memory management
+  const promises = texts.map(async (text, index) => {
+    await semaphore.acquire()
+    
+    try {
+      const result = await generateSpeechFromText(text, options)
+      
+      if (!result.success) {
+        console.error(`Failed to generate speech for text ${index + 1}/${texts.length} [${text.length} chars]`, { 
+          error: result.error,
+          batchIndex: index
+        })
+      }
+      
+      results[index] = result
+      return result
+    } catch (error) {
+      const errorResult = handleSpeechGenerationError(error, 'streaming batch speech generation', {
+        originalText: text,
+        voice: options.voice || DEFAULT_VOICE,
+        model: options.model || DEFAULT_MODEL,
+        speed: options.speed || DEFAULT_SPEED
+      })
+      
+      results[index] = errorResult
+      return errorResult
+    } finally {
+      semaphore.release()
+      
+      // Periodic garbage collection hint for long-running operations
+      if (index % 10 === 0 && typeof process !== 'undefined' && process.versions?.node && global.gc) {
+        global.gc()
+      }
+    }
+  })
+  
+  await Promise.all(promises)
+  return results
+}
+
+/**
+ * Semaphore for controlling concurrent operations to prevent resource exhaustion
+ */
+class SpeechSemaphore {
+  private permits: number
+  private waiting: Array<() => void> = []
+
+  constructor(permits: number) {
+    this.permits = permits
+  }
+
+  async acquire(): Promise<void> {
+    return new Promise((resolve) => {
+      if (this.permits > 0) {
+        this.permits--
+        resolve()
+      } else {
+        this.waiting.push(resolve)
+      }
+    })
+  }
+
+  release(): void {
+    this.permits++
+    if (this.waiting.length > 0) {
+      const resolve = this.waiting.shift()!
+      this.permits--
+      resolve()
+    }
+  }
 }
 
 /**

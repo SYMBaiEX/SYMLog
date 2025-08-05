@@ -6,7 +6,9 @@ import {
   customProvider,
   type LanguageModelV2Middleware,
   type LanguageModelV2,
-  type Experimental_LanguageModelV2CallSettings
+  type LanguageModelV2CallSettings,
+  type LanguageModelRequestMetadata,
+  type LanguageModelResponseMetadata
 } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
@@ -15,7 +17,6 @@ import { anthropic } from '@ai-sdk/anthropic'
  * Logging middleware for debugging and monitoring
  */
 export const loggingMiddleware: LanguageModelV2Middleware = {
-  middleware_version: 'v2' as const,
   transformParams: async ({ params }) => {
     console.log('[AI Request]', { 
       model: params.model, 
@@ -84,7 +85,6 @@ export const loggingMiddleware: LanguageModelV2Middleware = {
  * Performance monitoring middleware
  */
 export const performanceMiddleware: LanguageModelV2Middleware = {
-  middleware_version: 'v2' as const,
   transformParams: async ({ params }) => {
     // Add performance tracking headers
     return {
@@ -119,7 +119,6 @@ export const performanceMiddleware: LanguageModelV2Middleware = {
  * Security middleware for input/output sanitization
  */
 export const securityMiddleware: LanguageModelV2Middleware = {
-  middleware_version: 'v2' as const,
   transformParams: async ({ params }) => {
     // Enhanced prompt sanitization to prevent injection attacks
     if (params.prompt && typeof params.prompt === 'string') {
@@ -208,7 +207,6 @@ export function createCachingMiddleware(
   ttl: number = 5 * 60 * 1000 // 5 minutes
 ): LanguageModelV2Middleware {
   return {
-    middleware_version: 'v2' as const,
     wrapGenerate: async ({ doGenerate, params }) => {
       // Create cache key from params
       const cacheKey = JSON.stringify({
@@ -355,7 +353,6 @@ export const createEnhancedProvider = () => {
           }),
           // Custom middleware for blockchain context
           {
-            middleware_version: 'v2' as const,
             transformParams: async ({ params }) => {
               // Add blockchain-specific context
               const blockchainContext = `
@@ -387,7 +384,6 @@ export function composeMiddleware(
   ...middlewares: LanguageModelV2Middleware[]
 ): LanguageModelV2Middleware {
   return {
-    middleware_version: 'v2' as const,
     transformParams: async (options) => {
       let params = options.params
       for (const middleware of middlewares) {
@@ -442,7 +438,6 @@ export function createRateLimitMiddleware(
   const requests = new Map<string, number[]>()
   
   return {
-    middleware_version: 'v2' as const,
     transformParams: async ({ params }) => {
       const key = params.userId || 'anonymous'
       const now = Date.now()
@@ -471,7 +466,6 @@ export function createRetryMiddleware(
   initialDelay: number = 1000
 ): LanguageModelV2Middleware {
   return {
-    middleware_version: 'v2' as const,
     wrapGenerate: async ({ doGenerate }) => {
       let lastError: Error | undefined
       

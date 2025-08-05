@@ -9,6 +9,7 @@ const DEFAULT_MAX_TOKENS = 4096
 const MAX_PROMPT_LENGTH = 10000
 const DEPENDENCY_CHECK_TIMEOUT = 5000 // 5 seconds
 const MAX_WORKFLOW_STEPS = 50
+const MAX_CONCURRENCY = 3 // Maximum concurrent operations to prevent resource exhaustion
 
 // Agent configuration interface
 export interface AgentConfig {
@@ -488,6 +489,7 @@ export class AgentWorkflow {
     priority?: number
   }> = []
   private executionOrder: string[] = []
+  private readonly maxConcurrency: number = MAX_CONCURRENCY
 
   /**
    * Add an agent to the workflow
@@ -558,8 +560,8 @@ export class AgentWorkflow {
     for (let level = 0; level < dependencyLevels.length; level++) {
       const levelSteps = dependencyLevels[level]
       
-      // Execute independent steps in parallel
-      const levelPromises = levelSteps.map(async (step, stepIndex) => {
+      // Execute independent steps with controlled concurrency
+      const levelResults = await this.executeConcurrently(levelSteps, async (step, stepIndex) => {
         try {
           // Double-check dependencies
           const missingDeps = step.dependencies.filter(dep => !completed.has(dep))
@@ -604,15 +606,46 @@ export class AgentWorkflow {
         }
       })
       
-      // Wait for all steps in this level to complete
-      const levelResults = await Promise.all(levelPromises)
-      
       // Store results
       for (const { stepName, result } of levelResults) {
         results.set(stepName, result)
       }
     }
 
+    return results
+  }
+
+  /**
+   * Execute tasks with controlled concurrency to prevent resource exhaustion
+   * @param items Array of items to process
+   * @param processor Function to process each item
+   * @returns Promise resolving to array of results
+   */
+  private async executeConcurrently<T, R>(
+    items: T[],
+    processor: (item: T, index: number) => Promise<R>
+  ): Promise<R[]> {
+    const results: R[] = new Array(items.length)
+    
+    // Process items in batches with controlled concurrency
+    for (let i = 0; i < items.length; i += this.maxConcurrency) {
+      const batch = items.slice(i, i + this.maxConcurrency)
+      const batchPromises = batch.map(async (item, batchIndex) => {
+        const actualIndex = i + batchIndex
+        try {
+          const result = await processor(item, actualIndex)
+          results[actualIndex] = result
+          return result
+        } catch (error) {
+          // Re-throw to maintain error handling in calling code
+          throw error
+        }
+      })
+      
+      // Wait for this batch to complete before starting the next
+      await Promise.all(batchPromises)
+    }
+    
     return results
   }
   
@@ -786,6 +819,5 @@ export class AgentWorkflow {
   }
 }
 
-// Export types and utilities
-export type { AgentConfig, AgentStep, AgentResult }
+// Export custom error types
 export { WorkflowExecutionError, DependencyError }

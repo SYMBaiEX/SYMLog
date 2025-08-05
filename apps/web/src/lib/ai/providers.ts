@@ -1,75 +1,255 @@
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { 
-  experimental_createProviderRegistry as createProviderRegistry,
-  wrapProvider,
+  createProviderRegistry,
+  customProvider,
+  wrapLanguageModel,
+  defaultSettingsMiddleware,
   type LanguageModelRequestMetadata,
   type LanguageModelResponseMetadata,
   type ProviderMetadata 
 } from 'ai'
+import type { AnthropicProviderOptions } from '@ai-sdk/anthropic'
 import { config } from '../config'
-import { loggingMiddleware, performanceMiddleware, securityMiddleware, createCachingMiddleware } from './middleware'
+import { 
+  loggingMiddleware, 
+  performanceMiddleware, 
+  securityMiddleware, 
+  createCachingMiddleware,
+  composeMiddleware 
+} from './middleware'
 
-// Create enhanced provider registry with middleware support
-export const registry = createProviderRegistry({
-  // Wrap OpenAI provider with middleware
-  openai: wrapProvider({
-    provider: openai,
-    languageModelMiddleware: [
-      loggingMiddleware,
-      performanceMiddleware,
-      securityMiddleware
-    ]
-  }),
-  
-  // Wrap Anthropic provider with middleware
-  anthropic: wrapProvider({
-    provider: anthropic,
-    languageModelMiddleware: [
-      loggingMiddleware,
-      performanceMiddleware,
-      createCachingMiddleware() // Add caching for Anthropic
-    ]
-  }),
+// Create custom providers with model aliases and pre-configured settings
+const customOpenAI = customProvider({
+  languageModels: {
+    // Fast model for quick responses
+    'fast': wrapLanguageModel({
+      model: openai('gpt-4o-mini'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        defaultSettingsMiddleware({
+          settings: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          }
+        })
+      )
+    }),
+    
+    // Coding specialist with low temperature
+    'code': wrapLanguageModel({
+      model: openai('gpt-4.1-2025-04-14'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        securityMiddleware,
+        defaultSettingsMiddleware({
+          settings: {
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+            stopSequences: ['```end', '// END']
+          }
+        })
+      )
+    }),
+    
+    // High-quality model for complex tasks
+    'premium': wrapLanguageModel({
+      model: openai('gpt-4.1-nano'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        securityMiddleware,
+        defaultSettingsMiddleware({
+          settings: {
+            temperature: 0.3,
+            maxOutputTokens: 4096,
+            topP: 0.9
+          }
+        })
+      )
+    }),
+  },
+  fallbackProvider: openai
 })
 
-// Model configuration with fallback chain
+const customAnthropic = customProvider({
+  languageModels: {
+    // Fast Haiku model
+    'fast': wrapLanguageModel({
+      model: anthropic('claude-3-haiku-20240307'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        createCachingMiddleware(),
+        defaultSettingsMiddleware({
+          settings: {
+            temperature: 0.7,
+            maxOutputTokens: 2048,
+          }
+        })
+      )
+    }),
+    
+    // Sonnet for balanced quality/speed
+    'balanced': wrapLanguageModel({
+      model: anthropic('claude-3-5-sonnet-20241022'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        createCachingMiddleware(),
+        defaultSettingsMiddleware({
+          settings: {
+            temperature: 0.5,
+            maxOutputTokens: 4096,
+          }
+        })
+      )
+    }),
+    
+    // Claude 3.7 with reasoning capabilities
+    'reasoning': wrapLanguageModel({
+      model: anthropic('claude-3-7-sonnet-20250219'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        defaultSettingsMiddleware({
+          settings: {
+            maxOutputTokens: 100000,
+            providerMetadata: {
+              anthropic: {
+                thinking: {
+                  type: 'enabled',
+                  budgetTokens: 32000,
+                },
+              } satisfies AnthropicProviderOptions,
+            },
+          }
+        })
+      )
+    }),
+    
+    // Creative writing model
+    'creative': wrapLanguageModel({
+      model: anthropic('claude-3-opus-20240229'),
+      middleware: composeMiddleware(
+        loggingMiddleware,
+        performanceMiddleware,
+        defaultSettingsMiddleware({
+          settings: {
+            temperature: 0.9,
+            maxOutputTokens: 4096,
+            topP: 0.95,
+            frequencyPenalty: 0.5,
+            presencePenalty: 0.5
+          }
+        })
+      )
+    }),
+  },
+  fallbackProvider: anthropic
+})
+
+// Create enhanced provider registry with V2 specification compliance
+export const registry = createProviderRegistry({
+  openai: customOpenAI,
+  anthropic: customAnthropic,
+}, { separator: ':' })
+
+// Model configuration with metadata and fallback chain
 export const getAIModel = (
   preferredModel?: string,
   metadata?: LanguageModelRequestMetadata
 ) => {
-  const models = {
-    // Latest models as of August 2025
-    primary: 'gpt-4.1-nano',  // OpenAI's efficient nano model
-    secondary: 'claude-sonnet-4-20250514',  // Claude 4 Sonnet - latest model (May 2025)
-    fallback: 'gpt-4o-mini',  // Cost-effective OpenAI fallback
-    coding: 'gpt-4.1-2025-04-14',  // OpenAI's specialized coding model
-    reasoning: 'claude-3-7-sonnet@20250219',  // Claude 3.7 hybrid reasoning model
-    budget: 'claude-3-5-sonnet-20241022',  // Proven stable Claude model
+  // Model aliases for easy access
+  const modelAliases: Record<string, string> = {
+    // Primary models
+    'fast': 'openai:fast',
+    'balanced': 'anthropic:balanced',
+    'premium': 'openai:premium',
+    
+    // Specialized models
+    'code': 'openai:code',
+    'reasoning': 'anthropic:reasoning',
+    'creative': 'anthropic:creative',
+    
+    // Direct model access (backward compatibility)
+    'gpt-4.1-nano': 'openai:premium',
+    'claude-3-5-sonnet-20241022': 'anthropic:balanced',
+    'gpt-4o-mini': 'openai:fast',
+    'claude-3-haiku-20240307': 'anthropic:fast',
   }
 
-  // Return the preferred model or use the primary model
-  const modelToUse = preferredModel || models.primary
+  // Resolve model alias or use direct model ID
+  const modelToUse = preferredModel 
+    ? (modelAliases[preferredModel] || preferredModel)
+    : 'openai:premium'
   
-  // Get model from registry with metadata
-  const model = registry.languageModel(modelToUse)
-  
-  // Add provider metadata and options
-  if (metadata) {
-    return model.withMetadata({
-      ...metadata,
-      application: 'SYMLog',
-      version: '1.0.0',
-    })
+  try {
+    // Get model from registry
+    const model = registry.languageModel(modelToUse)
+    
+    // Add request metadata if provided
+    if (metadata) {
+      // Note: AI SDK v5 doesn't have withMetadata method
+      // Metadata is passed directly to generation functions
+      return model
+    }
+    
+    return model
+  } catch (error) {
+    console.warn(`Model ${modelToUse} not found, falling back to default`, error)
+    return registry.languageModel('openai:premium')
   }
-  
-  return model
+}
+
+// Helper function to get model with metadata
+export const getModelWithMetadata = (
+  modelId: string,
+  requestMetadata: LanguageModelRequestMetadata
+) => {
+  const model = getAIModel(modelId)
+  // Metadata will be passed during generation
+  return { model, metadata: requestMetadata }
+}
+
+// Response metadata collection for monitoring
+export const collectResponseMetadata = (response: any): LanguageModelResponseMetadata => {
+  return {
+    id: response.id || crypto.randomUUID(),
+    modelId: response.modelId,
+    usage: response.usage,
+    finishReason: response.finishReason,
+    custom: {
+      timestamp: new Date().toISOString(),
+      latency: response.latency,
+      cached: response.cached || false,
+      provider: response.provider,
+    }
+  }
 }
 
 // Rate limiting configuration
 export const rateLimitConfig = {
   maxRequestsPerHour: config.get().rateLimitMaxRequests,
   maxTokensPerRequest: config.get().aiMaxTokensPerRequest,
+}
+
+// Provider metadata helpers
+export const providerMetadata: Record<string, ProviderMetadata> = {
+  openai: {
+    provider: 'openai',
+    headers: {
+      'X-Custom-Header': 'SYMLog-AI',
+    },
+  },
+  anthropic: {
+    provider: 'anthropic',
+    headers: {
+      'X-Custom-Header': 'SYMLog-AI',
+    },
+  },
 }
 
 // System prompts for different contexts
