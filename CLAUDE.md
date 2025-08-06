@@ -140,3 +140,12 @@ export function Component({ ...props }: ComponentProps) {
 - Integration tests for API endpoints
 - E2E tests for critical user paths
 - Aim for ≥80% unit test coverage
+
+## OpenAI Models
+
+- gpt-4.1-nano
+- text-embedding-3-large
+- gpt-4.1-nano-2025-04-14
+- gpt-4.1-mini-2025-04-14
+- gpt-4o-mini
+- o4-mini
