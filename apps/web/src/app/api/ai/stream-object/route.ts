@@ -5,13 +5,13 @@ import {
   checkRateLimit,
   createAuthenticatedResponse,
   validateChatAuth,
-} from '@/lib/ai/auth-middleware';
+} from '@/lib/ai/core';
 import {
   type SchemaType,
   schemaRegistry,
   streamStructuredArray,
   streamStructuredData,
-} from '@/lib/ai/structured-output';
+} from '@/lib/ai/core';
 import { config } from '@/lib/config';
 import { extractClientInfo, logAPIError, logSecurityEvent } from '@/lib/logger';
 import { chatService } from '@/services/chat.service';
@@ -107,13 +107,14 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      let streamResult: any;
+      // TODO: Fix type mismatch between expected properties and actual return type
+      let streamResult: unknown;
 
       // Handle array vs object streaming
       if (output === 'array' && arrayCount) {
         // Stream array generation
         streamResult = await streamStructuredArray({
-          schema: schemaRegistry[schema as SchemaType] as z.ZodSchema<any>,
+          schema: schemaRegistry[schema as SchemaType] as z.ZodSchema<unknown>,
           prompt,
           count: arrayCount,
           model,
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest) {
       } else {
         // Stream object generation
         streamResult = await streamStructuredData({
-          schema: schemaRegistry[schema as SchemaType] as z.ZodSchema<any>,
+          schema: schemaRegistry[schema as SchemaType] as z.ZodSchema<unknown>,
           prompt,
           model,
           temperature,
@@ -138,7 +139,7 @@ export async function POST(req: NextRequest) {
         async start(controller) {
           try {
             // Stream partial objects
-            for await (const partialObject of streamResult.partialObjectStream) {
+            for await (const partialObject of (streamResult as any).partialObjectStream) {
               const chunk =
                 JSON.stringify({
                   type: 'partial',
@@ -149,9 +150,9 @@ export async function POST(req: NextRequest) {
             }
 
             // Get final result
-            const finalResult = await streamResult.object;
-            const usage = await streamResult.usage;
-            const finishReason = await streamResult.finishReason;
+            const finalResult = await (streamResult as any).object;
+            const usage = await (streamResult as any).usage;
+            const finishReason = await (streamResult as any).finishReason;
 
             // Send final result
             const finalChunk =
@@ -217,7 +218,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       if (error instanceof NoObjectGeneratedError) {
         logSecurityEvent({
-          type: 'API_ERROR' as any,
+          type: 'SUSPICIOUS_ACTIVITY',
           userId: userSession.userId,
           metadata: {
             reason: 'no_object_generated',

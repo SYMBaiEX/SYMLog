@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { GlassButton } from '@/components/ui/glass-button';
 import { GlassCard } from '@/components/ui/glass-card';
 import { ConversationTreeProvider } from '@/contexts/conversation-tree-context';
-import { MODEL_CONFIGS } from '@/lib/ai/model-orchestration';
+import { MODEL_CONFIGS } from '@/lib/ai/intelligence';
 import { cn } from '@/lib/utils';
 import type {
   FileAttachment,

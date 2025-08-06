@@ -4,14 +4,14 @@ import {
   type EnhancedToolResult,
   enhancedArtifactTools,
   toolExecutionService,
-} from '@/lib/ai/tools/enhanced-tools';
+} from '@/lib/ai/tools';
 import { logAPIError } from '@/lib/logger';
 import { generateSecureId } from '@/lib/utils/id-generator';
 
 // API request schema for tool execution
 const executeToolRequestSchema = z.object({
   toolName: z.string().min(1, 'Tool name is required'),
-  parameters: z.any().describe('Tool parameters'),
+  parameters: z.unknown().describe('Tool parameters'),
   options: z
     .object({
       executionId: z.string().optional(),
@@ -29,7 +29,7 @@ const executeWorkflowRequestSchema = z.object({
     .array(
       z.object({
         toolName: z.string(),
-        parameters: z.any(),
+        parameters: z.unknown(),
         dependsOn: z.array(z.string()).optional(),
         id: z.string(),
       })
@@ -57,7 +57,7 @@ interface ToolExecutionResponse {
 
 interface WorkflowExecutionResponse {
   success: boolean;
-  result?: any;
+  result?: unknown;
   error?: string;
   executionId?: string;
 }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid request: ${validation.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          error: `Invalid request: ${validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`
         },
         { status: 400 }
       );

@@ -1,7 +1,7 @@
 import { PublicKey } from '@solana/web3.js';
 import { type NextRequest, NextResponse } from 'next/server';
 import nacl from 'tweetnacl';
-import { validateChatAuth } from '@/lib/ai/auth-middleware';
+import { validateChatAuth } from '@/lib/ai/core';
 import { extractClientInfo, logSecurityEvent } from '@/lib/logger';
 import {
   createCorsResponse,

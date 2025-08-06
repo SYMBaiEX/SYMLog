@@ -5,7 +5,7 @@ import {
   checkRateLimit,
   createAuthenticatedResponse,
   validateChatAuth,
-} from '@/lib/ai/auth-middleware';
+} from '@/lib/ai/core';
 import {
   generateBySchemaName,
   generateStructuredData,
@@ -14,7 +14,7 @@ import {
   type StructuredResult,
   schemaRegistry,
   validateStructuredData,
-} from '@/lib/ai/structured-output';
+} from '@/lib/ai/core';
 import { config } from '@/lib/config';
 import { extractClientInfo, logAPIError, logSecurityEvent } from '@/lib/logger';
 import { chatService } from '@/services/chat.service';
@@ -139,11 +139,11 @@ export async function POST(req: NextRequest) {
       const result = (await Promise.race([
         generationPromise,
         timeoutPromise,
-      ])) as StructuredResult<any>;
+      ])) as StructuredResult<unknown>;
 
       // Log successful generation
       logSecurityEvent({
-        type: 'API_SUCCESS' as any,
+        type: 'AUTH_SUCCESS',
         userId: userSession.userId,
         metadata: {
           action: 'generate_object',
@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
     } catch (error) {
       if (error instanceof NoObjectGeneratedError) {
         logSecurityEvent({
-          type: 'API_ERROR' as any,
+          type: 'SUSPICIOUS_ACTIVITY',
           userId: userSession.userId,
           metadata: {
             reason: 'no_object_generated',

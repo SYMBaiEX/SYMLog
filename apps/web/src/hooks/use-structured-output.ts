@@ -7,7 +7,7 @@ import {
   type SchemaType,
   schemaRegistry,
   validateStructuredData,
-} from '../lib/ai/structured-output';
+} from '../lib/ai/core';
 
 export interface StructuredOutputState<T = any> {
   /** Generated structured data */

@@ -42,12 +42,12 @@ export class CacheService {
   }
 
   // Update cached conversation data
-  static updateConversationCache(conversationId: string, data: any) {
+  static updateConversationCache(conversationId: string, data: unknown) {
     mutate(`/api/conversation/${conversationId}`, data, { revalidate: false });
   }
 
   // Update cached user data
-  static updateUserCache(userId: string, data: any) {
+  static updateUserCache(userId: string, data: unknown) {
     mutate(`/api/user/${userId}`, data, { revalidate: false });
   }
 

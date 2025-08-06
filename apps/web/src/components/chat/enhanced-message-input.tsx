@@ -37,7 +37,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { MODEL_CONFIGS } from '@/lib/ai/model-orchestration';
+import { MODEL_CONFIGS } from '@/lib/ai/intelligence';
 import { cn } from '@/lib/utils';
 import type {
   FileAttachment,

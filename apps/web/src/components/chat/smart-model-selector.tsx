@@ -17,7 +17,7 @@ import { GlassButton } from '@/components/ui/glass-button';
 import {
   type ModelRole,
   modelOrchestrator,
-} from '@/lib/ai/model-orchestration';
+} from '@/lib/ai/intelligence';
 import { cn } from '@/lib/utils';
 
 interface SmartModelSelectorProps {

@@ -4,7 +4,7 @@ import {
   type EnhancedToolResult,
   enhancedArtifactTools,
   toolExecutionService,
-} from '@/lib/ai/tools/enhanced-tools';
+} from '@/lib/ai/tools';
 import { logAPIError } from '@/lib/logger';
 import { generateSecureId } from '@/lib/utils/id-generator';
 
@@ -15,7 +15,7 @@ const executeWorkflowRequestSchema = z.object({
     .array(
       z.object({
         toolName: z.string().min(1, 'Tool name is required'),
-        parameters: z.any().describe('Tool parameters'),
+        parameters: z.unknown().describe('Tool parameters'),
         dependsOn: z
           .array(z.string())
           .optional()
@@ -47,7 +47,7 @@ interface WorkflowExecutionResponse {
     workflowName: string;
     totalSteps: number;
     completedSteps: number;
-    results: any[];
+    results: unknown[];
     errors?: string[];
     executedAt: number;
   };
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       return NextResponse.json(
         {
           success: false,
-          error: `Invalid workflow request: ${validation.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+          error: `Invalid workflow request: ${validation.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         },
         { status: 400 }
       );
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
               workflowName: string;
               totalSteps: number;
               completedSteps: number;
-              results: any[];
+              results: unknown[];
               errors?: string[];
               executedAt: number;
             })

@@ -21,7 +21,7 @@ import { GlassCard } from '@/components/ui/glass-card';
 import {
   type ModelConfig,
   modelOrchestrator,
-} from '@/lib/ai/model-orchestration';
+} from '@/lib/ai/intelligence';
 import { cn } from '@/lib/utils';
 
 interface PipelineStep {

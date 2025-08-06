@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { z } from 'zod';
-import { checkRateLimit, validateChatAuth } from '@/lib/ai/auth-middleware';
+import { checkRateLimit, validateChatAuth } from '@/lib/ai/core';
 import {
   executeToolWithStreaming,
   toolStreamingManager,
-} from '@/lib/ai/tool-streaming';
+} from '@/lib/ai/streaming';
 // Error handling imports removed - not available
 import { config } from '@/lib/config';
 import { tokenReservationService } from '@/lib/convex-token-limits';
@@ -21,7 +21,7 @@ export const maxDuration = 60;
 // Request validation schema
 const toolStreamingRequestSchema = z.object({
   toolName: z.string().min(1).max(100),
-  input: z.any(),
+  input: z.unknown(),
   options: z
     .object({
       enableInputStreaming: z.boolean().optional(),
@@ -42,7 +42,7 @@ const toolStreamingRequestSchema = z.object({
       workflowId: z.string().optional(),
       stepIndex: z.number().optional(),
       totalSteps: z.number().optional(),
-      previousResults: z.array(z.any()).optional(),
+      previousResults: z.array(z.unknown()).optional(),
       dependencies: z.array(z.string()).optional(),
       parallelExecution: z.boolean().optional(),
     })
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
       });
 
       return createErrorResponse(
-        `Invalid request: ${validationResult.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
+        `Invalid request: ${validationResult.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')}`,
         400
       );
     }
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
 
     // Log tool execution start
     logSecurityEvent({
-      type: 'API_SUCCESS' as any,
+      type: 'AUTH_SUCCESS',
       userId: userSession.userId,
       metadata: {
         toolName,
@@ -219,7 +219,7 @@ export async function POST(req: NextRequest) {
         // Send initial connection established event
         sendSSEMessage(controller, {
           id: `init_${Date.now()}`,
-          event: 'input-start' as any,
+          event: 'input-start',
           data: {
             toolName,
             executionId,
@@ -245,7 +245,7 @@ export async function POST(req: NextRequest) {
                 // Send final close event
                 sendSSEMessage(controller, {
                   id: `close_${Date.now()}`,
-                  event: 'end' as any,
+                  event: 'end',
                   data: {
                     toolName,
                     executionId,
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
 
             sendSSEMessage(controller, {
               id: `error_${Date.now()}`,
-              event: 'error' as any,
+              event: 'error',
               data: {
                 toolName,
                 executionId,
@@ -293,7 +293,7 @@ export async function POST(req: NextRequest) {
 
             // Log completion
             logSecurityEvent({
-              type: 'API_SUCCESS' as any,
+              type: 'AUTH_SUCCESS',
               userId: userSession.userId,
               metadata: { toolName, executionId },
               ...extractClientInfo(req),
@@ -312,7 +312,7 @@ export async function POST(req: NextRequest) {
         );
 
         logSecurityEvent({
-          type: 'API_ERROR' as any,
+          type: 'SUSPICIOUS_ACTIVITY',
           userId: userSession.userId,
           metadata: { toolName, executionId, reason: 'client_disconnect' },
           ...extractClientInfo(req),
@@ -407,7 +407,7 @@ function formatSSEMessage(message: ToolStreamingSSEMessage): string {
 }
 
 // Estimate token usage for different tools
-function estimateToolTokenUsage(toolName: string, input: any): number {
+function estimateToolTokenUsage(toolName: string, input: unknown): number {
   const inputSize = JSON.stringify(input).length;
   const baseTokens = Math.ceil(inputSize / 4); // ~4 chars per token
 

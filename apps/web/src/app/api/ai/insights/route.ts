@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { validateChatAuth } from '@/lib/ai/auth-middleware';
+import { validateChatAuth } from '@/lib/ai/core';
 import { extractClientInfo, logSecurityEvent } from '@/lib/logger';
 import { chatService } from '@/services/chat.service';
 

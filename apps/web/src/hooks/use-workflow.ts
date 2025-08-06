@@ -3,11 +3,11 @@
 import { generateText, streamText } from 'ai';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { getAIModel } from '@/lib/ai/providers';
+import { getAIModel } from '@/lib/ai/core';
 import {
   enhancedArtifactTools,
   executeToolWorkflow,
-} from '@/lib/ai/tools/enhanced-tools';
+} from '@/lib/ai/tools';
 
 export interface WorkflowStep {
   id: string;

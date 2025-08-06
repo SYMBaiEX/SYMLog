@@ -14,12 +14,12 @@ import type {
   ToolExecutionProgress,
   ToolStreamingOptions,
 } from '../../../types/tool-streaming';
-import { codeValidator } from '../code-validator';
-import { getAIModel } from '../providers';
+import { codeValidator } from '../intelligence/code-validator';
+import { getAIModel } from '../core/providers';
 import {
   executeToolWithProgress,
   type ProgressStreamController,
-} from '../streaming-progress';
+} from '../streaming/streaming-progress';
 
 // Enhanced constants for tool system
 const TOOL_EXECUTION_TIMEOUT = 30_000; // 30 seconds

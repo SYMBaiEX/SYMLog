@@ -3,21 +3,21 @@ import {
   checkRateLimit,
   createAuthenticatedResponse,
   validateChatAuth,
-} from '@/lib/ai/auth-middleware';
+} from '@/lib/ai/core';
 import {
   collectResponseMetadata,
   getModelWithMetadata,
-} from '@/lib/ai/providers';
+} from '@/lib/ai/core';
 import {
   createProgressStream,
   streamingProgressManager,
-} from '@/lib/ai/streaming-progress';
-import { toolAnalyticsService } from '@/lib/ai/tool-analytics';
+} from '@/lib/ai/streaming';
+import { toolAnalyticsService } from '@/lib/ai/tools';
 import {
   enforceStructuredOutput,
   selectOptimalTool,
   toolChoiceEnforcer,
-} from '@/lib/ai/tool-choice';
+} from '@/lib/ai/tools';
 // Error handling imports removed - not available
 import { config } from '@/lib/config';
 import { tokenReservationService } from '@/lib/convex-token-limits';
@@ -84,12 +84,12 @@ export async function POST(req: NextRequest) {
     if (requireTools || shouldEnforceTools(lastMessage)) {
       const outputType = inferOutputType(lastMessage);
       enhancedToolChoice = enforceStructuredOutput(
-        outputType as any,
+        outputType as 'code' | 'document' | 'chart' | 'data' | 'image',
         'moderate'
       );
 
       logSecurityEvent({
-        type: 'API_SUCCESS' as any,
+        type: 'AUTH_SUCCESS',
         userId: userSession.userId,
         metadata: {
           outputType,
@@ -185,15 +185,15 @@ export async function POST(req: NextRequest) {
           extractClientInfo(req),
           reservation.reservationId
         );
-      } catch (error: any) {
+      } catch (error: unknown) {
         // Try without tools as fallback
         try {
           logSecurityEvent({
-            type: 'API_ERROR' as any,
+            type: 'SUSPICIOUS_ACTIVITY',
             userId: userSession.userId,
             metadata: {
               reason: 'Primary request failed, attempting without tools',
-              errorMessage: error?.message,
+              errorMessage: error instanceof Error ? error.message : String(error),
             },
             ...extractClientInfo(req),
           });
@@ -211,10 +211,10 @@ export async function POST(req: NextRequest) {
             extractClientInfo(req),
             reservation.reservationId
           );
-        } catch (fallbackError: any) {
+        } catch (fallbackError: unknown) {
           // Try with simpler model as last resort
           logSecurityEvent({
-            type: 'API_ERROR' as any,
+            type: 'SUSPICIOUS_ACTIVITY',
             userId: userSession.userId,
             metadata: { reason: 'Falling back to simpler model' },
             ...extractClientInfo(req),

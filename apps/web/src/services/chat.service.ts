@@ -3,13 +3,13 @@ import {
   MODEL_CONFIGS,
   type ModelRole,
   modelOrchestrator,
-} from '@/lib/ai/model-orchestration';
+} from '@/lib/ai/intelligence';
 import {
   addAttachmentsToMessage,
   processAttachmentsForAI,
 } from '@/lib/ai/multimodal';
-import { getAIModel, systemPrompts } from '@/lib/ai/providers';
-import { artifactTools } from '@/lib/ai/tools/artifact-tools';
+import { getAIModel, systemPrompts } from '@/lib/ai/core';
+import { artifactTools } from '@/lib/ai/tools';
 import { config } from '@/lib/config';
 import { tokenReservationService } from '@/lib/convex-token-limits';
 import { db } from '@/lib/db';
@@ -25,7 +25,7 @@ interface ChatRequest {
   attachments?: FileAttachment[];
   toolChoice?: any;
   streamProgress?: boolean;
-  metadata?: any;
+  metadata?: any; // Keep as any for service data flexibility
 }
 
 interface ChatSession {

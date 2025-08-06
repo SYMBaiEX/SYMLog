@@ -1,7 +1,7 @@
 // telemetry-integration-example.ts - Complete integration example
 // Demonstrates 100% telemetry implementation with August 2025 best practices
 
-import { aiTelemetry } from '../ai/telemetry';
+import { aiTelemetry } from '../ai/intelligence/telemetry';
 import { distributedTracing } from './distributed-tracing';
 import { aiMetricsHelpers, initializeAIMetrics } from './otel-metrics';
 import {
