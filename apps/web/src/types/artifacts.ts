@@ -1,4 +1,4 @@
-export type ArtifactType = 
+export type ArtifactType =
   | 'code'
   | 'document'
   | 'spreadsheet'
@@ -73,12 +73,12 @@ export interface DataArtifact extends BaseArtifact {
   preview?: any;
 }
 
-export type Artifact = 
-  | CodeArtifact 
-  | DocumentArtifact 
-  | SpreadsheetArtifact 
-  | ImageArtifact 
-  | ChartArtifact 
+export type Artifact =
+  | CodeArtifact
+  | DocumentArtifact
+  | SpreadsheetArtifact
+  | ImageArtifact
+  | ChartArtifact
   | DataArtifact;
 
 export interface TableOfContentsItem {

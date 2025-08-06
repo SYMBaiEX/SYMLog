@@ -82,7 +82,9 @@ export function CrossmintWalletAuth() {
 
   const handleLogin = async () => {
     try {
-      await login()
+      if (login) {
+        await login()
+      }
     } catch (error: any) {
       console.error("Login error:", error)
       toast.error("Login failed", {
@@ -94,7 +96,9 @@ export function CrossmintWalletAuth() {
   const handleLogout = async () => {
     setIsLoggingOut(true)
     try {
-      await logout()
+      if (logout) {
+        await logout()
+      }
       setShowAccountDialog(false)
       toast.info("Signed out successfully")
     } catch (error: any) {
