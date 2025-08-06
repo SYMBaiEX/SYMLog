@@ -1,10 +1,14 @@
 // Routing functionality exports
 export {
-  AdaptiveRouter,
-  type AdaptiveRoutingConfig,
+  AdaptiveRoutingSystem,
+  adaptiveRouter,
+  createAdaptiveRouter,
+  routeRequest,
+  type RouteConfig,
+  type RoutingContext,
   type CircuitBreakerState,
   type RoutingDecision,
-  type HealthMetrics,
+  type RouteMetrics,
 } from './adaptive-routing';
 
 export * from './fallback-chain';

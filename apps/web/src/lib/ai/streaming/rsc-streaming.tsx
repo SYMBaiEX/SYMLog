@@ -11,7 +11,7 @@ import { z } from 'zod';
 import {
   type PrepareStepFunction,
   usePrepareStep,
-} from '../../hooks/use-prepare-step';
+} from '@/hooks/use-prepare-step';
 import { getAIModel } from '../core/providers';
 
 // Type definitions for RSC streaming with proper AI SDK v5 constraints
@@ -243,9 +243,9 @@ export async function streamingArtifactGeneration<
   const prepareStepFunction =
     options.prepareStep ??
     (options.enableIntelligentStepping
-      ? ({ steps, stepNumber, model, messages }) => {
+      ? ({ steps, stepNumber, model, messages }: any) => {
           const isArtifactGeneration = messages.some(
-            (m) =>
+            (m: any) =>
               typeof m.content === 'string' &&
               (m.content.includes('create') ||
                 m.content.includes('generate') ||

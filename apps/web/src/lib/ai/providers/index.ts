@@ -1,15 +1,13 @@
 // Provider functionality exports
 export {
   gatewayRegistry,
-  registerGateway,
-  getRegisteredGateways,
-  clearGatewayRegistry,
-  type GatewayConfig,
-  type GatewayRegistry,
+  GatewayRegistry,
+  type EnhancedModelConfig,
+  getGatewayModel,
+  getGatewayModelById,
+  executeWithGateway,
+  systemPrompts,
 } from './gateway-registry';
-
-// Re-export specific items to avoid conflicts
-export { executeWithGateway, getGatewayModel } from './gateway-registry';
 
 export * from './gateway';
 export * from './provider-discovery';

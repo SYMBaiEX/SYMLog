@@ -12,7 +12,7 @@ import { z } from 'zod';
 import {
   type PrepareStepFunction,
   usePrepareStep,
-} from '../../hooks/use-prepare-step';
+} from '@/hooks/use-prepare-step';
 import { getAIModel } from '../core/providers';
 import { enhancedArtifactTools } from '../tools/enhanced-tools';
 
@@ -133,10 +133,10 @@ export async function streamingChat(
   const prepareStepFunction =
     options.prepareStep ??
     (options.enableIntelligentStepping
-      ? ({ steps, stepNumber, model, messages }) => {
+      ? ({ steps, stepNumber, model, messages }: any) => {
           // Analyze conversation complexity
           const isComplexTask = messages.some(
-            (m) =>
+            (m: any) =>
               typeof m.content === 'string' &&
               (m.content.includes('code') ||
                 m.content.includes('analyze') ||

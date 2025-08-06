@@ -747,7 +747,7 @@ export class UnifiedProviderSystem {
     return wrapLanguageModel({
       model: model as any,
       middleware: {
-        wrapGenerate: async ({ doGenerate, params }) => {
+        wrapGenerate: async ({ doGenerate, params }: any) => {
           try {
             return await doGenerate(params);
           } catch (error) {
