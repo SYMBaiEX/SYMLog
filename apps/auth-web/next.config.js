@@ -10,8 +10,10 @@ const nextConfig = {
   },
   env: {
     NEXT_PUBLIC_CONVEX_URL: process.env.NEXT_PUBLIC_CONVEX_URL,
-    NEXT_PUBLIC_CROSSMINT_CLIENT_KEY: process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY,
-    NEXT_PUBLIC_AUTH_REDIRECT_URL: process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL || 'symlog://auth',
+    NEXT_PUBLIC_CROSSMINT_CLIENT_KEY:
+      process.env.NEXT_PUBLIC_CROSSMINT_CLIENT_KEY,
+    NEXT_PUBLIC_AUTH_REDIRECT_URL:
+      process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL || 'symlog://auth',
   },
   output: 'standalone',
   webpack: (config, { isServer }) => {
@@ -21,9 +23,9 @@ const nextConfig = {
         ...config.resolve.fallback,
         '@react-native-async-storage/async-storage': false,
         'pino-pretty': false,
-      }
+      };
     }
-    return config
+    return config;
   },
   async headers() {
     return [
@@ -45,25 +47,25 @@ const nextConfig = {
               "base-uri 'self'",
               "form-action 'self'",
               "frame-ancestors 'none'",
-              "upgrade-insecure-requests"
-            ].join('; ')
+              'upgrade-insecure-requests',
+            ].join('; '),
           },
           {
             key: 'X-Frame-Options',
-            value: 'DENY'
+            value: 'DENY',
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff'
+            value: 'nosniff',
           },
           {
             key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin'
-          }
-        ]
-      }
-    ]
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
   },
-}
+};
 
-module.exports = nextConfig
+module.exports = nextConfig;

@@ -1,5 +1,53 @@
 {
   "compilerOptions": {
-    "strictNullChecks": true
-  }
+    "target": "ES2017",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "alwaysStrict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "downlevelIteration": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./apps/web/src/*"],
+      "@web/*": ["./apps/web/src/*"],
+      "@auth/*": ["./apps/auth-web/src/*"],
+      "@backend/*": ["./packages/backend/*"]
+    }
+  },
+  "include": [
+    "apps/**/*.ts",
+    "apps/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    ".turbo",
+    "**/node_modules",
+    "**/*.tsbuildinfo",
+    "packages/backend/convex/_generated",
+    "apps/web/convex/_generated"
+  ]
 }

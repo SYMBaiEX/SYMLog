@@ -1,22 +1,22 @@
-"use client"
+'use client';
 
-import { SWRConfig } from 'swr'
-import { ReactNode } from 'react'
+import type { ReactNode } from 'react';
+import { SWRConfig } from 'swr';
 
 interface SWRProviderProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 // Default fetcher function for SWR with validation
 const fetcher = async (url: string) => {
   // Basic URL validation
   if (!url || typeof url !== 'string') {
-    throw new Error('Invalid URL provided to fetcher')
+    throw new Error('Invalid URL provided to fetcher');
   }
 
   // Only allow API endpoints from same origin for security
-  if (!url.startsWith('/api/') && !url.startsWith('http')) {
-    throw new Error('Only API endpoints are allowed')
+  if (!(url.startsWith('/api/') || url.startsWith('http'))) {
+    throw new Error('Only API endpoints are allowed');
   }
 
   const response = await fetch(url, {
@@ -24,23 +24,23 @@ const fetcher = async (url: string) => {
     headers: {
       'Content-Type': 'application/json',
     },
-  })
-  
+  });
+
   if (!response.ok) {
-    const error = new Error('An error occurred while fetching the data')
-    error.message = response.statusText
-    throw error
+    const error = new Error('An error occurred while fetching the data');
+    error.message = response.statusText;
+    throw error;
   }
-  
-  const data = await response.json()
-  
+
+  const data = await response.json();
+
   // Basic data validation - ensure response is an object
   if (typeof data !== 'object' || data === null) {
-    throw new Error('Invalid response format')
+    throw new Error('Invalid response format');
   }
-  
-  return data
-}
+
+  return data;
+};
 
 export function SWRProvider({ children }: SWRProviderProps) {
   return (
@@ -64,16 +64,19 @@ export function SWRProvider({ children }: SWRProviderProps) {
         // Global error handler with environment awareness
         onError: (error) => {
           if (process.env.NODE_ENV === 'development') {
-            console.warn('SWR error:', error)
+            console.warn('SWR error:', error);
           } else {
             // In production, log minimal error info without sensitive data
-            console.warn('SWR error occurred:', error.name || 'Unknown error')
+            console.warn('SWR error occurred:', error.name || 'Unknown error');
           }
         },
         // Global success handler for debugging in development only
         onSuccess: (data, key) => {
           if (process.env.NODE_ENV === 'development') {
-            console.log('SWR cache hit:', typeof key === 'string' ? key.split('/')[2] || 'cache' : 'cache')
+            console.log(
+              'SWR cache hit:',
+              typeof key === 'string' ? key.split('/')[2] || 'cache' : 'cache'
+            );
           }
         },
         // Cache provider using Map for better performance
@@ -82,5 +85,5 @@ export function SWRProvider({ children }: SWRProviderProps) {
     >
       {children}
     </SWRConfig>
-  )
+  );
 }

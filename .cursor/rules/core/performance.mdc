@@ -1,0 +1,703 @@
+---
+description: "Performance Optimization Standards"
+globs: 
+  - "**/*.{ts,tsx}"
+  - "**/next.config.{js,ts}"
+  - "**/tailwind.config.{js,ts}"
+alwaysApply: true
+---
+
+# Performance Optimization Rules
+
+## Performance Targets
+
+### Core Web Vitals
+- **LCP (Largest Contentful Paint)**: < 2.5s
+- **FID (First Input Delay)**: < 100ms  
+- **CLS (Cumulative Layout Shift)**: < 0.1
+- **INP (Interaction to Next Paint)**: < 200ms
+- **TTFB (Time to First Byte)**: < 800ms
+
+### Application Metrics
+- **Initial Bundle Size**: < 500KB
+- **Total Bundle Size**: < 2MB
+- **API Response Time**: < 200ms (p50), < 500ms (p95)
+- **Memory Usage**: < 100MB mobile, < 500MB desktop
+- **60 FPS** for all animations and interactions
+
+## Bundle Optimization
+
+### 1. Code Splitting
+```typescript
+// Route-based splitting (automatic in Next.js 15)
+// Component-based splitting for heavy components
+import dynamic from 'next/dynamic'
+
+const HeavyChart = dynamic(() => import('@/components/HeavyChart'), {
+  loading: () => <ChartSkeleton />,
+  ssr: false, // Disable SSR for client-only components
+})
+
+// Conditional loading
+const AdminPanel = dynamic(() => 
+  import('@/components/AdminPanel').then(mod => mod.AdminPanel),
+  { 
+    loading: () => <div>Loading admin panel...</div>,
+    ssr: false 
+  }
+)
+
+// Parallel loading for better performance
+const loadComponents = async () => {
+  const [Chart, Table, Form] = await Promise.all([
+    import('./Chart'),
+    import('./Table'),
+    import('./Form'),
+  ])
+  return { Chart, Table, Form }
+}
+```
+
+### 2. Tree Shaking
+```typescript
+// Use specific imports
+// ❌ Bad: Imports entire library
+import _ from 'lodash'
+
+// ✅ Good: Imports only what's needed
+import debounce from 'lodash/debounce'
+
+// Even better: Use native alternatives
+const debounce = (fn: Function, delay: number) => {
+  let timeoutId: NodeJS.Timeout
+  return (...args: any[]) => {
+    clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn(...args), delay)
+  }
+}
+
+// Configure tree shaking in next.config.ts
+export default {
+  experimental: {
+    optimizePackageImports: ['lodash', 'date-fns', '@mui/icons-material'],
+  },
+}
+```
+
+### 3. Bundle Analysis
+```typescript
+// next.config.ts
+import { BundleAnalyzerPlugin } from 'webpack-bundle-analyzer'
+
+export default {
+  webpack: (config, { isServer }) => {
+    if (process.env.ANALYZE === 'true') {
+      config.plugins.push(
+        new BundleAnalyzerPlugin({
+          analyzerMode: 'static',
+          reportFilename: isServer 
+            ? '../analyze/server.html' 
+            : '../analyze/client.html',
+        })
+      )
+    }
+    return config
+  },
+}
+
+// Run analysis: ANALYZE=true bun build
+```
+
+## React Performance
+
+### 1. Memoization Strategy
+```typescript
+// Memoize expensive computations
+const ExpensiveComponent = memo(({ data }: Props) => {
+  const processedData = useMemo(
+    () => processComplexData(data),
+    [data] // Only recompute when data changes
+  )
+  
+  const handleClick = useCallback(
+    (id: string) => {
+      // Handle click without causing re-renders
+      processItem(id)
+    },
+    [] // Stable reference
+  )
+  
+  return <DataView data={processedData} onClick={handleClick} />
+}, (prevProps, nextProps) => {
+  // Custom comparison for fine-grained control
+  return prevProps.data.id === nextProps.data.id &&
+         prevProps.data.version === nextProps.data.version
+})
+
+// Use React.lazy for code splitting
+const LazyComponent = lazy(() => 
+  import('./HeavyComponent')
+    .then(module => ({ default: module.HeavyComponent }))
+)
+```
+
+### 2. Virtual Scrolling
+```typescript
+import { useVirtualizer } from '@tanstack/react-virtual'
+
+export function VirtualList({ items }: { items: Item[] }) {
+  const parentRef = useRef<HTMLDivElement>(null)
+  
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50, // Estimated item height
+    overscan: 5, // Render 5 items outside viewport
+  })
+  
+  return (
+    <div ref={parentRef} className="h-full overflow-auto">
+      <div style={{ height: `${virtualizer.getTotalSize()}px` }}>
+        {virtualizer.getVirtualItems().map((virtualRow) => (
+          <div
+            key={virtualRow.key}
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: `${virtualRow.size}px`,
+              transform: `translateY(${virtualRow.start}px)`,
+            }}
+          >
+            <Item item={items[virtualRow.index]} />
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+```
+
+### 3. State Update Optimization
+```typescript
+// Batch state updates
+import { flushSync } from 'react-dom'
+
+// React 18+ automatically batches, but for legacy code:
+const handleMultipleUpdates = () => {
+  flushSync(() => {
+    setCount(c => c + 1)
+    setFlag(true)
+    setItems([...items, newItem])
+  })
+}
+
+// Use state reducers for complex updates
+const [state, dispatch] = useReducer((state, action) => {
+  switch (action.type) {
+    case 'UPDATE_ALL':
+      // Single re-render for multiple updates
+      return {
+        ...state,
+        count: state.count + 1,
+        flag: true,
+        items: [...state.items, action.payload],
+      }
+    default:
+      return state
+  }
+}, initialState)
+
+// Optimize context usage
+const ThemeContext = createContext()
+const UserContext = createContext()
+
+// ❌ Bad: Single context causes unnecessary re-renders
+const AppContext = createContext({ theme, user, settings })
+
+// ✅ Good: Separate contexts for different concerns
+<ThemeContext.Provider value={theme}>
+  <UserContext.Provider value={user}>
+    <App />
+  </UserContext.Provider>
+</ThemeContext.Provider>
+```
+
+## Image Optimization
+
+### 1. Next.js Image Component
+```typescript
+import Image from 'next/image'
+
+// Responsive images with automatic optimization
+export function OptimizedImage({ src, alt }: Props) {
+  return (
+    <Image
+      src={src}
+      alt={alt}
+      width={800}
+      height={600}
+      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+      quality={85}
+      placeholder="blur"
+      blurDataURL={generateBlurDataURL(src)}
+      loading="lazy" // Default for Next.js Image
+      style={{
+        width: '100%',
+        height: 'auto',
+      }}
+    />
+  )
+}
+
+// Generate blur placeholders
+export async function generateBlurDataURL(src: string): Promise<string> {
+  // Use a service like Plaiceholder or generate during build
+  const { base64 } = await getPlaiceholder(src)
+  return base64
+}
+```
+
+### 2. Image Format Selection
+```typescript
+// next.config.ts
+export default {
+  images: {
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60 * 60 * 24 * 365, // 1 year
+  },
+}
+
+// Preload critical images
+export function PreloadImages({ images }: { images: string[] }) {
+  useEffect(() => {
+    images.forEach(src => {
+      const link = document.createElement('link')
+      link.rel = 'preload'
+      link.as = 'image'
+      link.href = src
+      document.head.appendChild(link)
+    })
+  }, [images])
+  
+  return null
+}
+```
+
+## API Performance
+
+### 1. Caching Strategy
+```typescript
+// Use stale-while-revalidate pattern
+export async function getCachedData<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  options: CacheOptions = {}
+): Promise<T> {
+  const {
+    ttl = 60 * 1000, // 1 minute default
+    swr = 5 * 60 * 1000, // 5 minutes stale-while-revalidate
+  } = options
+  
+  const cached = await cache.get(key)
+  
+  if (cached) {
+    const age = Date.now() - cached.timestamp
+    
+    // Return fresh cache
+    if (age < ttl) {
+      return cached.data
+    }
+    
+    // Return stale cache while revalidating
+    if (age < ttl + swr) {
+      // Revalidate in background
+      fetcher().then(data => {
+        cache.set(key, { data, timestamp: Date.now() })
+      })
+      return cached.data
+    }
+  }
+  
+  // Fetch fresh data
+  const data = await fetcher()
+  await cache.set(key, { data, timestamp: Date.now() })
+  return data
+}
+```
+
+### 2. Database Query Optimization
+```typescript
+// Use indexes for Convex queries
+export const getUsersByRole = query({
+  args: { role: v.string() },
+  handler: async (ctx, args) => {
+    // Use index for efficient querying
+    return await ctx.db
+      .query('users')
+      .withIndex('by_role', (q) => q.eq('role', args.role))
+      .collect()
+  },
+})
+
+// Batch operations
+export const batchUpdateUsers = mutation({
+  args: { updates: v.array(v.object({ id: v.id('users'), data: v.any() })) },
+  handler: async (ctx, args) => {
+    // Process in parallel for better performance
+    await Promise.all(
+      args.updates.map(({ id, data }) =>
+        ctx.db.patch(id, data)
+      )
+    )
+  },
+})
+
+// Pagination for large datasets
+export const paginatedQuery = query({
+  args: { 
+    cursor: v.optional(v.string()),
+    limit: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const { cursor, limit = 20 } = args
+    
+    let query = ctx.db.query('items')
+    
+    if (cursor) {
+      query = query.filter((q) => q.gt(q.field('_id'), cursor))
+    }
+    
+    const items = await query.take(limit + 1)
+    const hasMore = items.length > limit
+    const nextCursor = hasMore ? items[limit - 1]._id : null
+    
+    return {
+      items: items.slice(0, limit),
+      nextCursor,
+      hasMore,
+    }
+  },
+})
+```
+
+### 3. Request Deduplication
+```typescript
+// Deduplicate concurrent requests
+class RequestDeduplicator {
+  private pending = new Map<string, Promise<any>>()
+  
+  async fetch<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+    // Return existing promise if request is in flight
+    if (this.pending.has(key)) {
+      return this.pending.get(key)!
+    }
+    
+    // Create new promise and store it
+    const promise = fetcher().finally(() => {
+      this.pending.delete(key)
+    })
+    
+    this.pending.set(key, promise)
+    return promise
+  }
+}
+
+const deduplicator = new RequestDeduplicator()
+
+// Usage in React Query or SWR
+export function useUser(userId: string) {
+  return useQuery({
+    queryKey: ['user', userId],
+    queryFn: () => deduplicator.fetch(
+      `user-${userId}`,
+      () => fetchUser(userId)
+    ),
+  })
+}
+```
+
+## CSS Performance
+
+### 1. Critical CSS
+```typescript
+// Extract critical CSS for above-the-fold content
+// In pages/_document.tsx
+import { getCssText } from '@/stitches.config'
+
+export default function Document() {
+  return (
+    <Html>
+      <Head>
+        <style
+          id="stitches"
+          dangerouslySetInnerHTML={{ __html: getCssText() }}
+        />
+      </Head>
+      <body>
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  )
+}
+
+// Use CSS-in-JS with zero runtime
+// tailwind.config.ts
+export default {
+  content: [
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
+  ],
+  // Purge unused styles
+  theme: {
+    extend: {
+      // Custom utilities for common patterns
+      animation: {
+        'fade-in': 'fadeIn 0.5s ease-in-out',
+        'slide-up': 'slideUp 0.3s ease-out',
+      },
+    },
+  },
+}
+```
+
+### 2. CSS Containment
+```css
+/* Use CSS containment for performance */
+.card {
+  contain: layout style paint;
+  /* Tells browser this element won't affect others */
+}
+
+.virtual-list-item {
+  contain: strict;
+  /* Maximum containment for list items */
+}
+
+/* Use will-change sparingly */
+.animation-target {
+  will-change: transform;
+}
+
+/* Remove will-change after animation */
+.animation-target.finished {
+  will-change: auto;
+}
+```
+
+## Font Optimization
+
+### 1. Font Loading Strategy
+```typescript
+// next.config.ts
+import { Inter, Roboto_Mono } from 'next/font/google'
+
+export const inter = Inter({
+  subsets: ['latin'],
+  display: 'swap', // Prevent FOIT
+  preload: true,
+  fallback: ['system-ui', 'arial'],
+  adjustFontFallback: true, // Reduce CLS
+})
+
+export const robotoMono = Roboto_Mono({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-mono',
+  preload: false, // Don't preload secondary fonts
+})
+
+// Use in layout.tsx
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en" className={`${inter.className} ${robotoMono.variable}`}>
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+### 2. Font Subsetting
+```css
+/* Use unicode-range for icon fonts */
+@font-face {
+  font-family: 'Icons';
+  src: url('/fonts/icons.woff2') format('woff2');
+  unicode-range: U+E000-F8FF; /* Private use area */
+  font-display: block; /* Prevent FOIT for icons */
+}
+```
+
+## Runtime Performance
+
+### 1. Web Workers
+```typescript
+// Heavy computation in Web Worker
+// worker.ts
+self.addEventListener('message', (event) => {
+  const { data, id } = event.data
+  
+  // Perform heavy computation
+  const result = processLargeDataset(data)
+  
+  self.postMessage({ result, id })
+})
+
+// Main thread
+export function useWebWorker<T, R>(
+  workerPath: string,
+  processor: (data: T) => R
+) {
+  const [result, setResult] = useState<R | null>(null)
+  const [loading, setLoading] = useState(false)
+  const workerRef = useRef<Worker>()
+  
+  useEffect(() => {
+    workerRef.current = new Worker(workerPath)
+    
+    workerRef.current.onmessage = (event) => {
+      setResult(event.data.result)
+      setLoading(false)
+    }
+    
+    return () => workerRef.current?.terminate()
+  }, [workerPath])
+  
+  const process = useCallback((data: T) => {
+    setLoading(true)
+    workerRef.current?.postMessage({ data, id: Date.now() })
+  }, [])
+  
+  return { result, loading, process }
+}
+```
+
+### 2. Debouncing and Throttling
+```typescript
+// Optimized hooks for performance
+export function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value)
+  
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value)
+    }, delay)
+    
+    return () => clearTimeout(handler)
+  }, [value, delay])
+  
+  return debouncedValue
+}
+
+export function useThrottle<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number
+): T {
+  const lastRun = useRef(Date.now())
+  
+  return useCallback((...args: Parameters<T>) => {
+    const now = Date.now()
+    
+    if (now - lastRun.current >= delay) {
+      lastRun.current = now
+      return callback(...args)
+    }
+  }, [callback, delay]) as T
+}
+
+// Usage
+const debouncedSearch = useDebounce(searchTerm, 300)
+const throttledScroll = useThrottle(handleScroll, 100)
+```
+
+## Monitoring
+
+### 1. Performance Monitoring
+```typescript
+// Custom performance monitoring
+export function measurePerformance(name: string) {
+  const start = performance.now()
+  
+  return {
+    end: () => {
+      const duration = performance.now() - start
+      
+      // Log to analytics
+      analytics.track('performance', {
+        metric: name,
+        duration,
+        timestamp: Date.now(),
+      })
+      
+      // Log warning for slow operations
+      if (duration > 1000) {
+        console.warn(`Slow operation: ${name} took ${duration}ms`)
+      }
+    }
+  }
+}
+
+// React DevTools Profiler
+export function ProfiledComponent({ children, id }: Props) {
+  const onRender = (
+    id: string,
+    phase: 'mount' | 'update',
+    actualDuration: number
+  ) => {
+    // Send to analytics
+    analytics.track('react_render', {
+      component: id,
+      phase,
+      duration: actualDuration,
+    })
+  }
+  
+  return (
+    <Profiler id={id} onRender={onRender}>
+      {children}
+    </Profiler>
+  )
+}
+```
+
+### 2. Bundle Size Monitoring
+```typescript
+// Monitor bundle size in CI
+import { readFileSync } from 'fs'
+import { join } from 'path'
+
+export async function checkBundleSize() {
+  const stats = JSON.parse(
+    readFileSync(join(process.cwd(), '.next/build-stats.json'), 'utf-8')
+  )
+  
+  const limits = {
+    'main.js': 500 * 1024, // 500KB
+    'pages/index.js': 100 * 1024, // 100KB
+  }
+  
+  const violations = []
+  
+  for (const [file, limit] of Object.entries(limits)) {
+    const size = stats.bundles[file]?.size || 0
+    
+    if (size > limit) {
+      violations.push({
+        file,
+        size,
+        limit,
+        excess: size - limit,
+      })
+    }
+  }
+  
+  if (violations.length > 0) {
+    throw new Error(`Bundle size violations: ${JSON.stringify(violations)}`)
+  }
+}
+```
+
+Remember: Performance is a feature. Measure, optimize, and monitor continuously.

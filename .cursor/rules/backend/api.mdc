@@ -1,0 +1,848 @@
+---
+description: "API Design and Development Standards"
+globs: 
+  - "**/api/**/*.{ts,js}"
+  - "**/routes/**/*.{ts,js}"
+  - "**/controllers/**/*.{ts,js}"
+alwaysApply: true
+---
+
+# API Design Rules
+
+## RESTful API Principles
+
+### 1. URL Structure
+```typescript
+// Resource-based URLs
+// ✅ Good
+GET    /api/users              // List users
+GET    /api/users/:id          // Get specific user
+POST   /api/users              // Create user
+PUT    /api/users/:id          // Update entire user
+PATCH  /api/users/:id          // Partial update
+DELETE /api/users/:id          // Delete user
+
+// Nested resources
+GET    /api/users/:id/posts    // User's posts
+POST   /api/users/:id/posts    // Create post for user
+GET    /api/posts/:id/comments // Post's comments
+
+// ❌ Bad - verb-based URLs
+GET    /api/getUsers
+POST   /api/createUser
+POST   /api/updateUser
+POST   /api/deleteUser
+```
+
+### 2. HTTP Methods
+```typescript
+// app/api/users/route.ts (Next.js App Router)
+import { NextRequest, NextResponse } from 'next/server'
+import { z } from 'zod'
+
+// GET /api/users - List resources
+export async function GET(request: NextRequest) {
+  try {
+    // Parse query parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '10')
+    const sort = searchParams.get('sort') || '-createdAt'
+    const filter = searchParams.get('filter')
+    
+    // Validate parameters
+    if (page < 1 || limit < 1 || limit > 100) {
+      return NextResponse.json(
+        { error: 'Invalid pagination parameters' },
+        { status: 400 }
+      )
+    }
+    
+    // Build query
+    let query = db.select().from(users)
+    
+    if (filter) {
+      query = query.where(/* filter conditions */)
+    }
+    
+    // Execute query with pagination
+    const totalCount = await db.count(users)
+    const data = await query
+      .orderBy(sort)
+      .limit(limit)
+      .offset((page - 1) * limit)
+    
+    // Return paginated response
+    return NextResponse.json({
+      data,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limit),
+      },
+      links: {
+        self: `/api/users?page=${page}&limit=${limit}`,
+        first: `/api/users?page=1&limit=${limit}`,
+        last: `/api/users?page=${Math.ceil(totalCount / limit)}&limit=${limit}`,
+        next: page < Math.ceil(totalCount / limit) 
+          ? `/api/users?page=${page + 1}&limit=${limit}` 
+          : null,
+        prev: page > 1 
+          ? `/api/users?page=${page - 1}&limit=${limit}` 
+          : null,
+      },
+    })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+// POST /api/users - Create resource
+export async function POST(request: NextRequest) {
+  try {
+    // Parse and validate body
+    const body = await request.json()
+    
+    const createUserSchema = z.object({
+      email: z.string().email(),
+      name: z.string().min(2).max(100),
+      password: z.string().min(8),
+      role: z.enum(['user', 'admin']).default('user'),
+    })
+    
+    const data = createUserSchema.parse(body)
+    
+    // Check for conflicts
+    const existing = await db.select()
+      .from(users)
+      .where(eq(users.email, data.email))
+      .limit(1)
+    
+    if (existing.length > 0) {
+      return NextResponse.json(
+        { error: 'User with this email already exists' },
+        { status: 409 } // Conflict
+      )
+    }
+    
+    // Create resource
+    const hashedPassword = await hashPassword(data.password)
+    const user = await db.insert(users).values({
+      ...data,
+      password: hashedPassword,
+    }).returning()
+    
+    // Return created resource
+    return NextResponse.json(
+      { data: omit(user[0], ['password']) },
+      { 
+        status: 201, // Created
+        headers: {
+          'Location': `/api/users/${user[0].id}`,
+        },
+      }
+    )
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+// PUT /api/users/:id - Full update
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json()
+    
+    const updateUserSchema = z.object({
+      email: z.string().email(),
+      name: z.string().min(2).max(100),
+      role: z.enum(['user', 'admin']),
+      // All fields required for PUT
+    })
+    
+    const data = updateUserSchema.parse(body)
+    
+    // Update entire resource
+    const updated = await db.update(users)
+      .set(data)
+      .where(eq(users.id, params.id))
+      .returning()
+    
+    if (updated.length === 0) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+    
+    return NextResponse.json({ data: updated[0] })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+// PATCH /api/users/:id - Partial update
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const body = await request.json()
+    
+    const patchUserSchema = z.object({
+      email: z.string().email().optional(),
+      name: z.string().min(2).max(100).optional(),
+      role: z.enum(['user', 'admin']).optional(),
+      // All fields optional for PATCH
+    })
+    
+    const data = patchUserSchema.parse(body)
+    
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      )
+    }
+    
+    // Update only provided fields
+    const updated = await db.update(users)
+      .set(data)
+      .where(eq(users.id, params.id))
+      .returning()
+    
+    if (updated.length === 0) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+    
+    return NextResponse.json({ data: updated[0] })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+// DELETE /api/users/:id - Delete resource
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const deleted = await db.delete(users)
+      .where(eq(users.id, params.id))
+      .returning()
+    
+    if (deleted.length === 0) {
+      return NextResponse.json(
+        { error: 'User not found' },
+        { status: 404 }
+      )
+    }
+    
+    // Return 204 No Content on successful deletion
+    return new NextResponse(null, { status: 204 })
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+```
+
+### 3. Status Codes
+```typescript
+// Success responses
+200 OK                  // Successful GET, PUT, PATCH
+201 Created            // Successful POST
+202 Accepted           // Request accepted for processing
+204 No Content         // Successful DELETE
+
+// Client errors
+400 Bad Request        // Invalid request data
+401 Unauthorized       // Missing or invalid authentication
+403 Forbidden         // Authenticated but not authorized
+404 Not Found         // Resource doesn't exist
+405 Method Not Allowed // HTTP method not supported
+409 Conflict          // Resource conflict (duplicate)
+422 Unprocessable Entity // Validation errors
+429 Too Many Requests  // Rate limit exceeded
+
+// Server errors
+500 Internal Server Error // Generic server error
+502 Bad Gateway          // Invalid response from upstream
+503 Service Unavailable  // Server temporarily unavailable
+504 Gateway Timeout      // Upstream timeout
+```
+
+### 4. Error Responses
+```typescript
+// Consistent error format
+interface ApiError {
+  error: {
+    code: string
+    message: string
+    details?: any
+    timestamp: string
+    path: string
+    requestId?: string
+  }
+}
+
+// Error handler
+export function handleApiError(error: unknown): NextResponse {
+  console.error('API Error:', error)
+  
+  // Zod validation errors
+  if (error instanceof z.ZodError) {
+    return NextResponse.json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid request data',
+        details: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+        })),
+        timestamp: new Date().toISOString(),
+        path: request.url,
+      },
+    }, { status: 422 })
+  }
+  
+  // Custom application errors
+  if (error instanceof AppError) {
+    return NextResponse.json({
+      error: {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        timestamp: new Date().toISOString(),
+        path: request.url,
+      },
+    }, { status: error.statusCode })
+  }
+  
+  // Database errors
+  if (error instanceof DatabaseError) {
+    if (error.code === 'P2002') {
+      return NextResponse.json({
+        error: {
+          code: 'DUPLICATE_ENTRY',
+          message: 'Resource already exists',
+          timestamp: new Date().toISOString(),
+          path: request.url,
+        },
+      }, { status: 409 })
+    }
+  }
+  
+  // Generic error
+  return NextResponse.json({
+    error: {
+      code: 'INTERNAL_ERROR',
+      message: 'An unexpected error occurred',
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      requestId: generateRequestId(),
+    },
+  }, { status: 500 })
+}
+
+// Custom error classes
+export class AppError extends Error {
+  constructor(
+    public code: string,
+    public message: string,
+    public statusCode: number,
+    public details?: any
+  ) {
+    super(message)
+    this.name = 'AppError'
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string, details?: any) {
+    super('VALIDATION_ERROR', message, 422, details)
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(resource: string) {
+    super('NOT_FOUND', `${resource} not found`, 404)
+  }
+}
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Unauthorized') {
+    super('UNAUTHORIZED', message, 401)
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'Forbidden') {
+    super('FORBIDDEN', message, 403)
+  }
+}
+```
+
+### 5. Authentication & Authorization
+```typescript
+// JWT authentication middleware
+import { verify } from 'jsonwebtoken'
+
+export async function authenticate(
+  request: NextRequest
+): Promise<User | null> {
+  const token = request.headers.get('authorization')?.replace('Bearer ', '')
+  
+  if (!token) {
+    throw new UnauthorizedError('Missing authentication token')
+  }
+  
+  try {
+    const payload = verify(token, process.env.JWT_SECRET!) as JWTPayload
+    const user = await getUserById(payload.sub)
+    
+    if (!user) {
+      throw new UnauthorizedError('Invalid token')
+    }
+    
+    return user
+  } catch (error) {
+    throw new UnauthorizedError('Invalid token')
+  }
+}
+
+// Role-based authorization
+export function authorize(...allowedRoles: string[]) {
+  return async (request: NextRequest) => {
+    const user = await authenticate(request)
+    
+    if (!allowedRoles.includes(user.role)) {
+      throw new ForbiddenError(
+        `Requires one of the following roles: ${allowedRoles.join(', ')}`
+      )
+    }
+    
+    return user
+  }
+}
+
+// Usage in route handler
+export async function DELETE(request: NextRequest) {
+  try {
+    // Only admins can delete users
+    await authorize('admin')(request)
+    
+    // Delete logic...
+  } catch (error) {
+    return handleApiError(error)
+  }
+}
+
+// API key authentication for service-to-service
+export async function authenticateApiKey(
+  request: NextRequest
+): Promise<Service | null> {
+  const apiKey = request.headers.get('x-api-key')
+  
+  if (!apiKey) {
+    throw new UnauthorizedError('Missing API key')
+  }
+  
+  const service = await getServiceByApiKey(apiKey)
+  
+  if (!service) {
+    throw new UnauthorizedError('Invalid API key')
+  }
+  
+  // Check rate limits
+  const rateLimitOk = await checkRateLimit(service.id, request)
+  if (!rateLimitOk) {
+    throw new AppError('RATE_LIMIT_EXCEEDED', 'Too many requests', 429)
+  }
+  
+  return service
+}
+```
+
+### 6. Request Validation
+```typescript
+// Comprehensive validation with Zod
+import { z } from 'zod'
+
+// Reusable schemas
+const paginationSchema = z.object({
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(100).default(10),
+  sort: z.string().regex(/^-?\w+$/).optional(),
+})
+
+const filterSchema = z.object({
+  status: z.enum(['active', 'inactive']).optional(),
+  role: z.enum(['user', 'admin']).optional(),
+  createdAfter: z.coerce.date().optional(),
+  createdBefore: z.coerce.date().optional(),
+})
+
+// Query parameter validation
+export function validateQuery<T>(
+  searchParams: URLSearchParams,
+  schema: z.ZodSchema<T>
+): T {
+  const params = Object.fromEntries(searchParams.entries())
+  return schema.parse(params)
+}
+
+// Body validation with detailed errors
+export async function validateBody<T>(
+  request: NextRequest,
+  schema: z.ZodSchema<T>
+): Promise<T> {
+  try {
+    const body = await request.json()
+    return schema.parse(body)
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      throw new ValidationError('Invalid request body', {
+        errors: error.errors.map(err => ({
+          field: err.path.join('.'),
+          message: err.message,
+          code: err.code,
+        })),
+      })
+    }
+    throw new ValidationError('Invalid JSON in request body')
+  }
+}
+
+// File upload validation
+const fileUploadSchema = z.object({
+  file: z.instanceof(File),
+  type: z.enum(['image', 'document', 'video']),
+  maxSize: z.number().max(10 * 1024 * 1024), // 10MB
+})
+
+export async function validateFileUpload(request: NextRequest) {
+  const formData = await request.formData()
+  const file = formData.get('file') as File
+  
+  if (!file) {
+    throw new ValidationError('No file provided')
+  }
+  
+  // Validate file type
+  const allowedTypes = {
+    image: ['image/jpeg', 'image/png', 'image/webp'],
+    document: ['application/pdf', 'application/msword'],
+    video: ['video/mp4', 'video/webm'],
+  }
+  
+  const fileType = formData.get('type') as string
+  
+  if (!allowedTypes[fileType]?.includes(file.type)) {
+    throw new ValidationError(`Invalid file type: ${file.type}`)
+  }
+  
+  return { file, type: fileType }
+}
+```
+
+### 7. Response Formatting
+```typescript
+// Consistent response structure
+interface ApiResponse<T> {
+  data: T
+  meta?: {
+    timestamp: string
+    version: string
+    requestId: string
+  }
+}
+
+interface PaginatedResponse<T> extends ApiResponse<T[]> {
+  pagination: {
+    page: number
+    limit: number
+    total: number
+    pages: number
+  }
+  links: {
+    self: string
+    first: string
+    last: string
+    next: string | null
+    prev: string | null
+  }
+}
+
+// Response builder
+export class ResponseBuilder {
+  static success<T>(data: T, meta?: Partial<ApiResponse<T>['meta']>) {
+    return NextResponse.json({
+      data,
+      meta: {
+        timestamp: new Date().toISOString(),
+        version: 'v1',
+        requestId: generateRequestId(),
+        ...meta,
+      },
+    })
+  }
+  
+  static paginated<T>(
+    data: T[],
+    pagination: PaginatedResponse<T>['pagination'],
+    baseUrl: string
+  ) {
+    const { page, limit, total, pages } = pagination
+    
+    return NextResponse.json({
+      data,
+      pagination,
+      links: {
+        self: `${baseUrl}?page=${page}&limit=${limit}`,
+        first: `${baseUrl}?page=1&limit=${limit}`,
+        last: `${baseUrl}?page=${pages}&limit=${limit}`,
+        next: page < pages 
+          ? `${baseUrl}?page=${page + 1}&limit=${limit}` 
+          : null,
+        prev: page > 1 
+          ? `${baseUrl}?page=${page - 1}&limit=${limit}` 
+          : null,
+      },
+      meta: {
+        timestamp: new Date().toISOString(),
+        version: 'v1',
+        requestId: generateRequestId(),
+      },
+    })
+  }
+  
+  static created<T>(data: T, location: string) {
+    return NextResponse.json(
+      { data },
+      {
+        status: 201,
+        headers: {
+          'Location': location,
+        },
+      }
+    )
+  }
+  
+  static noContent() {
+    return new NextResponse(null, { status: 204 })
+  }
+}
+```
+
+### 8. Rate Limiting
+```typescript
+// Rate limiting with Redis
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(100, '1 m'), // 100 requests per minute
+  analytics: true,
+})
+
+export async function rateLimit(request: NextRequest) {
+  const ip = request.ip ?? '127.0.0.1'
+  const { success, limit, reset, remaining } = await ratelimit.limit(ip)
+  
+  // Add rate limit headers
+  const headers = {
+    'X-RateLimit-Limit': limit.toString(),
+    'X-RateLimit-Remaining': remaining.toString(),
+    'X-RateLimit-Reset': new Date(reset).toISOString(),
+  }
+  
+  if (!success) {
+    return NextResponse.json(
+      {
+        error: {
+          code: 'RATE_LIMIT_EXCEEDED',
+          message: 'Too many requests',
+          retryAfter: Math.ceil((reset - Date.now()) / 1000),
+        },
+      },
+      {
+        status: 429,
+        headers: {
+          ...headers,
+          'Retry-After': Math.ceil((reset - Date.now()) / 1000).toString(),
+        },
+      }
+    )
+  }
+  
+  return { success, headers }
+}
+
+// Different rate limits for different endpoints
+const rateLimits = {
+  auth: Ratelimit.slidingWindow(5, '15 m'), // 5 auth attempts per 15 min
+  api: Ratelimit.slidingWindow(100, '1 m'), // 100 API calls per minute
+  upload: Ratelimit.slidingWindow(10, '1 h'), // 10 uploads per hour
+}
+```
+
+### 9. API Versioning
+```typescript
+// Version in URL path
+// /api/v1/users
+// /api/v2/users
+
+// Version in header
+export function getApiVersion(request: NextRequest): string {
+  return request.headers.get('api-version') || 'v1'
+}
+
+// Version-specific handlers
+const handlers = {
+  v1: {
+    getUsers: getUsersV1,
+    createUser: createUserV1,
+  },
+  v2: {
+    getUsers: getUsersV2,
+    createUser: createUserV2,
+  },
+}
+
+export async function GET(request: NextRequest) {
+  const version = getApiVersion(request)
+  const handler = handlers[version]?.getUsers
+  
+  if (!handler) {
+    return NextResponse.json(
+      { error: 'Unsupported API version' },
+      { status: 400 }
+    )
+  }
+  
+  return handler(request)
+}
+
+// Deprecation headers
+export function addDeprecationHeaders(response: NextResponse, sunset?: Date) {
+  response.headers.set('Deprecation', 'true')
+  if (sunset) {
+    response.headers.set('Sunset', sunset.toUTCString())
+  }
+  response.headers.set(
+    'Link',
+    '</api/v2/users>; rel="successor-version"'
+  )
+  return response
+}
+```
+
+### 10. OpenAPI Documentation
+```typescript
+// OpenAPI schema generation
+import { z } from 'zod'
+import { generateSchema } from '@anatine/zod-openapi'
+
+// Add OpenAPI metadata to Zod schemas
+const userSchema = z.object({
+  id: z.string().uuid().describe('Unique user identifier'),
+  email: z.string().email().describe('User email address'),
+  name: z.string().describe('User full name'),
+  role: z.enum(['user', 'admin']).describe('User role'),
+  createdAt: z.string().datetime().describe('Creation timestamp'),
+}).openapi('User')
+
+// Generate OpenAPI spec
+export const openApiSpec = {
+  openapi: '3.0.0',
+  info: {
+    title: 'SYMLog API',
+    version: '1.0.0',
+    description: 'API for SYMLog platform',
+  },
+  servers: [
+    { url: 'https://api.symlog.ai', description: 'Production' },
+    { url: 'http://localhost:3000', description: 'Development' },
+  ],
+  paths: {
+    '/api/users': {
+      get: {
+        summary: 'List users',
+        parameters: [
+          {
+            name: 'page',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1 },
+          },
+          {
+            name: 'limit',
+            in: 'query',
+            schema: { type: 'integer', minimum: 1, maximum: 100 },
+          },
+        ],
+        responses: {
+          200: {
+            description: 'Successful response',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    data: {
+                      type: 'array',
+                      items: generateSchema(userSchema),
+                    },
+                    pagination: {
+                      $ref: '#/components/schemas/Pagination',
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  },
+  components: {
+    schemas: {
+      User: generateSchema(userSchema),
+      Pagination: {
+        type: 'object',
+        properties: {
+          page: { type: 'integer' },
+          limit: { type: 'integer' },
+          total: { type: 'integer' },
+          pages: { type: 'integer' },
+        },
+      },
+    },
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      apiKey: {
+        type: 'apiKey',
+        in: 'header',
+        name: 'X-API-Key',
+      },
+    },
+  },
+}
+
+// Serve OpenAPI spec
+export async function GET() {
+  return NextResponse.json(openApiSpec)
+}
+```
+
+Remember: Design APIs that are predictable, well-documented, and easy to use. Follow REST principles consistently.

@@ -1,0 +1,121 @@
+[
+  {
+    "context": "Workspace",
+    "bindings": {
+      "cmd-t": "file_finder::Toggle",
+      "cmd-shift-t": "workspace::NewFile",
+      "cmd-shift-f": "search::ToggleProjectSearch",
+      "cmd-shift-p": "command_palette::Toggle",
+      "alt-f": "task::Spawn"
+    }
+  },
+  {
+    "context": "Editor",
+    "bindings": {
+      "cmd-/": "editor::ToggleComments",
+      "cmd-shift-l": "editor::SelectLargerSyntaxNode",
+      "cmd-shift-k": "editor::SelectSmallerSyntaxNode",
+      "cmd-d": "editor::SelectNext",
+      "cmd-shift-d": "editor::SelectPrevious",
+      "alt-up": "editor::MoveLineUp",
+      "alt-down": "editor::MoveLineDown",
+      "cmd-shift-up": "editor::AddSelectionAbove",
+      "cmd-shift-down": "editor::AddSelectionBelow"
+    }
+  },
+  {
+    "context": "ProjectPanel",
+    "bindings": {
+      "a": "project_panel::NewFile",
+      "shift-a": "project_panel::NewDirectory",
+      "d": "project_panel::Delete",
+      "r": "project_panel::Rename",
+      "x": "project_panel::Cut",
+      "c": "project_panel::Copy",
+      "v": "project_panel::Paste"
+    }
+  },
+  {
+    "context": "Terminal",
+    "bindings": {
+      "cmd-c": "terminal::Copy",
+      "cmd-v": "terminal::Paste",
+      "cmd-k": "terminal::Clear"
+    }
+  },
+  {
+    "context": "Editor && edit_prediction",
+    "bindings": {
+      "tab": "editor::AcceptEditPrediction",
+      "alt-tab": "editor::AcceptPartialEditPrediction"
+    }
+  },
+  {
+    "context": "Editor",
+    "bindings": {
+      "cmd-shift-enter": ["assistant::InlineAssist", { "prompt": "Help me refactor this code" }],
+      "cmd-alt-enter": ["assistant::InlineAssist", { "prompt": "Add comments and documentation" }],
+      "ctrl-shift-enter": ["assistant::InlineAssist", { "prompt": "Optimize this code for performance" }]
+    }
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      "cmd-1": "pane::ActivateItem(0)",
+      "cmd-2": "pane::ActivateItem(1)",
+      "cmd-3": "pane::ActivateItem(2)",
+      "cmd-4": "pane::ActivateItem(3)",
+      "cmd-5": "pane::ActivateItem(4)",
+      "cmd-6": "pane::ActivateItem(5)",
+      "cmd-7": "pane::ActivateItem(6)",
+      "cmd-8": "pane::ActivateItem(7)",
+      "cmd-9": "pane::ActivateItem(8)",
+      "cmd-0": "pane::ActivateLastItem",
+      "cmd-alt-left": "pane::ActivatePrevItem",
+      "cmd-alt-right": "pane::ActivateNextItem"
+    }
+  },
+  {
+    "context": "Workspace",
+    "bindings": {
+      "cmd-shift-e": "project_panel::ToggleFocus",
+      "cmd-shift-o": "outline_panel::ToggleFocus",
+      "cmd-j": "workspace::ToggleBottomDock",
+      "cmd-shift-j": "terminal_panel::ToggleFocus",
+      "alt-cmd-t": "task::Rerun"
+    }
+  },
+  {
+    "context": "Editor",
+    "bindings": {
+      "cmd-k cmd-f": "editor::Format",
+      "cmd-k cmd-s": "workspace::Save",
+      "cmd-k cmd-w": "pane::CloseActiveItem",
+      "cmd-k cmd-shift-w": "pane::CloseAllItems",
+      "cmd-alt-f": "search::ToggleReplace",
+      "f12": "editor::GoToDefinition",
+      "alt-f12": "editor::GoToDeclaration",
+      "shift-f12": "editor::FindAllReferences"
+    }
+  },
+  {
+    "context": "ProjectPanel",
+    "bindings": {
+      "enter": "project_panel::Open",
+      "space": "project_panel::Open",
+      "cmd-down": "project_panel::ExpandSelectedEntry",
+      "cmd-up": "project_panel::CollapseSelectedEntry",
+      "cmd-a": "project_panel::SelectAll",
+      "escape": "project_panel::Cancel"
+    }
+  },
+  {
+    "context": "Terminal",
+    "bindings": {
+      "cmd-n": "terminal_panel::NewTerminal",
+      "cmd-w": "terminal_panel::CloseTerminal",
+      "cmd-shift-c": "terminal::Copy",
+      "cmd-shift-v": "terminal::Paste"
+    }
+  }
+]

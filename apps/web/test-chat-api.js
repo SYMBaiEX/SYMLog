@@ -3,28 +3,28 @@
 
 async function testChatAPI() {
   console.log('Testing chat API...');
-  
+
   // You'll need to replace this with a valid JWT token
   const testToken = 'YOUR_TEST_TOKEN_HERE';
-  
+
   try {
     const response = await fetch('http://localhost:3001/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${testToken}`
+        Authorization: `Bearer ${testToken}`,
       },
       body: JSON.stringify({
         messages: [
           {
             id: '1',
             role: 'user',
-            parts: [{ type: 'text', text: 'Hello, how are you?' }]
-          }
+            parts: [{ type: 'text', text: 'Hello, how are you?' }],
+          },
         ],
         model: 'gpt-3.5-turbo',
-        systemPromptType: 'default'
-      })
+        systemPromptType: 'default',
+      }),
     });
 
     if (!response.ok) {
@@ -37,16 +37,16 @@ async function testChatAPI() {
     // Read the streaming response
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
-    
+
     console.log('Reading streaming response...');
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      
+
       const chunk = decoder.decode(value);
       process.stdout.write(chunk);
     }
-    
+
     console.log('\n\nTest completed successfully!');
   } catch (error) {
     console.error('Test failed:', error);

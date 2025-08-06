@@ -1,0 +1,1074 @@
+---
+description: "Integration Testing Standards"
+globs: 
+  - "**/__tests__/integration/**/*.{test,spec}.{ts,tsx,js,jsx}"
+  - "**/integration/**/*.{test,spec}.{ts,tsx,js,jsx}"
+  - "**/*.integration.{test,spec}.{ts,tsx,js,jsx}"
+alwaysApply: true
+---
+
+# Integration Testing Rules
+
+## Integration Testing Philosophy
+
+### 1. API Integration Tests
+```typescript
+// __tests__/integration/api/users.test.ts
+import { createMocks } from 'node-mocks-http'
+import { GET, POST, PUT, DELETE } from '@/app/api/users/route'
+import { prisma } from '@/lib/prisma'
+import { hash } from 'bcryptjs'
+
+describe('Users API Integration', () => {
+  beforeEach(async () => {
+    // Clean database
+    await prisma.user.deleteMany()
+  })
+  
+  afterAll(async () => {
+    await prisma.$disconnect()
+  })
+  
+  describe('GET /api/users', () => {
+    it('should return paginated users', async () => {
+      // Seed test data
+      await prisma.user.createMany({
+        data: Array.from({ length: 25 }, (_, i) => ({
+          email: `user${i}@example.com`,
+          name: `User ${i}`,
+          password: 'hashed_password',
+        })),
+      })
+      
+      const { req } = createMocks({
+        method: 'GET',
+        url: '/api/users?page=2&limit=10',
+      })
+      
+      const response = await GET(req as any)
+      const data = await response.json()
+      
+      expect(response.status).toBe(200)
+      expect(data.data).toHaveLength(10)
+      expect(data.pagination).toEqual({
+        page: 2,
+        limit: 10,
+        total: 25,
+        pages: 3,
+      })
+    })
+    
+    it('should filter users by role', async () => {
+      await prisma.user.createMany({
+        data: [
+          { email: 'admin@example.com', name: 'Admin', role: 'admin' },
+          { email: 'user1@example.com', name: 'User 1', role: 'user' },
+          { email: 'user2@example.com', name: 'User 2', role: 'user' },
+        ],
+      })
+      
+      const { req } = createMocks({
+        method: 'GET',
+        url: '/api/users?role=admin',
+      })
+      
+      const response = await GET(req as any)
+      const data = await response.json()
+      
+      expect(data.data).toHaveLength(1)
+      expect(data.data[0].role).toBe('admin')
+    })
+  })
+  
+  describe('POST /api/users', () => {
+    it('should create a new user', async () => {
+      const { req } = createMocks({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: {
+          email: 'newuser@example.com',
+          name: 'New User',
+          password: 'password123',
+        },
+      })
+      
+      const response = await POST(req as any)
+      const data = await response.json()
+      
+      expect(response.status).toBe(201)
+      expect(data.data).toMatchObject({
+        email: 'newuser@example.com',
+        name: 'New User',
+      })
+      expect(data.data.password).toBeUndefined()
+      
+      // Verify in database
+      const user = await prisma.user.findUnique({
+        where: { email: 'newuser@example.com' },
+      })
+      expect(user).toBeTruthy()
+    })
+    
+    it('should handle duplicate email', async () => {
+      await prisma.user.create({
+        data: {
+          email: 'existing@example.com',
+          name: 'Existing User',
+          password: 'hashed',
+        },
+      })
+      
+      const { req } = createMocks({
+        method: 'POST',
+        body: {
+          email: 'existing@example.com',
+          name: 'Duplicate User',
+          password: 'password123',
+        },
+      })
+      
+      const response = await POST(req as any)
+      const data = await response.json()
+      
+      expect(response.status).toBe(409)
+      expect(data.error).toContain('already exists')
+    })
+  })
+  
+  describe('Authentication Flow', () => {
+    it('should complete full authentication flow', async () => {
+      // 1. Register user
+      const registerReq = createMocks({
+        method: 'POST',
+        url: '/api/auth/register',
+        body: {
+          email: 'test@example.com',
+          name: 'Test User',
+          password: 'password123',
+        },
+      })
+      
+      const registerRes = await POST(registerReq.req as any)
+      expect(registerRes.status).toBe(201)
+      
+      // 2. Login
+      const loginReq = createMocks({
+        method: 'POST',
+        url: '/api/auth/login',
+        body: {
+          email: 'test@example.com',
+          password: 'password123',
+        },
+      })
+      
+      const loginRes = await POST(loginReq.req as any)
+      const loginData = await loginRes.json()
+      
+      expect(loginRes.status).toBe(200)
+      expect(loginData.token).toBeDefined()
+      
+      // 3. Access protected route
+      const protectedReq = createMocks({
+        method: 'GET',
+        url: '/api/profile',
+        headers: {
+          Authorization: `Bearer ${loginData.token}`,
+        },
+      })
+      
+      const protectedRes = await GET(protectedReq.req as any)
+      const profileData = await protectedRes.json()
+      
+      expect(protectedRes.status).toBe(200)
+      expect(profileData.email).toBe('test@example.com')
+    })
+  })
+})
+```
+
+### 2. Database Integration Tests
+```typescript
+// __tests__/integration/db/user-repository.test.ts
+import { UserRepository } from '@/lib/repositories/user-repository'
+import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
+
+describe('UserRepository Integration', () => {
+  let userRepo: UserRepository
+  
+  beforeAll(() => {
+    userRepo = new UserRepository(prisma)
+  })
+  
+  beforeEach(async () => {
+    await prisma.user.deleteMany()
+    await prisma.post.deleteMany()
+  })
+  
+  describe('Complex Queries', () => {
+    it('should fetch users with posts count', async () => {
+      // Create users with posts
+      const user1 = await prisma.user.create({
+        data: {
+          email: 'user1@example.com',
+          name: 'User 1',
+          posts: {
+            create: [
+              { title: 'Post 1', content: 'Content 1' },
+              { title: 'Post 2', content: 'Content 2' },
+            ],
+          },
+        },
+      })
+      
+      const user2 = await prisma.user.create({
+        data: {
+          email: 'user2@example.com',
+          name: 'User 2',
+          posts: {
+            create: [
+              { title: 'Post 3', content: 'Content 3' },
+            ],
+          },
+        },
+      })
+      
+      const users = await userRepo.findAllWithPostsCount()
+      
+      expect(users).toHaveLength(2)
+      expect(users[0]._count.posts).toBe(2)
+      expect(users[1]._count.posts).toBe(1)
+    })
+    
+    it('should handle transactions correctly', async () => {
+      const email = 'transaction@example.com'
+      
+      try {
+        await prisma.$transaction(async (tx) => {
+          // Create user
+          await tx.user.create({
+            data: {
+              email,
+              name: 'Transaction User',
+            },
+          })
+          
+          // Force error
+          throw new Error('Transaction should rollback')
+        })
+      } catch (error) {
+        // Expected error
+      }
+      
+      // User should not exist due to rollback
+      const user = await prisma.user.findUnique({ where: { email } })
+      expect(user).toBeNull()
+    })
+    
+    it('should handle concurrent updates', async () => {
+      const user = await prisma.user.create({
+        data: {
+          email: 'concurrent@example.com',
+          name: 'Concurrent User',
+          credits: 100,
+        },
+      })
+      
+      // Simulate concurrent updates
+      const updates = Array.from({ length: 10 }, (_, i) => 
+        prisma.user.update({
+          where: { id: user.id },
+          data: {
+            credits: {
+              increment: 1,
+            },
+          },
+        })
+      )
+      
+      await Promise.all(updates)
+      
+      const updated = await prisma.user.findUnique({
+        where: { id: user.id },
+      })
+      
+      expect(updated?.credits).toBe(110)
+    })
+  })
+  
+  describe('Search and Filtering', () => {
+    it('should perform full-text search', async () => {
+      await prisma.user.createMany({
+        data: [
+          { email: 'john.doe@example.com', name: 'John Doe', bio: 'Software engineer' },
+          { email: 'jane.smith@example.com', name: 'Jane Smith', bio: 'Product manager' },
+          { email: 'bob.engineer@example.com', name: 'Bob Johnson', bio: 'DevOps engineer' },
+        ],
+      })
+      
+      const results = await userRepo.search('engineer')
+      
+      expect(results).toHaveLength(2)
+      expect(results.map(u => u.email)).toContain('john.doe@example.com')
+      expect(results.map(u => u.email)).toContain('bob.engineer@example.com')
+    })
+    
+    it('should filter by date range', async () => {
+      const now = new Date()
+      const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+      const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000)
+      
+      await prisma.user.create({
+        data: {
+          email: 'old@example.com',
+          name: 'Old User',
+          createdAt: yesterday,
+        },
+      })
+      
+      await prisma.user.create({
+        data: {
+          email: 'new@example.com',
+          name: 'New User',
+        },
+      })
+      
+      const results = await userRepo.findByDateRange(
+        new Date(now.getTime() - 1000),
+        tomorrow
+      )
+      
+      expect(results).toHaveLength(1)
+      expect(results[0].email).toBe('new@example.com')
+    })
+  })
+})
+```
+
+### 3. Service Integration Tests
+```typescript
+// __tests__/integration/services/email-service.test.ts
+import { EmailService } from '@/lib/services/email-service'
+import { createTransport } from 'nodemailer'
+import { render } from '@react-email/render'
+
+jest.mock('nodemailer')
+
+describe('EmailService Integration', () => {
+  let emailService: EmailService
+  let mockTransport: any
+  
+  beforeEach(() => {
+    mockTransport = {
+      sendMail: jest.fn().mockResolvedValue({ messageId: '123' }),
+    }
+    
+    ;(createTransport as jest.Mock).mockReturnValue(mockTransport)
+    
+    emailService = new EmailService({
+      host: 'smtp.test.com',
+      port: 587,
+      auth: {
+        user: 'test@example.com',
+        pass: 'password',
+      },
+    })
+  })
+  
+  it('should send welcome email', async () => {
+    const result = await emailService.sendWelcomeEmail({
+      to: 'user@example.com',
+      name: 'Test User',
+    })
+    
+    expect(mockTransport.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'user@example.com',
+        subject: 'Welcome to SYMLog',
+        html: expect.stringContaining('Test User'),
+      })
+    )
+    
+    expect(result.messageId).toBe('123')
+  })
+  
+  it('should send bulk emails with rate limiting', async () => {
+    const recipients = Array.from({ length: 100 }, (_, i) => ({
+      email: `user${i}@example.com`,
+      name: `User ${i}`,
+    }))
+    
+    const startTime = Date.now()
+    await emailService.sendBulkEmails(recipients, {
+      subject: 'Newsletter',
+      template: 'newsletter',
+    })
+    const endTime = Date.now()
+    
+    // Should take at least 10 seconds for 100 emails at 10/second rate
+    expect(endTime - startTime).toBeGreaterThanOrEqual(10000)
+    expect(mockTransport.sendMail).toHaveBeenCalledTimes(100)
+  })
+  
+  it('should retry failed emails', async () => {
+    mockTransport.sendMail
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockRejectedValueOnce(new Error('Network error'))
+      .mockResolvedValueOnce({ messageId: '456' })
+    
+    const result = await emailService.sendEmailWithRetry({
+      to: 'user@example.com',
+      subject: 'Test',
+      html: '<p>Test</p>',
+    })
+    
+    expect(mockTransport.sendMail).toHaveBeenCalledTimes(3)
+    expect(result.messageId).toBe('456')
+  })
+  
+  it('should handle email templates', async () => {
+    await emailService.sendTemplatedEmail({
+      to: 'user@example.com',
+      template: 'passwordReset',
+      data: {
+        name: 'Test User',
+        resetLink: 'https://example.com/reset/123',
+      },
+    })
+    
+    expect(mockTransport.sendMail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining('https://example.com/reset/123'),
+      })
+    )
+  })
+})
+```
+
+### 4. Queue Integration Tests
+```typescript
+// __tests__/integration/queues/job-processor.test.ts
+import { Queue, Worker, QueueEvents } from 'bullmq'
+import { Redis } from 'ioredis'
+import { JobProcessor } from '@/lib/queues/job-processor'
+
+describe('Job Queue Integration', () => {
+  let queue: Queue
+  let worker: Worker
+  let queueEvents: QueueEvents
+  let redis: Redis
+  
+  beforeAll(() => {
+    redis = new Redis({
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+      maxRetriesPerRequest: null,
+    })
+    
+    queue = new Queue('test-queue', { connection: redis })
+    queueEvents = new QueueEvents('test-queue', { connection: redis })
+  })
+  
+  afterAll(async () => {
+    await worker?.close()
+    await queue.close()
+    await queueEvents.close()
+    await redis.quit()
+  })
+  
+  beforeEach(async () => {
+    await queue.obliterate({ force: true })
+  })
+  
+  it('should process jobs successfully', async () => {
+    const processor = new JobProcessor()
+    worker = new Worker('test-queue', processor.process, {
+      connection: redis,
+    })
+    
+    const job = await queue.add('test-job', {
+      type: 'email',
+      data: { to: 'user@example.com' },
+    })
+    
+    const result = await job.waitUntilFinished(queueEvents)
+    
+    expect(result).toEqual({
+      success: true,
+      processedAt: expect.any(String),
+    })
+  })
+  
+  it('should handle job failures and retries', async () => {
+    let attempts = 0
+    
+    worker = new Worker(
+      'test-queue',
+      async () => {
+        attempts++
+        if (attempts < 3) {
+          throw new Error('Temporary failure')
+        }
+        return { success: true }
+      },
+      {
+        connection: redis,
+        concurrency: 1,
+      }
+    )
+    
+    const job = await queue.add(
+      'retry-job',
+      { data: 'test' },
+      {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 100,
+        },
+      }
+    )
+    
+    const result = await job.waitUntilFinished(queueEvents)
+    
+    expect(attempts).toBe(3)
+    expect(result).toEqual({ success: true })
+  })
+  
+  it('should process jobs in priority order', async () => {
+    const processedJobs: string[] = []
+    
+    worker = new Worker(
+      'test-queue',
+      async (job) => {
+        processedJobs.push(job.data.id)
+        return { processed: job.data.id }
+      },
+      {
+        connection: redis,
+        concurrency: 1,
+      }
+    )
+    
+    // Add jobs with different priorities
+    await queue.add('job-1', { id: 'low' }, { priority: 3 })
+    await queue.add('job-2', { id: 'high' }, { priority: 1 })
+    await queue.add('job-3', { id: 'medium' }, { priority: 2 })
+    
+    // Wait for all jobs to complete
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    expect(processedJobs).toEqual(['high', 'medium', 'low'])
+  })
+  
+  it('should handle scheduled jobs', async () => {
+    worker = new Worker(
+      'test-queue',
+      async (job) => ({ processed: true, time: Date.now() }),
+      { connection: redis }
+    )
+    
+    const delay = 1000 // 1 second
+    const job = await queue.add(
+      'scheduled-job',
+      { data: 'test' },
+      { delay }
+    )
+    
+    const startTime = Date.now()
+    const result = await job.waitUntilFinished(queueEvents)
+    const endTime = Date.now()
+    
+    expect(endTime - startTime).toBeGreaterThanOrEqual(delay)
+    expect(result.processed).toBe(true)
+  })
+})
+```
+
+### 5. Cache Integration Tests
+```typescript
+// __tests__/integration/cache/redis-cache.test.ts
+import { RedisCache } from '@/lib/cache/redis-cache'
+import { Redis } from 'ioredis'
+
+describe('Redis Cache Integration', () => {
+  let cache: RedisCache
+  let redis: Redis
+  
+  beforeAll(() => {
+    redis = new Redis({
+      host: process.env.REDIS_HOST,
+      port: parseInt(process.env.REDIS_PORT || '6379'),
+    })
+    cache = new RedisCache(redis)
+  })
+  
+  afterAll(async () => {
+    await redis.quit()
+  })
+  
+  beforeEach(async () => {
+    await redis.flushdb()
+  })
+  
+  it('should cache and retrieve data', async () => {
+    const key = 'test:user:1'
+    const data = { id: 1, name: 'Test User' }
+    
+    await cache.set(key, data, 60) // 60 seconds TTL
+    
+    const cached = await cache.get(key)
+    expect(cached).toEqual(data)
+  })
+  
+  it('should expire cache after TTL', async () => {
+    const key = 'test:expire'
+    await cache.set(key, 'data', 1) // 1 second TTL
+    
+    // Wait for expiration
+    await new Promise(resolve => setTimeout(resolve, 1100))
+    
+    const cached = await cache.get(key)
+    expect(cached).toBeNull()
+  })
+  
+  it('should handle cache stampede', async () => {
+    let computeCount = 0
+    const expensiveComputation = async () => {
+      computeCount++
+      await new Promise(resolve => setTimeout(resolve, 100))
+      return { result: 'expensive data' }
+    }
+    
+    // Simulate multiple concurrent requests
+    const promises = Array.from({ length: 10 }, () =>
+      cache.getOrSet('stampede:key', expensiveComputation, 60)
+    )
+    
+    const results = await Promise.all(promises)
+    
+    // Should only compute once despite concurrent requests
+    expect(computeCount).toBe(1)
+    expect(results.every(r => r.result === 'expensive data')).toBe(true)
+  })
+  
+  it('should handle cache invalidation patterns', async () => {
+    // Set multiple related cache entries
+    await cache.set('user:1:profile', { name: 'User 1' }, 3600)
+    await cache.set('user:1:posts', ['post1', 'post2'], 3600)
+    await cache.set('user:1:followers', ['user2', 'user3'], 3600)
+    
+    // Invalidate all user:1 related cache
+    await cache.invalidatePattern('user:1:*')
+    
+    expect(await cache.get('user:1:profile')).toBeNull()
+    expect(await cache.get('user:1:posts')).toBeNull()
+    expect(await cache.get('user:1:followers')).toBeNull()
+  })
+  
+  it('should handle distributed locks', async () => {
+    const results: number[] = []
+    const lockKey = 'distributed:lock'
+    
+    // Simulate concurrent processes trying to update same resource
+    const processes = Array.from({ length: 5 }, (_, i) => async () => {
+      const lock = await cache.acquireLock(lockKey, 5000) // 5 second lock
+      
+      if (lock) {
+        try {
+          // Critical section
+          results.push(i)
+          await new Promise(resolve => setTimeout(resolve, 100))
+        } finally {
+          await cache.releaseLock(lockKey, lock)
+        }
+      }
+    })
+    
+    await Promise.all(processes.map(p => p()))
+    
+    // Only one process should acquire lock at a time
+    expect(results).toHaveLength(5)
+    expect(results.sort()).toEqual([0, 1, 2, 3, 4])
+  })
+})
+```
+
+### 6. WebSocket Integration Tests
+```typescript
+// __tests__/integration/websocket/socket-server.test.ts
+import { createServer } from 'http'
+import { Server as SocketServer } from 'socket.io'
+import { io as ioClient, Socket as ClientSocket } from 'socket.io-client'
+import { SocketHandler } from '@/lib/websocket/socket-handler'
+
+describe('WebSocket Integration', () => {
+  let httpServer: any
+  let socketServer: SocketServer
+  let clientSocket: ClientSocket
+  let serverSocket: any
+  const port = 3001
+  
+  beforeAll((done) => {
+    httpServer = createServer()
+    socketServer = new SocketServer(httpServer, {
+      cors: {
+        origin: '*',
+      },
+    })
+    
+    const handler = new SocketHandler()
+    handler.initialize(socketServer)
+    
+    httpServer.listen(port, () => {
+      clientSocket = ioClient(`http://localhost:${port}`)
+      
+      socketServer.on('connection', (socket) => {
+        serverSocket = socket
+      })
+      
+      clientSocket.on('connect', done)
+    })
+  })
+  
+  afterAll(() => {
+    socketServer.close()
+    clientSocket.close()
+    httpServer.close()
+  })
+  
+  it('should handle authentication', (done) => {
+    clientSocket.emit('authenticate', { token: 'valid-token' })
+    
+    clientSocket.on('authenticated', (data) => {
+      expect(data.userId).toBeDefined()
+      done()
+    })
+  })
+  
+  it('should join and leave rooms', (done) => {
+    const roomId = 'test-room'
+    
+    clientSocket.emit('join-room', { roomId })
+    
+    clientSocket.on('room-joined', (data) => {
+      expect(data.roomId).toBe(roomId)
+      
+      // Leave room
+      clientSocket.emit('leave-room', { roomId })
+      
+      clientSocket.on('room-left', (data) => {
+        expect(data.roomId).toBe(roomId)
+        done()
+      })
+    })
+  })
+  
+  it('should broadcast messages to room', (done) => {
+    const roomId = 'broadcast-room'
+    const message = { text: 'Hello room!' }
+    
+    // Create second client
+    const client2 = ioClient(`http://localhost:${port}`)
+    
+    client2.on('connect', () => {
+      // Both clients join same room
+      clientSocket.emit('join-room', { roomId })
+      client2.emit('join-room', { roomId })
+      
+      // Listen for message on client2
+      client2.on('new-message', (data) => {
+        expect(data.message.text).toBe(message.text)
+        client2.close()
+        done()
+      })
+      
+      // Send message from client1
+      setTimeout(() => {
+        clientSocket.emit('send-message', { roomId, message })
+      }, 100)
+    })
+  })
+  
+  it('should handle real-time presence', (done) => {
+    const roomId = 'presence-room'
+    const clients: ClientSocket[] = []
+    
+    // Create multiple clients
+    for (let i = 0; i < 3; i++) {
+      const client = ioClient(`http://localhost:${port}`)
+      clients.push(client)
+      
+      client.on('connect', () => {
+        client.emit('join-room', { roomId })
+      })
+    }
+    
+    // Wait for all to join
+    setTimeout(() => {
+      clientSocket.emit('get-room-presence', { roomId })
+      
+      clientSocket.on('room-presence', (data) => {
+        expect(data.users).toHaveLength(4) // 3 + original client
+        
+        // Cleanup
+        clients.forEach(c => c.close())
+        done()
+      })
+    }, 200)
+  })
+})
+```
+
+### 7. File Upload Integration Tests
+```typescript
+// __tests__/integration/upload/file-upload.test.ts
+import { createMocks } from 'node-mocks-http'
+import { POST } from '@/app/api/upload/route'
+import { S3Client } from '@aws-sdk/client-s3'
+import fs from 'fs/promises'
+import path from 'path'
+
+jest.mock('@aws-sdk/client-s3')
+
+describe('File Upload Integration', () => {
+  let mockS3Client: any
+  
+  beforeEach(() => {
+    mockS3Client = {
+      send: jest.fn().mockResolvedValue({}),
+    }
+    
+    ;(S3Client as jest.Mock).mockImplementation(() => mockS3Client)
+  })
+  
+  it('should upload single file', async () => {
+    const fileContent = Buffer.from('test file content')
+    const formData = new FormData()
+    formData.append('file', new Blob([fileContent]), 'test.txt')
+    
+    const { req } = createMocks({
+      method: 'POST',
+      headers: {
+        'content-type': 'multipart/form-data',
+      },
+      body: formData,
+    })
+    
+    const response = await POST(req as any)
+    const data = await response.json()
+    
+    expect(response.status).toBe(200)
+    expect(data.url).toMatch(/^https:\/\/.*\/test\.txt$/)
+    expect(mockS3Client.send).toHaveBeenCalled()
+  })
+  
+  it('should validate file types', async () => {
+    const formData = new FormData()
+    formData.append('file', new Blob(['content']), 'test.exe')
+    
+    const { req } = createMocks({
+      method: 'POST',
+      body: formData,
+    })
+    
+    const response = await POST(req as any)
+    const data = await response.json()
+    
+    expect(response.status).toBe(400)
+    expect(data.error).toContain('File type not allowed')
+  })
+  
+  it('should handle large file uploads', async () => {
+    // Create 10MB file
+    const largeContent = Buffer.alloc(10 * 1024 * 1024)
+    const formData = new FormData()
+    formData.append('file', new Blob([largeContent]), 'large.pdf')
+    
+    const { req } = createMocks({
+      method: 'POST',
+      body: formData,
+    })
+    
+    const response = await POST(req as any)
+    const data = await response.json()
+    
+    expect(response.status).toBe(200)
+    expect(data.size).toBe(10 * 1024 * 1024)
+  })
+  
+  it('should process image uploads', async () => {
+    const imagePath = path.join(__dirname, 'fixtures', 'test-image.jpg')
+    const imageBuffer = await fs.readFile(imagePath)
+    
+    const formData = new FormData()
+    formData.append('file', new Blob([imageBuffer]), 'photo.jpg')
+    formData.append('resize', 'true')
+    formData.append('width', '800')
+    formData.append('height', '600')
+    
+    const { req } = createMocks({
+      method: 'POST',
+      body: formData,
+    })
+    
+    const response = await POST(req as any)
+    const data = await response.json()
+    
+    expect(response.status).toBe(200)
+    expect(data.thumbnails).toBeDefined()
+    expect(data.thumbnails.small).toMatch(/small\.jpg$/)
+    expect(data.thumbnails.medium).toMatch(/medium\.jpg$/)
+  })
+})
+```
+
+### 8. Environment Setup
+```typescript
+// test/integration/setup.ts
+import { execSync } from 'child_process'
+import { config } from 'dotenv'
+import { prisma } from '@/lib/prisma'
+
+// Load test environment variables
+config({ path: '.env.test' })
+
+export async function setupTestDatabase() {
+  // Run migrations
+  execSync('npx prisma migrate deploy', {
+    env: {
+      ...process.env,
+      DATABASE_URL: process.env.TEST_DATABASE_URL,
+    },
+  })
+  
+  // Seed test data if needed
+  await seedTestData()
+}
+
+export async function teardownTestDatabase() {
+  // Clean up all data
+  const tables = await prisma.$queryRaw`
+    SELECT tablename FROM pg_tables 
+    WHERE schemaname='public'
+  `
+  
+  for (const { tablename } of tables as any[]) {
+    if (tablename !== '_prisma_migrations') {
+      await prisma.$executeRawUnsafe(
+        `TRUNCATE TABLE "${tablename}" CASCADE`
+      )
+    }
+  }
+  
+  await prisma.$disconnect()
+}
+
+async function seedTestData() {
+  // Create default test users
+  await prisma.user.createMany({
+    data: [
+      {
+        email: 'admin@test.com',
+        name: 'Test Admin',
+        role: 'admin',
+      },
+      {
+        email: 'user@test.com',
+        name: 'Test User',
+        role: 'user',
+      },
+    ],
+  })
+}
+
+// jest.setup.js
+import { setupTestDatabase, teardownTestDatabase } from './integration/setup'
+
+beforeAll(async () => {
+  await setupTestDatabase()
+})
+
+afterAll(async () => {
+  await teardownTestDatabase()
+})
+```
+
+### 9. Docker Compose for Tests
+```yaml
+# docker-compose.test.yml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: symlog_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
+  
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+  
+  localstack:
+    image: localstack/localstack
+    ports:
+      - "4567:4566"
+    environment:
+      - SERVICES=s3,sqs,ses
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+    volumes:
+      - localstack_data:/tmp/localstack
+
+volumes:
+  postgres_test_data:
+  localstack_data:
+```
+
+### 10. Integration Test Configuration
+```typescript
+// jest.integration.config.js
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  testMatch: ['**/__tests__/integration/**/*.test.ts'],
+  setupFilesAfterEnv: ['<rootDir>/test/integration/setup.ts'],
+  testTimeout: 30000, // 30 seconds for integration tests
+  maxWorkers: 1, // Run integration tests sequentially
+  globals: {
+    'ts-jest': {
+      tsconfig: {
+        jsx: 'react',
+      },
+    },
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1',
+  },
+  coveragePathIgnorePatterns: [
+    '/node_modules/',
+    '/dist/',
+    '/__tests__/',
+  ],
+}
+
+// package.json scripts
+{
+  "scripts": {
+    "test:integration": "docker-compose -f docker-compose.test.yml up -d && jest --config jest.integration.config.js",
+    "test:integration:watch": "docker-compose -f docker-compose.test.yml up -d && jest --config jest.integration.config.js --watch",
+    "test:integration:down": "docker-compose -f docker-compose.test.yml down -v"
+  }
+}
+```
+
+Remember: Integration tests verify that different parts of your system work together correctly. Focus on testing boundaries, external services, and complex workflows.

@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES, TIME_CONSTANTS, DB_OPERATIONS } from "./constants";
+import { v } from 'convex/values';
+import { mutation, query } from './_generated/server';
+import { DB_OPERATIONS, EXPIRY_TIMES, TIME_CONSTANTS } from './constants';
 
 // Generate cryptographically secure random token
 function generateSecureToken(): string {
@@ -8,7 +8,9 @@ function generateSecureToken(): string {
   // This is safe to use in Convex functions
   const tokenBytes = new Uint8Array(32);
   crypto.getRandomValues(tokenBytes);
-  return Array.from(tokenBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  return Array.from(tokenBytes, (byte) =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
 }
 
 export const generateCSRFToken = mutation({
@@ -18,16 +20,16 @@ export const generateCSRFToken = mutation({
   handler: async (ctx, args) => {
     // Validate input
     if (!args.userId || args.userId.trim().length === 0) {
-      throw new Error("User ID is required")
+      throw new Error('User ID is required');
     }
     // Generate a random token
     const token = generateSecureToken();
-    
+
     const now = Date.now();
     const expiresAt = now + EXPIRY_TIMES.CSRF_TOKEN;
 
     // Store the token
-    await ctx.db.insert("csrfTokens", {
+    await ctx.db.insert('csrfTokens', {
       token,
       userId: args.userId,
       expiresAt,
@@ -46,37 +48,37 @@ export const validateCSRFToken = mutation({
   handler: async (ctx, args) => {
     // Validate inputs
     if (!args.token || args.token.trim().length === 0) {
-      return { valid: false, reason: "token_required" }
+      return { valid: false, reason: 'token_required' };
     }
     if (!args.userId || args.userId.trim().length === 0) {
-      return { valid: false, reason: "user_id_required" }
+      return { valid: false, reason: 'user_id_required' };
     }
     const now = Date.now();
 
     // Find the token
     const tokenRecord = await ctx.db
-      .query("csrfTokens")
-      .withIndex("by_token", (q) => q.eq("token", args.token))
+      .query('csrfTokens')
+      .withIndex('by_token', (q) => q.eq('token', args.token))
       .first();
 
     if (!tokenRecord) {
-      return { valid: false, reason: "invalid_token" };
+      return { valid: false, reason: 'invalid_token' };
     }
 
     // Check if expired
     if (tokenRecord.expiresAt < now) {
       await ctx.db.delete(tokenRecord._id);
-      return { valid: false, reason: "invalid_token" };
+      return { valid: false, reason: 'invalid_token' };
     }
 
     // Check if already used
     if (tokenRecord.used) {
-      return { valid: false, reason: "invalid_token" };
+      return { valid: false, reason: 'invalid_token' };
     }
 
     // Check if token belongs to the user
     if (tokenRecord.userId !== args.userId) {
-      return { valid: false, reason: "invalid_token" };
+      return { valid: false, reason: 'invalid_token' };
     }
 
     // Mark token as used (one-time use)
@@ -91,13 +93,13 @@ export const cleanupExpiredCSRFTokens = mutation({
   handler: async (ctx) => {
     const now = Date.now();
     let deletedCount = 0;
-    
+
     // Process expired tokens in batches
     let hasMoreExpired = true;
     while (hasMoreExpired) {
       const expired = await ctx.db
-        .query("csrfTokens")
-        .withIndex("by_expiry", (q) => q.lte("expiresAt", now))
+        .query('csrfTokens')
+        .withIndex('by_expiry', (q) => q.lte('expiresAt', now))
         .take(DB_OPERATIONS.BATCH_SIZE);
 
       if (expired.length === 0) {
@@ -120,11 +122,11 @@ export const cleanupExpiredCSRFTokens = mutation({
     let hasMoreUsed = true;
     while (hasMoreUsed) {
       const usedTokens = await ctx.db
-        .query("csrfTokens")
-        .filter((q) => 
+        .query('csrfTokens')
+        .filter((q) =>
           q.and(
-            q.eq(q.field("used"), true),
-            q.lt(q.field("expiresAt"), oneHourAgo)
+            q.eq(q.field('used'), true),
+            q.lt(q.field('expiresAt'), oneHourAgo)
           )
         )
         .take(DB_OPERATIONS.BATCH_SIZE);
@@ -154,14 +156,14 @@ export const getUserCSRFTokens = query({
   },
   handler: async (ctx, args) => {
     const now = Date.now();
-    
+
     const tokens = await ctx.db
-      .query("csrfTokens")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .filter((q) => q.gt(q.field("expiresAt"), now))
+      .query('csrfTokens')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
+      .filter((q) => q.gt(q.field('expiresAt'), now))
       .collect();
 
-    return tokens.map(t => ({
+    return tokens.map((t) => ({
       token: t.token,
       expiresAt: t.expiresAt,
       used: t.used,

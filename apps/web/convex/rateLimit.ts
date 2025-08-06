@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
-import { EXPIRY_TIMES, RATE_LIMIT_DEFAULTS, DB_OPERATIONS } from "./constants";
+import { v } from 'convex/values';
+import { mutation, query } from './_generated/server';
+import { DB_OPERATIONS, EXPIRY_TIMES, RATE_LIMIT_DEFAULTS } from './constants';
 
 export const checkRateLimit = mutation({
   args: {
@@ -14,9 +14,9 @@ export const checkRateLimit = mutation({
 
     // Get all rate limit entries for this user in the current window
     const entries = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_user_and_timestamp", (q) =>
-        q.eq("userId", args.userId).gte("timestamp", windowStart)
+      .query('rateLimits')
+      .withIndex('by_user_and_timestamp', (q) =>
+        q.eq('userId', args.userId).gte('timestamp', windowStart)
       )
       .collect();
 
@@ -28,7 +28,7 @@ export const checkRateLimit = mutation({
     // Note: We intentionally record after checking to ensure accurate counting
     // This prevents the current request from being counted in its own limit check
     if (isAllowed) {
-      await ctx.db.insert("rateLimits", {
+      await ctx.db.insert('rateLimits', {
         userId: args.userId,
         timestamp: now,
         expiresAt: now + EXPIRY_TIMES.RATE_LIMIT_WINDOW,
@@ -52,8 +52,8 @@ export const resetRateLimit = mutation({
   handler: async (ctx, args) => {
     // Delete all rate limit entries for this user
     const entries = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .query('rateLimits')
+      .withIndex('by_user', (q) => q.eq('userId', args.userId))
       .collect();
 
     for (const entry of entries) {
@@ -75,9 +75,9 @@ export const getRateLimitStatus = query({
     const windowStart = now - EXPIRY_TIMES.RATE_LIMIT_WINDOW;
 
     const entries = await ctx.db
-      .query("rateLimits")
-      .withIndex("by_user_and_timestamp", (q) =>
-        q.eq("userId", args.userId).gte("timestamp", windowStart)
+      .query('rateLimits')
+      .withIndex('by_user_and_timestamp', (q) =>
+        q.eq('userId', args.userId).gte('timestamp', windowStart)
       )
       .collect();
 
@@ -100,13 +100,13 @@ export const cleanupExpiredRateLimits = mutation({
     const now = Date.now();
     let deletedCount = 0;
     let hasMore = true;
-    
+
     // Process deletions in batches to handle large datasets efficiently
     while (hasMore) {
       // Find a batch of expired entries
       const expired = await ctx.db
-        .query("rateLimits")
-        .withIndex("by_expiry", (q) => q.lte("expiresAt", now))
+        .query('rateLimits')
+        .withIndex('by_expiry', (q) => q.lte('expiresAt', now))
         .take(DB_OPERATIONS.BATCH_SIZE);
 
       if (expired.length === 0) {

@@ -1,0 +1,860 @@
+---
+description: "Unit Testing Standards and Best Practices"
+globs: 
+  - "**/__tests__/**/*.{test,spec}.{ts,tsx,js,jsx}"
+  - "**/*.{test,spec}.{ts,tsx,js,jsx}"
+  - "**/test/**/*.{ts,tsx,js,jsx}"
+alwaysApply: true
+---
+
+# Unit Testing Rules
+
+## Testing Philosophy
+
+### 1. Test Structure
+```typescript
+// __tests__/components/Button.test.tsx
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { Button } from '@/components/ui/button'
+import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest'
+
+// Test file structure
+describe('Button Component', () => {
+  // Setup and teardown
+  beforeEach(() => {
+    // Reset mocks
+    vi.clearAllMocks()
+  })
+  
+  afterEach(() => {
+    // Cleanup
+    vi.restoreAllMocks()
+  })
+  
+  // Group related tests
+  describe('Rendering', () => {
+    it('should render with default props', () => {
+      render(<Button>Click me</Button>)
+      
+      const button = screen.getByRole('button', { name: /click me/i })
+      expect(button).toBeInTheDocument()
+      expect(button).toHaveClass('bg-primary')
+    })
+    
+    it('should render with custom variant', () => {
+      render(<Button variant="destructive">Delete</Button>)
+      
+      const button = screen.getByRole('button')
+      expect(button).toHaveClass('bg-destructive')
+    })
+    
+    it('should render as child component', () => {
+      render(
+        <Button asChild>
+          <a href="/home">Home</a>
+        </Button>
+      )
+      
+      const link = screen.getByRole('link', { name: /home/i })
+      expect(link).toBeInTheDocument()
+      expect(link).toHaveAttribute('href', '/home')
+    })
+  })
+  
+  describe('Interactions', () => {
+    it('should handle click events', async () => {
+      const handleClick = vi.fn()
+      const user = userEvent.setup()
+      
+      render(<Button onClick={handleClick}>Click me</Button>)
+      
+      const button = screen.getByRole('button')
+      await user.click(button)
+      
+      expect(handleClick).toHaveBeenCalledTimes(1)
+    })
+    
+    it('should be disabled when prop is set', async () => {
+      const handleClick = vi.fn()
+      const user = userEvent.setup()
+      
+      render(
+        <Button onClick={handleClick} disabled>
+          Disabled
+        </Button>
+      )
+      
+      const button = screen.getByRole('button')
+      expect(button).toBeDisabled()
+      
+      await user.click(button)
+      expect(handleClick).not.toHaveBeenCalled()
+    })
+    
+    it('should handle keyboard navigation', async () => {
+      const handleClick = vi.fn()
+      const user = userEvent.setup()
+      
+      render(<Button onClick={handleClick}>Press Enter</Button>)
+      
+      const button = screen.getByRole('button')
+      button.focus()
+      
+      await user.keyboard('{Enter}')
+      expect(handleClick).toHaveBeenCalledTimes(1)
+      
+      await user.keyboard(' ') // Space key
+      expect(handleClick).toHaveBeenCalledTimes(2)
+    })
+  })
+  
+  describe('Accessibility', () => {
+    it('should have proper ARIA attributes', () => {
+      render(
+        <Button aria-label="Save document" aria-pressed="true">
+          Save
+        </Button>
+      )
+      
+      const button = screen.getByRole('button')
+      expect(button).toHaveAttribute('aria-label', 'Save document')
+      expect(button).toHaveAttribute('aria-pressed', 'true')
+    })
+    
+    it('should be keyboard accessible', async () => {
+      const user = userEvent.setup()
+      
+      render(
+        <div>
+          <Button>First</Button>
+          <Button>Second</Button>
+          <Button>Third</Button>
+        </div>
+      )
+      
+      const buttons = screen.getAllByRole('button')
+      
+      // Tab through buttons
+      await user.tab()
+      expect(buttons[0]).toHaveFocus()
+      
+      await user.tab()
+      expect(buttons[1]).toHaveFocus()
+      
+      await user.tab()
+      expect(buttons[2]).toHaveFocus()
+    })
+  })
+})
+```
+
+### 2. React Hooks Testing
+```typescript
+// __tests__/hooks/useCounter.test.ts
+import { renderHook, act } from '@testing-library/react'
+import { useCounter } from '@/hooks/useCounter'
+
+describe('useCounter Hook', () => {
+  it('should initialize with default value', () => {
+    const { result } = renderHook(() => useCounter())
+    
+    expect(result.current.count).toBe(0)
+  })
+  
+  it('should initialize with custom value', () => {
+    const { result } = renderHook(() => useCounter(10))
+    
+    expect(result.current.count).toBe(10)
+  })
+  
+  it('should increment count', () => {
+    const { result } = renderHook(() => useCounter())
+    
+    act(() => {
+      result.current.increment()
+    })
+    
+    expect(result.current.count).toBe(1)
+    
+    act(() => {
+      result.current.increment()
+    })
+    
+    expect(result.current.count).toBe(2)
+  })
+  
+  it('should decrement count', () => {
+    const { result } = renderHook(() => useCounter(5))
+    
+    act(() => {
+      result.current.decrement()
+    })
+    
+    expect(result.current.count).toBe(4)
+  })
+  
+  it('should reset to initial value', () => {
+    const { result } = renderHook(() => useCounter(10))
+    
+    act(() => {
+      result.current.increment()
+      result.current.increment()
+    })
+    
+    expect(result.current.count).toBe(12)
+    
+    act(() => {
+      result.current.reset()
+    })
+    
+    expect(result.current.count).toBe(10)
+  })
+  
+  it('should update when initial value changes', () => {
+    const { result, rerender } = renderHook(
+      ({ initialValue }) => useCounter(initialValue),
+      { initialProps: { initialValue: 0 } }
+    )
+    
+    expect(result.current.count).toBe(0)
+    
+    rerender({ initialValue: 5 })
+    
+    expect(result.current.count).toBe(5)
+  })
+})
+```
+
+### 3. Async Testing
+```typescript
+// __tests__/api/fetchUser.test.ts
+import { fetchUser, fetchUsers } from '@/lib/api/users'
+import { server } from '@/test/mocks/server'
+import { rest } from 'msw'
+
+describe('User API', () => {
+  describe('fetchUser', () => {
+    it('should fetch user successfully', async () => {
+      const user = await fetchUser('123')
+      
+      expect(user).toEqual({
+        id: '123',
+        name: 'John Doe',
+        email: 'john@example.com',
+      })
+    })
+    
+    it('should handle 404 error', async () => {
+      server.use(
+        rest.get('/api/users/:id', (req, res, ctx) => {
+          return res(ctx.status(404), ctx.json({ error: 'User not found' }))
+        })
+      )
+      
+      await expect(fetchUser('999')).rejects.toThrow('User not found')
+    })
+    
+    it('should handle network error', async () => {
+      server.use(
+        rest.get('/api/users/:id', (req, res) => {
+          return res.networkError('Network error')
+        })
+      )
+      
+      await expect(fetchUser('123')).rejects.toThrow('Network error')
+    })
+    
+    it('should include auth token', async () => {
+      let capturedHeaders: Headers | undefined
+      
+      server.use(
+        rest.get('/api/users/:id', (req, res, ctx) => {
+          capturedHeaders = req.headers
+          return res(ctx.json({ id: '123' }))
+        })
+      )
+      
+      await fetchUser('123', { token: 'secret-token' })
+      
+      expect(capturedHeaders?.get('Authorization')).toBe('Bearer secret-token')
+    })
+  })
+  
+  describe('fetchUsers', () => {
+    it('should fetch paginated users', async () => {
+      const result = await fetchUsers({ page: 1, limit: 10 })
+      
+      expect(result.data).toHaveLength(10)
+      expect(result.pagination).toEqual({
+        page: 1,
+        limit: 10,
+        total: 100,
+        pages: 10,
+      })
+    })
+    
+    it('should handle empty results', async () => {
+      server.use(
+        rest.get('/api/users', (req, res, ctx) => {
+          return res(
+            ctx.json({
+              data: [],
+              pagination: {
+                page: 1,
+                limit: 10,
+                total: 0,
+                pages: 0,
+              },
+            })
+          )
+        })
+      )
+      
+      const result = await fetchUsers({ page: 1, limit: 10 })
+      
+      expect(result.data).toHaveLength(0)
+      expect(result.pagination.total).toBe(0)
+    })
+  })
+})
+```
+
+### 4. Form Testing
+```typescript
+// __tests__/components/LoginForm.test.tsx
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { LoginForm } from '@/components/auth/LoginForm'
+import { vi } from 'vitest'
+
+const mockLogin = vi.fn()
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    login: mockLogin,
+    loading: false,
+    error: null,
+  }),
+}))
+
+describe('LoginForm', () => {
+  beforeEach(() => {
+    mockLogin.mockClear()
+  })
+  
+  it('should render form fields', () => {
+    render(<LoginForm />)
+    
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument()
+  })
+  
+  it('should validate required fields', async () => {
+    const user = userEvent.setup()
+    render(<LoginForm />)
+    
+    const submitButton = screen.getByRole('button', { name: /sign in/i })
+    await user.click(submitButton)
+    
+    expect(await screen.findByText(/email is required/i)).toBeInTheDocument()
+    expect(await screen.findByText(/password is required/i)).toBeInTheDocument()
+    expect(mockLogin).not.toHaveBeenCalled()
+  })
+  
+  it('should validate email format', async () => {
+    const user = userEvent.setup()
+    render(<LoginForm />)
+    
+    const emailInput = screen.getByLabelText(/email/i)
+    await user.type(emailInput, 'invalid-email')
+    await user.tab() // Trigger blur
+    
+    expect(await screen.findByText(/invalid email/i)).toBeInTheDocument()
+  })
+  
+  it('should submit form with valid data', async () => {
+    const user = userEvent.setup()
+    render(<LoginForm />)
+    
+    const emailInput = screen.getByLabelText(/email/i)
+    const passwordInput = screen.getByLabelText(/password/i)
+    const submitButton = screen.getByRole('button', { name: /sign in/i })
+    
+    await user.type(emailInput, 'test@example.com')
+    await user.type(passwordInput, 'password123')
+    await user.click(submitButton)
+    
+    await waitFor(() => {
+      expect(mockLogin).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        password: 'password123',
+      })
+    })
+  })
+  
+  it('should show loading state', async () => {
+    vi.mock('@/hooks/useAuth', () => ({
+      useAuth: () => ({
+        login: mockLogin,
+        loading: true,
+        error: null,
+      }),
+    }))
+    
+    render(<LoginForm />)
+    
+    const submitButton = screen.getByRole('button', { name: /signing in/i })
+    expect(submitButton).toBeDisabled()
+  })
+  
+  it('should display error message', () => {
+    vi.mock('@/hooks/useAuth', () => ({
+      useAuth: () => ({
+        login: mockLogin,
+        loading: false,
+        error: 'Invalid credentials',
+      }),
+    }))
+    
+    render(<LoginForm />)
+    
+    expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('bg-destructive')
+  })
+})
+```
+
+### 5. Redux/Zustand Testing
+```typescript
+// __tests__/store/userStore.test.ts
+import { renderHook, act } from '@testing-library/react'
+import { useUserStore } from '@/store/userStore'
+
+describe('User Store', () => {
+  beforeEach(() => {
+    // Reset store state
+    useUserStore.setState({
+      user: null,
+      isAuthenticated: false,
+      loading: false,
+      error: null,
+    })
+  })
+  
+  it('should have initial state', () => {
+    const { result } = renderHook(() => useUserStore())
+    
+    expect(result.current.user).toBeNull()
+    expect(result.current.isAuthenticated).toBe(false)
+    expect(result.current.loading).toBe(false)
+    expect(result.current.error).toBeNull()
+  })
+  
+  it('should set user', () => {
+    const { result } = renderHook(() => useUserStore())
+    
+    const user = {
+      id: '1',
+      name: 'John Doe',
+      email: 'john@example.com',
+    }
+    
+    act(() => {
+      result.current.setUser(user)
+    })
+    
+    expect(result.current.user).toEqual(user)
+    expect(result.current.isAuthenticated).toBe(true)
+  })
+  
+  it('should handle login flow', async () => {
+    const { result } = renderHook(() => useUserStore())
+    
+    // Start login
+    act(() => {
+      result.current.login('test@example.com', 'password')
+    })
+    
+    expect(result.current.loading).toBe(true)
+    
+    // Wait for async operation
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 100))
+    })
+    
+    expect(result.current.loading).toBe(false)
+    expect(result.current.user).toBeDefined()
+    expect(result.current.isAuthenticated).toBe(true)
+  })
+  
+  it('should handle login error', async () => {
+    const { result } = renderHook(() => useUserStore())
+    
+    // Mock API error
+    global.fetch = vi.fn().mockRejectedValue(new Error('Invalid credentials'))
+    
+    await act(async () => {
+      await result.current.login('test@example.com', 'wrong-password')
+    })
+    
+    expect(result.current.loading).toBe(false)
+    expect(result.current.error).toBe('Invalid credentials')
+    expect(result.current.user).toBeNull()
+    expect(result.current.isAuthenticated).toBe(false)
+  })
+  
+  it('should logout user', () => {
+    const { result } = renderHook(() => useUserStore())
+    
+    // Set user first
+    act(() => {
+      result.current.setUser({ id: '1', name: 'John', email: 'john@example.com' })
+    })
+    
+    expect(result.current.isAuthenticated).toBe(true)
+    
+    // Logout
+    act(() => {
+      result.current.logout()
+    })
+    
+    expect(result.current.user).toBeNull()
+    expect(result.current.isAuthenticated).toBe(false)
+  })
+})
+```
+
+### 6. Mock Service Worker (MSW)
+```typescript
+// test/mocks/handlers.ts
+import { rest } from 'msw'
+
+export const handlers = [
+  // User endpoints
+  rest.get('/api/users/:id', (req, res, ctx) => {
+    const { id } = req.params
+    
+    return res(
+      ctx.json({
+        id,
+        name: 'John Doe',
+        email: 'john@example.com',
+      })
+    )
+  }),
+  
+  rest.get('/api/users', (req, res, ctx) => {
+    const page = Number(req.url.searchParams.get('page') || 1)
+    const limit = Number(req.url.searchParams.get('limit') || 10)
+    
+    const users = Array.from({ length: limit }, (_, i) => ({
+      id: String((page - 1) * limit + i + 1),
+      name: `User ${(page - 1) * limit + i + 1}`,
+      email: `user${(page - 1) * limit + i + 1}@example.com`,
+    }))
+    
+    return res(
+      ctx.json({
+        data: users,
+        pagination: {
+          page,
+          limit,
+          total: 100,
+          pages: 10,
+        },
+      })
+    )
+  }),
+  
+  rest.post('/api/auth/login', async (req, res, ctx) => {
+    const { email, password } = await req.json()
+    
+    if (email === 'test@example.com' && password === 'password') {
+      return res(
+        ctx.json({
+          user: {
+            id: '1',
+            email,
+            name: 'Test User',
+          },
+          token: 'mock-jwt-token',
+        })
+      )
+    }
+    
+    return res(
+      ctx.status(401),
+      ctx.json({ error: 'Invalid credentials' })
+    )
+  }),
+  
+  // File upload
+  rest.post('/api/upload', async (req, res, ctx) => {
+    const data = await req.formData()
+    const file = data.get('file') as File
+    
+    if (!file) {
+      return res(
+        ctx.status(400),
+        ctx.json({ error: 'No file provided' })
+      )
+    }
+    
+    return res(
+      ctx.json({
+        url: `https://example.com/uploads/${file.name}`,
+        size: file.size,
+        type: file.type,
+      })
+    )
+  }),
+]
+
+// test/mocks/server.ts
+import { setupServer } from 'msw/node'
+import { handlers } from './handlers'
+
+export const server = setupServer(...handlers)
+
+// test/setup.ts
+import { beforeAll, afterEach, afterAll } from 'vitest'
+import { server } from './mocks/server'
+import '@testing-library/jest-dom'
+
+// Start server before all tests
+beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
+
+// Reset handlers after each test
+afterEach(() => server.resetHandlers())
+
+// Clean up after all tests
+afterAll(() => server.close())
+```
+
+### 7. Testing Utils
+```typescript
+// test/utils/test-utils.tsx
+import { ReactElement, ReactNode } from 'react'
+import { render, RenderOptions } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/toaster'
+
+interface AllTheProvidersProps {
+  children: ReactNode
+}
+
+function AllTheProviders({ children }: AllTheProvidersProps) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: {
+        retry: false,
+      },
+    },
+  })
+  
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="light" storageKey="theme">
+        {children}
+        <Toaster />
+      </ThemeProvider>
+    </QueryClientProvider>
+  )
+}
+
+const customRender = (
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>
+) => render(ui, { wrapper: AllTheProviders, ...options })
+
+export * from '@testing-library/react'
+export { customRender as render }
+
+// Custom queries
+export const getByTextContent = (text: string) => {
+  return screen.getByText((content, element) => {
+    const hasText = (element: Element) => element.textContent === text
+    const elementHasText = hasText(element as Element)
+    const childrenDontHaveText = Array.from(element?.children || []).every(
+      (child) => !hasText(child)
+    )
+    return elementHasText && childrenDontHaveText
+  })
+}
+
+// Custom matchers
+export const toHaveNoAxeViolations = async (container: HTMLElement) => {
+  const { axe } = await import('jest-axe')
+  const results = await axe(container)
+  return {
+    pass: results.violations.length === 0,
+    message: () => {
+      const violations = results.violations
+        .map((v) => `${v.id}: ${v.description}`)
+        .join('\n')
+      return `Expected no accessibility violations but found:\n${violations}`
+    },
+  }
+}
+```
+
+### 8. Component Testing Best Practices
+```typescript
+// Best practices example
+import { render, screen } from '@/test/utils/test-utils'
+import { Modal } from '@/components/ui/modal'
+
+describe('Modal Component Best Practices', () => {
+  // ✅ Test behavior, not implementation
+  it('should close when escape key is pressed', async () => {
+    const onClose = vi.fn()
+    const user = userEvent.setup()
+    
+    render(
+      <Modal isOpen onClose={onClose}>
+        <p>Modal content</p>
+      </Modal>
+    )
+    
+    await user.keyboard('{Escape}')
+    expect(onClose).toHaveBeenCalled()
+  })
+  
+  // ✅ Test user interactions
+  it('should trap focus within modal', async () => {
+    const user = userEvent.setup()
+    
+    render(
+      <Modal isOpen>
+        <button>First</button>
+        <button>Second</button>
+        <button>Third</button>
+      </Modal>
+    )
+    
+    const buttons = screen.getAllByRole('button')
+    buttons[0].focus()
+    
+    // Tab through all buttons
+    await user.tab()
+    expect(buttons[1]).toHaveFocus()
+    
+    await user.tab()
+    expect(buttons[2]).toHaveFocus()
+    
+    // Should wrap to first button
+    await user.tab()
+    expect(buttons[0]).toHaveFocus()
+  })
+  
+  // ✅ Test accessibility
+  it('should have proper ARIA attributes', () => {
+    render(
+      <Modal isOpen aria-labelledby="modal-title">
+        <h2 id="modal-title">Delete Item</h2>
+        <p>Are you sure?</p>
+      </Modal>
+    )
+    
+    const modal = screen.getByRole('dialog')
+    expect(modal).toHaveAttribute('aria-modal', 'true')
+    expect(modal).toHaveAttribute('aria-labelledby', 'modal-title')
+  })
+  
+  // ✅ Test error states
+  it('should show error message on save failure', async () => {
+    const onSave = vi.fn().mockRejectedValue(new Error('Save failed'))
+    const user = userEvent.setup()
+    
+    render(
+      <Modal isOpen onSave={onSave}>
+        <button>Save</button>
+      </Modal>
+    )
+    
+    await user.click(screen.getByRole('button', { name: /save/i }))
+    
+    expect(await screen.findByText(/save failed/i)).toBeInTheDocument()
+  })
+})
+```
+
+### 9. Test Coverage
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './test/setup.ts',
+    coverage: {
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'test/',
+        '**/*.d.ts',
+        '**/*.config.*',
+        '**/mockData.ts',
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 80,
+        functions: 80,
+        lines: 80,
+      },
+    },
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
+```
+
+### 10. Testing Checklist
+```typescript
+/**
+ * Unit Testing Checklist
+ * 
+ * Component Testing:
+ * ✅ Renders without crashing
+ * ✅ Renders correct content
+ * ✅ Handles all props correctly
+ * ✅ Handles user interactions
+ * ✅ Updates state correctly
+ * ✅ Calls callbacks with correct arguments
+ * ✅ Handles error states
+ * ✅ Is accessible (ARIA, keyboard nav)
+ * ✅ Has proper TypeScript types
+ * 
+ * Hook Testing:
+ * ✅ Returns correct initial state
+ * ✅ Updates state correctly
+ * ✅ Handles edge cases
+ * ✅ Cleans up side effects
+ * ✅ Handles errors gracefully
+ * 
+ * Async Testing:
+ * ✅ Handles loading states
+ * ✅ Handles success responses
+ * ✅ Handles error responses
+ * ✅ Handles network failures
+ * ✅ Includes proper assertions
+ * 
+ * Coverage Goals:
+ * ✅ Statements: >80%
+ * ✅ Branches: >80%
+ * ✅ Functions: >80%
+ * ✅ Lines: >80%
+ */
+```
+
+Remember: Write tests that give confidence your code works, not tests that just increase coverage numbers.

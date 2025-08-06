@@ -1,183 +1,196 @@
-"use client"
+'use client';
 
-import { useState } from "react"
-import { GlassButton } from "@/components/ui/glass-button"
-import { GlassCard } from "@/components/ui/glass-card"
-import { Badge } from "@/components/ui/badge"
-import { 
-  GitBranch, 
-  ChevronLeft, 
-  ChevronRight, 
-  MoreHorizontal,
-  Eye,
-  Trash2,
-  Edit3,
+import {
   Bookmark,
-  Star
-} from "lucide-react"
-import { cn } from "@/lib/utils"
+  ChevronLeft,
+  ChevronRight,
+  Edit3,
+  Eye,
+  GitBranch,
+  MoreHorizontal,
+  Star,
+  Trash2,
+} from 'lucide-react';
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Badge } from '@/components/ui/badge';
+import { ConfirmationDialog } from '@/components/ui/confirmation-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { useTreeNavigation, useCurrentTree, useTreeOperations } from "@/contexts/conversation-tree-context"
-import { BranchRenameDialog } from "./branch-rename-dialog"
-import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
-import { toast } from "sonner"
-import type { Branch } from "@/types/conversation-tree"
+} from '@/components/ui/dropdown-menu';
+import { GlassButton } from '@/components/ui/glass-button';
+import { GlassCard } from '@/components/ui/glass-card';
+import {
+  useCurrentTree,
+  useTreeNavigation,
+  useTreeOperations,
+} from '@/contexts/conversation-tree-context';
+import { cn } from '@/lib/utils';
+import type { Branch, ConversationNode } from '@/types/conversation-tree';
+import { BranchRenameDialog } from './branch-rename-dialog';
 
 interface BranchNavigatorProps {
-  className?: string
-  compact?: boolean
+  className?: string;
+  compact?: boolean;
 }
 
-export function BranchNavigator({ className, compact = false }: BranchNavigatorProps) {
-  const [showAllBranches, setShowAllBranches] = useState(false)
-  const [selectedBranchForRename, setSelectedBranchForRename] = useState<Branch | null>(null)
-  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null)
-  
-  const { 
-    navigationState, 
-    canGoBack, 
-    canGoForward, 
-    currentBranch, 
+export function BranchNavigator({
+  className,
+  compact = false,
+}: BranchNavigatorProps) {
+  const [showAllBranches, setShowAllBranches] = useState(false);
+  const [selectedBranchForRename, setSelectedBranchForRename] =
+    useState<Branch | null>(null);
+  const [branchToDelete, setBranchToDelete] = useState<Branch | null>(null);
+
+  const {
+    navigationState,
+    canGoBack,
+    canGoForward,
+    currentBranch,
     availableBranches,
     breadcrumbs,
-    switchToBranch 
-  } = useTreeNavigation()
-  
-  const { branches, tree } = useCurrentTree()
-  const { 
-    renameBranch, 
-    toggleBranchFavorite, 
-    deleteBranch 
-  } = useTreeOperations()
+    switchToBranch,
+  } = useTreeNavigation();
+
+  const { branches, tree } = useCurrentTree();
+  const { renameBranch, toggleBranchFavorite, deleteBranch } =
+    useTreeOperations();
 
   if (!tree || branches.length === 0) {
-    return null
+    return null;
   }
 
-  const currentBranchData = branches.find(b => b.id === currentBranch)
-  const visibleBranches = showAllBranches ? branches : branches.slice(0, 3)
+  const currentBranchData = branches.find((b) => b.id === currentBranch);
+  const visibleBranches = showAllBranches ? branches : branches.slice(0, 3);
 
   const handleBranchSwitch = (branchId: string) => {
-    switchToBranch(branchId)
-  }
+    switchToBranch(branchId);
+  };
 
   const handleRenameBranch = async (branchId: string, newName: string) => {
     try {
-      renameBranch(branchId, newName)
+      renameBranch(branchId, newName);
     } catch (error) {
-      throw error // Re-throw to let the dialog handle it
+      throw error; // Re-throw to let the dialog handle it
     }
-  }
+  };
 
   const handleToggleFavorite = async (branchId: string) => {
     try {
-      const isFavorited = toggleBranchFavorite(branchId)
-      const branch = branches.find(b => b.id === branchId)
+      const isFavorited = toggleBranchFavorite(branchId);
+      const branch = branches.find((b) => b.id === branchId);
       if (branch) {
         toast.success(
-          isFavorited 
+          isFavorited
             ? `"${branch.name}" added to favorites`
             : `"${branch.name}" removed from favorites`
-        )
+        );
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to update favorite status')
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : 'Failed to update favorite status'
+      );
     }
-  }
+  };
 
   const handleDeleteBranch = (branch: Branch) => {
-    setBranchToDelete(branch)
-  }
+    setBranchToDelete(branch);
+  };
 
   const confirmDeleteBranch = async () => {
-    if (!branchToDelete) return
-    
+    if (!branchToDelete) return;
+
     try {
-      deleteBranch(branchToDelete.id)
-      toast.success(`Branch "${branchToDelete.name}" deleted`)
+      deleteBranch(branchToDelete.id);
+      toast.success(`Branch "${branchToDelete.name}" deleted`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Failed to delete branch')
-      throw error
+      toast.error(
+        error instanceof Error ? error.message : 'Failed to delete branch'
+      );
+      throw error;
     }
-  }
+  };
 
   const formatMessageCount = (count: number) => {
-    return `${count} message${count !== 1 ? 's' : ''}`
-  }
+    return `${count} message${count !== 1 ? 's' : ''}`;
+  };
 
   const getBranchPreview = (branch: Branch) => {
     // Get the last few characters of the branch for preview
-    const node = Array.from(tree.nodes.values()).find(n => n.id === branch.leafNodeId)
-    if (!node) return branch.name
-    
+    const node: ConversationNode | undefined = Array.from(
+      tree.nodes.values()
+    ).find((n) => n.id === branch.leafNodeId);
+    if (!node) return branch.name;
+
     const content = node.message.parts
-      .filter(part => part.type === 'text')
-      .map(part => part.text)
-      .join('')
-    
-    return content.length > 30 ? content.substring(0, 30) + '...' : content
-  }
+      .filter((part: any) => part.type === 'text')
+      .map((part: any) => part.text)
+      .join('');
+
+    return content.length > 30 ? content.substring(0, 30) + '...' : content;
+  };
 
   if (compact) {
     return (
-      <div className={cn("flex items-center gap-2", className)}>
+      <div className={cn('flex items-center gap-2', className)}>
         {branches.length > 1 && (
           <>
-            <Badge 
-              variant="outline" 
-              className="text-xs gap-1 cursor-pointer hover:bg-white/10"
+            <Badge
+              className="cursor-pointer gap-1 text-xs hover:bg-white/10"
               onClick={() => setShowAllBranches(!showAllBranches)}
+              variant="outline"
             >
               <GitBranch className="h-3 w-3" />
               {branches.length}
             </Badge>
-            
+
             {currentBranchData && (
-              <span className="text-xs text-muted-foreground truncate max-w-[100px]">
+              <span className="max-w-[100px] truncate text-muted-foreground text-xs">
                 {currentBranchData.name}
               </span>
             )}
           </>
         )}
       </div>
-    )
+    );
   }
 
   return (
-    <GlassCard className={cn("p-3 space-y-3", className)}>
+    <GlassCard className={cn('space-y-3 p-3', className)}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <GitBranch className="h-4 w-4 text-periwinkle" />
-          <span className="text-sm font-medium">Conversation Branches</span>
-          <Badge variant="secondary" className="text-xs">
+          <span className="font-medium text-sm">Conversation Branches</span>
+          <Badge className="text-xs" variant="secondary">
             {branches.length}
           </Badge>
         </div>
-        
+
         <div className="flex items-center gap-1">
           <GlassButton
-            variant="ghost"
-            size="icon"
             className="h-6 w-6"
             disabled={!canGoBack}
+            size="icon"
             title="Previous in branch"
+            variant="ghost"
           >
             <ChevronLeft className="h-3 w-3" />
           </GlassButton>
-          
+
           <GlassButton
-            variant="ghost"
-            size="icon"
             className="h-6 w-6"
             disabled={!canGoForward}
+            size="icon"
             title="Next in branch"
+            variant="ghost"
           >
             <ChevronRight className="h-3 w-3" />
           </GlassButton>
@@ -186,18 +199,18 @@ export function BranchNavigator({ className, compact = false }: BranchNavigatorP
 
       {/* Current Branch Info */}
       {currentBranchData && (
-        <div className="p-2 bg-periwinkle/10 rounded-lg border border-periwinkle/20">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm font-medium text-periwinkle">
+        <div className="rounded-lg border border-periwinkle/20 bg-periwinkle/10 p-2">
+          <div className="mb-1 flex items-center justify-between">
+            <span className="font-medium text-periwinkle text-sm">
               {currentBranchData.name}
             </span>
             {currentBranchData.isFavorite && (
-              <Star className="h-3 w-3 text-yellow-400 fill-current" />
+              <Star className="h-3 w-3 fill-current text-yellow-400" />
             )}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {formatMessageCount(currentBranchData.messageCount)} • 
-            {" "}Created {new Date(currentBranchData.createdAt).toLocaleDateString()}
+          <div className="text-muted-foreground text-xs">
+            {formatMessageCount(currentBranchData.messageCount)} • Created{' '}
+            {new Date(currentBranchData.createdAt).toLocaleDateString()}
           </div>
         </div>
       )}
@@ -205,103 +218,105 @@ export function BranchNavigator({ className, compact = false }: BranchNavigatorP
       {/* Branch List */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="font-medium text-muted-foreground text-xs">
             Available Branches
           </span>
           {branches.length > 3 && (
             <GlassButton
-              variant="ghost"
-              size="sm"
-              className="text-xs h-6"
+              className="h-6 text-xs"
               onClick={() => setShowAllBranches(!showAllBranches)}
+              size="sm"
+              variant="ghost"
             >
               {showAllBranches ? 'Show Less' : `Show All (${branches.length})`}
             </GlassButton>
           )}
         </div>
-        
+
         {visibleBranches.map((branch) => (
           <div
-            key={branch.id}
             className={cn(
-              "group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors",
+              'group flex cursor-pointer items-center justify-between rounded-lg p-2 transition-colors',
               branch.id === currentBranch
-                ? "bg-periwinkle/20 border border-periwinkle/30"
-                : "hover:bg-white/5 border border-transparent"
+                ? 'border border-periwinkle/30 bg-periwinkle/20'
+                : 'border border-transparent hover:bg-white/5'
             )}
+            key={branch.id}
             onClick={() => handleBranchSwitch(branch.id)}
           >
-            <div className="flex-1 min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium truncate">
+                <span className="truncate font-medium text-sm">
                   {branch.name}
                 </span>
                 {branch.isFavorite && (
-                  <Star className="h-3 w-3 text-yellow-400 fill-current" />
+                  <Star className="h-3 w-3 fill-current text-yellow-400" />
                 )}
               </div>
-              <div className="text-xs text-muted-foreground">
+              <div className="text-muted-foreground text-xs">
                 {formatMessageCount(branch.messageCount)}
               </div>
-              <div className="text-xs text-muted-foreground/80 truncate">
+              <div className="truncate text-muted-foreground/80 text-xs">
                 {getBranchPreview(branch)}
               </div>
             </div>
-            
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+
+            <div className="opacity-0 transition-opacity group-hover:opacity-100">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <GlassButton
-                    variant="ghost"
-                    size="icon"
                     className="h-6 w-6"
                     onClick={(e) => e.stopPropagation()}
+                    size="icon"
+                    variant="ghost"
                   >
                     <MoreHorizontal className="h-3 w-3" />
                   </GlassButton>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="glass">
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleBranchSwitch(branch.id)
-                    }}
+                  <DropdownMenuItem
                     className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleBranchSwitch(branch.id);
+                    }}
                   >
                     <Eye className="h-3 w-3" />
                     Switch to branch
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedBranchForRename(branch)
-                    }}
+
+                  <DropdownMenuItem
                     className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedBranchForRename(branch);
+                    }}
                   >
                     <Edit3 className="h-3 w-3" />
                     Rename branch
                   </DropdownMenuItem>
-                  
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleToggleFavorite(branch.id)
-                    }}
+
+                  <DropdownMenuItem
                     className="gap-2"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleToggleFavorite(branch.id);
+                    }}
                   >
                     <Bookmark className="h-3 w-3" />
-                    {branch.isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                    {branch.isFavorite
+                      ? 'Remove from favorites'
+                      : 'Add to favorites'}
                   </DropdownMenuItem>
-                  
+
                   <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem 
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteBranch(branch)
-                    }}
+
+                  <DropdownMenuItem
                     className="gap-2 text-red-400 hover:text-red-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDeleteBranch(branch);
+                    }}
                   >
                     <Trash2 className="h-3 w-3" />
                     Delete branch
@@ -316,17 +331,17 @@ export function BranchNavigator({ className, compact = false }: BranchNavigatorP
       {/* Breadcrumbs */}
       {breadcrumbs.length > 1 && (
         <div className="space-y-1">
-          <span className="text-xs font-medium text-muted-foreground">
+          <span className="font-medium text-muted-foreground text-xs">
             Current Path
           </span>
           <div className="flex items-center gap-1 text-xs">
             {breadcrumbs.map((crumb, index) => (
-              <div key={crumb.nodeId} className="flex items-center gap-1">
+              <div className="flex items-center gap-1" key={crumb.nodeId}>
                 {index > 0 && (
                   <ChevronRight className="h-3 w-3 text-muted-foreground/50" />
                 )}
                 <button
-                  className="text-muted-foreground hover:text-white transition-colors truncate max-w-[80px]"
+                  className="max-w-[80px] truncate text-muted-foreground transition-colors hover:text-white"
                   title={crumb.messagePreview}
                 >
                   {crumb.branchName || `Message ${index + 1}`}
@@ -336,7 +351,7 @@ export function BranchNavigator({ className, compact = false }: BranchNavigatorP
           </div>
         </div>
       )}
-    
+
       {/* Branch Rename Dialog */}
       <BranchRenameDialog
         branch={selectedBranchForRename}
@@ -347,19 +362,19 @@ export function BranchNavigator({ className, compact = false }: BranchNavigatorP
 
       {/* Branch Delete Confirmation Dialog */}
       <ConfirmationDialog
+        confirmText="Delete Branch"
+        description={
+          branchToDelete
+            ? `Are you sure you want to delete "${branchToDelete.name}"? This will remove ${branchToDelete.messageCount} messages and cannot be undone.`
+            : ''
+        }
         isOpen={!!branchToDelete}
         onClose={() => setBranchToDelete(null)}
         onConfirm={confirmDeleteBranch}
-        title="Delete Branch"
-        description={
-          branchToDelete 
-            ? `Are you sure you want to delete "${branchToDelete.name}"? This will remove ${branchToDelete.messageCount} messages and cannot be undone.`
-            : ""
-        }
-        confirmText="Delete Branch"
-        variant="danger"
         requiresTyping={branchToDelete?.name}
+        title="Delete Branch"
+        variant="danger"
       />
     </GlassCard>
-  )
+  );
 }

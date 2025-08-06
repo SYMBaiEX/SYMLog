@@ -1,0 +1,491 @@
+---
+description: "System Architecture and Design Principles"
+globs: 
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/README.md"
+alwaysApply: true
+context_files:
+  - "@README.md"
+  - "@AGENTS.md"
+  - "@apps/*/README.md"
+---
+
+# System Architecture Rules
+
+## Architecture Overview
+
+SYMLog follows a modern, scalable architecture pattern:
+- **Monorepo Structure**: Turborepo for efficient builds
+- **Microfrontend Ready**: Independent app deployments
+- **Real-time First**: Convex reactive architecture
+- **Cross-platform**: Web, Desktop (Tauri), Mobile (PWA)
+- **Type-safe**: End-to-end TypeScript
+
+## Design Principles
+
+### 1. Domain-Driven Design (DDD)
+```typescript
+// Group by business domain
+apps/
+├── auth-web/        # Authentication domain
+├── web/            # Main application domain
+└── fumadocs/       # Documentation domain
+
+// Feature-based organization within apps
+src/
+├── features/
+│   ├── chat/       # Chat feature module
+│   ├── auth/       # Auth feature module
+│   └── wallet/     # Web3 feature module
+```
+
+### 2. Clean Architecture Layers
+```typescript
+// 1. Domain Layer (innermost)
+interface User {
+  id: string
+  email: string
+  walletAddress?: string
+}
+
+// 2. Application Layer
+interface AuthService {
+  authenticate(credentials: Credentials): Promise<User>
+  validateSession(token: string): Promise<boolean>
+}
+
+// 3. Infrastructure Layer
+class ConvexAuthService implements AuthService {
+  constructor(private client: ConvexClient) {}
+  // Implementation details
+}
+
+// 4. Presentation Layer (outermost)
+export function LoginPage() {
+  const authService = useAuthService()
+  // UI implementation
+}
+```
+
+### 3. Dependency Injection
+```typescript
+// Use React Context for DI
+const ServiceContext = createContext<Services>()
+
+// Provide services at app level
+export function App() {
+  const services = useServices()
+  return (
+    <ServiceContext.Provider value={services}>
+      <AppContent />
+    </ServiceContext.Provider>
+  )
+}
+
+// Consume services in components
+export function useAuthService() {
+  const { authService } = useContext(ServiceContext)
+  return authService
+}
+```
+
+### 4. SOLID Principles
+
+#### Single Responsibility
+```typescript
+// ❌ Bad: Multiple responsibilities
+class UserComponent {
+  fetchUser() { /* API call */ }
+  validateUser() { /* Validation */ }
+  renderUser() { /* UI rendering */ }
+}
+
+// ✅ Good: Single responsibility
+const useUser = () => { /* Data fetching */ }
+const validateUser = (user: User) => { /* Validation */ }
+const UserDisplay = ({ user }: Props) => { /* UI only */ }
+```
+
+#### Open/Closed Principle
+```typescript
+// Base interface open for extension
+interface PaymentProcessor {
+  process(amount: number): Promise<PaymentResult>
+}
+
+// Closed for modification, open for extension
+class StripeProcessor implements PaymentProcessor { }
+class CryptoProcessor implements PaymentProcessor { }
+```
+
+### 5. Event-Driven Architecture
+```typescript
+// Use Convex for real-time events
+const useRealtimeChat = () => {
+  const messages = useQuery(api.chat.list)
+  const sendMessage = useMutation(api.chat.send)
+  
+  // Automatically updates when backend changes
+  return { messages, sendMessage }
+}
+
+// Event emitter for client-side events  
+class EventBus extends EventEmitter {
+  emit(event: AppEvent): void
+  on(event: string, handler: Handler): void
+}
+```
+
+## Architectural Patterns
+
+### 1. Repository Pattern
+```typescript
+interface Repository<T> {
+  findById(id: string): Promise<T | null>
+  findAll(): Promise<T[]>
+  create(data: Partial<T>): Promise<T>
+  update(id: string, data: Partial<T>): Promise<T>
+  delete(id: string): Promise<void>
+}
+
+class ConvexUserRepository implements Repository<User> {
+  // Implementation using Convex
+}
+```
+
+### 2. Factory Pattern
+```typescript
+interface ComponentFactory {
+  createComponent(type: string): React.ComponentType
+}
+
+class DynamicComponentFactory implements ComponentFactory {
+  private components = new Map<string, React.ComponentType>()
+  
+  register(type: string, component: React.ComponentType) {
+    this.components.set(type, component)
+  }
+  
+  createComponent(type: string) {
+    return this.components.get(type) || DefaultComponent
+  }
+}
+```
+
+### 3. Observer Pattern (via React/Convex)
+```typescript
+// Convex handles observer pattern automatically
+export const useMessages = () => {
+  // Automatically re-renders on data changes
+  return useQuery(api.messages.list)
+}
+
+// Custom observer for client state
+const useObservable = <T>(observable: Observable<T>) => {
+  const [value, setValue] = useState(observable.value)
+  
+  useEffect(() => {
+    return observable.subscribe(setValue)
+  }, [observable])
+  
+  return value
+}
+```
+
+### 4. Adapter Pattern
+```typescript
+// Adapt different wallet providers to common interface
+interface WalletAdapter {
+  connect(): Promise<string>
+  disconnect(): Promise<void>
+  signMessage(message: string): Promise<string>
+}
+
+class PhantomAdapter implements WalletAdapter { }
+class CrossmintAdapter implements WalletAdapter { }
+```
+
+## Component Architecture
+
+### 1. Compound Components
+```typescript
+// Parent component with child components
+export const Card = Object.assign(CardRoot, {
+  Header: CardHeader,
+  Body: CardBody,
+  Footer: CardFooter
+})
+
+// Usage
+<Card>
+  <Card.Header>Title</Card.Header>
+  <Card.Body>Content</Card.Body>
+  <Card.Footer>Actions</Card.Footer>
+</Card>
+```
+
+### 2. Render Props Pattern
+```typescript
+interface DataFetcherProps<T> {
+  url: string
+  render: (data: T, loading: boolean) => React.ReactNode
+}
+
+function DataFetcher<T>({ url, render }: DataFetcherProps<T>) {
+  const { data, loading } = useFetch<T>(url)
+  return <>{render(data, loading)}</>
+}
+```
+
+### 3. Higher-Order Components (HOCs)
+```typescript
+// Authentication HOC
+function withAuth<P extends object>(
+  Component: React.ComponentType<P>
+): React.ComponentType<P> {
+  return (props: P) => {
+    const { user } = useAuth()
+    
+    if (!user) {
+      return <Navigate to="/login" />
+    }
+    
+    return <Component {...props} user={user} />
+  }
+}
+```
+
+## State Management Architecture
+
+### 1. Local State (Component)
+```typescript
+// Use for UI-only state
+const [isOpen, setIsOpen] = useState(false)
+```
+
+### 2. Global State (Context/Zustand)
+```typescript
+// For cross-component state
+interface AppState {
+  theme: 'light' | 'dark'
+  user: User | null
+  setTheme: (theme: 'light' | 'dark') => void
+  setUser: (user: User | null) => void
+}
+
+const useAppStore = create<AppState>((set) => ({
+  theme: 'light',
+  user: null,
+  setTheme: (theme) => set({ theme }),
+  setUser: (user) => set({ user })
+}))
+```
+
+### 3. Server State (Convex/React Query)
+```typescript
+// For data from backend
+const messages = useQuery(api.messages.list)
+const sendMessage = useMutation(api.messages.send)
+```
+
+### 4. URL State (Next.js Router)
+```typescript
+// For shareable state
+const router = useRouter()
+const { query } = router
+```
+
+## Performance Architecture
+
+### 1. Code Splitting
+```typescript
+// Route-based splitting (automatic in Next.js)
+// Component-based splitting
+const HeavyComponent = lazy(() => import('./HeavyComponent'))
+
+// Use with Suspense
+<Suspense fallback={<Loading />}>
+  <HeavyComponent />
+</Suspense>
+```
+
+### 2. Memoization Strategy
+```typescript
+// Memoize expensive computations
+const expensiveValue = useMemo(
+  () => computeExpensiveValue(deps),
+  [deps]
+)
+
+// Memoize components
+const MemoizedComponent = memo(Component, (prev, next) => {
+  return prev.id === next.id
+})
+```
+
+### 3. Virtual Scrolling
+```typescript
+// For large lists
+import { VirtualList } from '@tanstack/react-virtual'
+
+function LargeList({ items }: { items: Item[] }) {
+  const virtualizer = useVirtualizer({
+    count: items.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 50,
+  })
+}
+```
+
+## Security Architecture
+
+### 1. Authentication Flow
+```typescript
+// Multi-provider authentication
+interface AuthProvider {
+  type: 'wallet' | 'email' | 'social'
+  authenticate(): Promise<AuthResult>
+}
+
+// Secure session management
+interface SessionManager {
+  createSession(user: User): Promise<Session>
+  validateSession(token: string): Promise<boolean>
+  revokeSession(sessionId: string): Promise<void>
+}
+```
+
+### 2. Authorization Layers
+```typescript
+// Role-based access control (RBAC)
+interface Permission {
+  resource: string
+  action: string
+}
+
+interface Role {
+  name: string
+  permissions: Permission[]
+}
+
+// Protect routes
+function ProtectedRoute({ role, children }: Props) {
+  const { user } = useAuth()
+  
+  if (!hasRole(user, role)) {
+    return <Forbidden />
+  }
+  
+  return children
+}
+```
+
+### 3. Data Validation
+```typescript
+// Input validation with Zod
+const UserSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(8),
+  walletAddress: z.string().optional()
+})
+
+// Validate at boundaries
+export async function createUser(data: unknown) {
+  const validated = UserSchema.parse(data)
+  return await userService.create(validated)
+}
+```
+
+## Testing Architecture
+
+### 1. Test Structure
+```
+src/
+├── components/
+│   ├── Button.tsx
+│   └── Button.test.tsx
+├── hooks/
+│   ├── useAuth.ts
+│   └── useAuth.test.ts
+└── __tests__/
+    └── integration/
+        └── auth-flow.test.ts
+```
+
+### 2. Test Utilities
+```typescript
+// Custom render with providers
+export function renderWithProviders(
+  ui: React.ReactElement,
+  options?: RenderOptions
+) {
+  return render(
+    <QueryClient>
+      <ConvexProvider>
+        {ui}
+      </ConvexProvider>
+    </QueryClient>,
+    options
+  )
+}
+```
+
+### 3. Mock Strategy
+```typescript
+// Mock external dependencies
+jest.mock('@/lib/convex', () => ({
+  useQuery: jest.fn(),
+  useMutation: jest.fn()
+}))
+
+// Mock factories
+export function createMockUser(overrides?: Partial<User>): User {
+  return {
+    id: 'test-id',
+    email: 'test@example.com',
+    ...overrides
+  }
+}
+```
+
+## Deployment Architecture
+
+### 1. Environment Strategy
+```typescript
+// Environment-specific configs
+const config = {
+  development: {
+    apiUrl: 'http://localhost:3000',
+    convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL
+  },
+  production: {
+    apiUrl: 'https://api.symlog.ai',
+    convexUrl: process.env.NEXT_PUBLIC_CONVEX_URL
+  }
+}[process.env.NODE_ENV]
+```
+
+### 2. Build Pipeline
+```yaml
+# Turborepo pipeline
+{
+  "pipeline": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": [".next/**", "dist/**"]
+    },
+    "test": {
+      "dependsOn": ["build"],
+      "outputs": []
+    }
+  }
+}
+```
+
+### 3. Multi-platform Deployment
+- **Web**: Vercel with preview deployments
+- **Desktop**: Tauri with auto-updater
+- **Mobile**: PWA with service workers
+
+Remember: Architecture should evolve with the project. These patterns are guidelines, not rigid rules.

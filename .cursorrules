@@ -1,0 +1,213 @@
+# SYMLog Platform Development Rules
+
+This is the main Cursor IDE rules file for the SYMLog platform. It provides an overview and links to all modular rule files in the `.cursor/rules/` directory.
+
+## 🎯 Project Overview
+
+SYMLog is a modern, cross-platform symbol logging and event tracking system built with:
+- **Frontend**: Next.js 15, React 19, TypeScript 5.5, Tailwind CSS
+- **Backend**: Convex for real-time data, PostgreSQL with Prisma
+- **Desktop**: Tauri 2 for native desktop applications
+- **Blockchain**: Solana integration with Crossmint for Web3 features
+- **Infrastructure**: Docker, Kubernetes, AWS, Terraform
+
+## 📁 Rules Structure
+
+All detailed rules are organized in the `.cursor/rules/` directory:
+
+### Core Principles
+- **[Global Rules](.cursor/rules/global.mdc)** - Project-wide conventions and standards
+- **[Architecture](.cursor/rules/core/architecture.mdc)** - System design patterns and principles
+- **[Security](.cursor/rules/core/security.mdc)** - Security best practices and guidelines
+- **[Performance](.cursor/rules/core/performance.mdc)** - Performance optimization strategies
+- **[Quality](.cursor/rules/core/quality.mdc)** - Code quality standards
+
+### Frontend Development
+- **[React](.cursor/rules/frontend/react.mdc)** - React 19 patterns and best practices
+- **[Next.js](.cursor/rules/frontend/nextjs.mdc)** - Next.js 15 App Router conventions
+- **[TypeScript](.cursor/rules/frontend/typescript.mdc)** - TypeScript 5.5 strict mode guidelines
+- **[Tailwind CSS](.cursor/rules/frontend/tailwind.mdc)** - Styling conventions and utilities
+- **[UI Components](.cursor/rules/frontend/ui-components.mdc)** - Component library standards
+
+### Backend Development
+- **[API Design](.cursor/rules/backend/api.mdc)** - RESTful and GraphQL API patterns
+- **[Convex](.cursor/rules/backend/convex.mdc)** - Real-time data management
+- **[Real-time Features](.cursor/rules/backend/real-time.mdc)** - WebSocket and SSE patterns
+
+### Desktop Development
+- **[Tauri](.cursor/rules/desktop/tauri.mdc)** - Tauri 2 desktop application patterns
+
+### Web3 Integration
+- **[Solana](.cursor/rules/web3/solana.mdc)** - Blockchain integration patterns
+- **[Crossmint](.cursor/rules/web3/crossmint.mdc)** - NFT and wallet integration
+
+### Testing Standards
+- **[Unit Testing](.cursor/rules/testing/unit.mdc)** - Jest and React Testing Library
+- **[Integration Testing](.cursor/rules/testing/integration.mdc)** - API and database testing
+- **[E2E Testing](.cursor/rules/testing/e2e.mdc)** - Playwright automation
+
+### Quality Assurance
+- **[Code Review](.cursor/rules/quality/code-review.mdc)** - Review process and checklists
+- **[Documentation](.cursor/rules/quality/documentation.mdc)** - Documentation standards
+- **[Metrics](.cursor/rules/quality/metrics.mdc)** - Quality and performance metrics
+
+### DevOps & Infrastructure
+- **[CI/CD](.cursor/rules/devops/ci-cd.mdc)** - GitHub Actions workflows
+- **[Deployment](.cursor/rules/devops/deployment.mdc)** - Deployment strategies
+- **[Infrastructure](.cursor/rules/devops/infrastructure.mdc)** - Infrastructure as Code
+
+## 🚀 Quick Start Commands
+
+```bash
+# Development
+pnpm dev              # Start development server
+pnpm build            # Build for production
+pnpm test             # Run tests
+pnpm lint             # Run linting
+pnpm type-check       # TypeScript validation
+
+# Database
+pnpm db:push          # Push schema changes
+pnpm db:migrate       # Run migrations
+pnpm db:studio        # Open Prisma Studio
+
+# Desktop
+pnpm tauri dev        # Start Tauri development
+pnpm tauri build      # Build desktop app
+```
+
+## 📏 Key Conventions
+
+### File Naming
+- Components: `PascalCase.tsx` (e.g., `UserProfile.tsx`)
+- Utilities: `camelCase.ts` (e.g., `formatDate.ts`)
+- Types: `types.ts` or `PascalCase.types.ts`
+- Tests: `*.test.ts` or `*.spec.ts`
+- Stories: `*.stories.tsx`
+
+### Code Style
+- 2 spaces indentation
+- Single quotes for strings
+- Trailing commas in multi-line objects/arrays
+- Explicit return types for functions
+- Prefer `interface` over `type` for object shapes
+
+### Component Structure
+```typescript
+// 1. Imports
+import { useState, useEffect } from 'react'
+import { Button } from '@/components/ui/button'
+
+// 2. Types
+interface UserCardProps {
+  user: User
+  onSelect?: (user: User) => void
+}
+
+// 3. Component
+export function UserCard({ user, onSelect }: UserCardProps) {
+  // 4. State & Hooks
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // 5. Effects
+  useEffect(() => {
+    // Effect logic
+  }, [])
+  
+  // 6. Handlers
+  const handleClick = () => {
+    onSelect?.(user)
+  }
+  
+  // 7. Render
+  return (
+    <div onClick={handleClick}>
+      {/* Component JSX */}
+    </div>
+  )
+}
+```
+
+### Commit Message Format
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+Examples:
+- `feat(auth): add OAuth2 integration`
+- `fix(ui): resolve button alignment issue`
+- `docs(api): update endpoint documentation`
+
+## 🛡️ Security First
+
+1. **Never commit secrets** - Use environment variables
+2. **Validate all inputs** - Both client and server side
+3. **Implement rate limiting** - Protect API endpoints
+4. **Use HTTPS everywhere** - No exceptions in production
+5. **Keep dependencies updated** - Regular security audits
+
+## 🎨 UI/UX Guidelines
+
+1. **Accessibility** - WCAG 2.1 AA compliance minimum
+2. **Responsive Design** - Mobile-first approach
+3. **Performance** - Core Web Vitals optimization
+4. **Consistency** - Follow design system strictly
+5. **User Feedback** - Loading states, error handling
+
+## 📊 Performance Targets
+
+- **First Contentful Paint**: < 1.8s
+- **Largest Contentful Paint**: < 2.5s
+- **Time to Interactive**: < 3.8s
+- **Bundle Size**: < 500KB initial load
+- **API Response Time**: < 200ms p95
+
+## 🧪 Testing Requirements
+
+- **Unit Test Coverage**: ≥ 80%
+- **Integration Test Coverage**: ≥ 70%
+- **E2E Critical Paths**: 100% coverage
+- **Performance Testing**: All API endpoints
+- **Security Testing**: Regular penetration tests
+
+## 📝 Documentation Standards
+
+1. **README files** - Every directory should have one
+2. **Code Comments** - Explain "why", not "what"
+3. **API Documentation** - OpenAPI/Swagger specs
+4. **Architecture Decisions** - Document in ADRs
+5. **User Guides** - Keep updated with features
+
+## 🤝 Contribution Guidelines
+
+1. **Fork & Pull Request** - All changes via PR
+2. **Code Review** - Minimum 1 approval required
+3. **CI Must Pass** - All checks green
+4. **Update Tests** - New features need tests
+5. **Update Docs** - Keep documentation current
+
+## 🚨 When in Doubt
+
+1. **Check existing patterns** in the codebase
+2. **Refer to specific rule files** in `.cursor/rules/`
+3. **Ask for clarification** before implementing
+4. **Prioritize maintainability** over cleverness
+5. **Follow platform conventions** (React, Next.js, etc.)
+
+## 📚 Additional Resources
+
+- [Project Documentation](./docs/README.md)
+- [API Reference](./docs/api/README.md)
+- [Architecture Guide](./docs/architecture/README.md)
+- [Contributing Guide](./CONTRIBUTING.md)
+- [Security Policy](./SECURITY.md)
+
+---
+
+Remember: These rules are guidelines to ensure consistency and quality. When edge cases arise, use your best judgment while keeping the project's goals and user experience in mind.

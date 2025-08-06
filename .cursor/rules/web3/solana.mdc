@@ -1,0 +1,906 @@
+---
+description: "Solana Blockchain Integration"
+globs: 
+  - "**/solana/**/*.{ts,js}"
+  - "**/web3/**/*.{ts,js}"
+  - "**/blockchain/**/*.{ts,js}"
+alwaysApply: true
+---
+
+# Solana Development Rules
+
+## Solana Architecture
+
+### 1. Wallet Connection
+```typescript
+// lib/solana/wallet.ts
+import { WalletAdapterNetwork } from '@solana/wallet-adapter-base'
+import {
+  ConnectionProvider,
+  WalletProvider,
+  useWallet,
+  useConnection,
+} from '@solana/wallet-adapter-react'
+import {
+  WalletModalProvider,
+  WalletMultiButton,
+} from '@solana/wallet-adapter-react-ui'
+import {
+  PhantomWalletAdapter,
+  SolflareWalletAdapter,
+  TorusWalletAdapter,
+  LedgerWalletAdapter,
+} from '@solana/wallet-adapter-wallets'
+import { clusterApiUrl } from '@solana/web3.js'
+import { useMemo } from 'react'
+
+// Wallet configuration
+export function WalletContextProvider({ children }: { children: React.ReactNode }) {
+  const network = WalletAdapterNetwork.Mainnet
+  const endpoint = useMemo(() => clusterApiUrl(network), [network])
+  
+  const wallets = useMemo(
+    () => [
+      new PhantomWalletAdapter(),
+      new SolflareWalletAdapter({ network }),
+      new TorusWalletAdapter(),
+      new LedgerWalletAdapter(),
+    ],
+    [network]
+  )
+  
+  return (
+    <ConnectionProvider endpoint={endpoint}>
+      <WalletProvider wallets={wallets} autoConnect>
+        <WalletModalProvider>{children}</WalletModalProvider>
+      </WalletProvider>
+    </ConnectionProvider>
+  )
+}
+
+// Custom wallet hook
+export function useSolanaWallet() {
+  const { publicKey, connected, connecting, disconnect, signMessage } = useWallet()
+  const { connection } = useConnection()
+  
+  const getBalance = async () => {
+    if (!publicKey) return 0
+    const balance = await connection.getBalance(publicKey)
+    return balance / 1e9 // Convert lamports to SOL
+  }
+  
+  const sendTransaction = async (
+    instructions: TransactionInstruction[],
+    signers?: Keypair[]
+  ) => {
+    if (!publicKey) throw new Error('Wallet not connected')
+    
+    const transaction = new Transaction()
+    instructions.forEach(instruction => transaction.add(instruction))
+    
+    // Get recent blockhash
+    const { blockhash } = await connection.getLatestBlockhash()
+    transaction.recentBlockhash = blockhash
+    transaction.feePayer = publicKey
+    
+    // Sign and send
+    if (signers && signers.length > 0) {
+      transaction.partialSign(...signers)
+    }
+    
+    const signed = await sendTransaction(transaction, connection)
+    const confirmation = await connection.confirmTransaction(signed, 'confirmed')
+    
+    return confirmation
+  }
+  
+  return {
+    publicKey,
+    connected,
+    connecting,
+    disconnect,
+    signMessage,
+    getBalance,
+    sendTransaction,
+  }
+}
+```
+
+### 2. Program Interaction
+```typescript
+// lib/solana/program.ts
+import {
+  Connection,
+  PublicKey,
+  Transaction,
+  TransactionInstruction,
+  SystemProgram,
+  SYSVAR_RENT_PUBKEY,
+} from '@solana/web3.js'
+import { Program, AnchorProvider, web3, BN } from '@project-serum/anchor'
+import { IDL, SymlogProgram } from './idl'
+
+const PROGRAM_ID = new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID!)
+
+export class SolanaProgram {
+  program: Program<SymlogProgram>
+  connection: Connection
+  
+  constructor(connection: Connection, wallet: any) {
+    const provider = new AnchorProvider(
+      connection,
+      wallet,
+      { preflightCommitment: 'confirmed' }
+    )
+    
+    this.program = new Program(IDL, PROGRAM_ID, provider)
+    this.connection = connection
+  }
+  
+  // Initialize user account
+  async initializeUser(userPublicKey: PublicKey) {
+    const [userPDA] = await PublicKey.findProgramAddress(
+      [Buffer.from('user'), userPublicKey.toBuffer()],
+      this.program.programId
+    )
+    
+    try {
+      const tx = await this.program.methods
+        .initializeUser()
+        .accounts({
+          user: userPublicKey,
+          userAccount: userPDA,
+          systemProgram: SystemProgram.programId,
+        })
+        .rpc()
+      
+      return { tx, userPDA }
+    } catch (error) {
+      console.error('Error initializing user:', error)
+      throw error
+    }
+  }
+  
+  // Create content NFT
+  async createContent(
+    creator: PublicKey,
+    metadata: {
+      title: string
+      description: string
+      uri: string
+    }
+  ) {
+    const mint = web3.Keypair.generate()
+    
+    const [contentPDA] = await PublicKey.findProgramAddress(
+      [Buffer.from('content'), mint.publicKey.toBuffer()],
+      this.program.programId
+    )
+    
+    const tx = await this.program.methods
+      .createContent(metadata.title, metadata.description, metadata.uri)
+      .accounts({
+        creator,
+        mint: mint.publicKey,
+        contentAccount: contentPDA,
+        systemProgram: SystemProgram.programId,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        rent: SYSVAR_RENT_PUBKEY,
+      })
+      .signers([mint])
+      .rpc()
+    
+    return { tx, mint: mint.publicKey, contentPDA }
+  }
+  
+  // Transfer tokens
+  async transferTokens(
+    from: PublicKey,
+    to: PublicKey,
+    amount: number
+  ) {
+    const fromTokenAccount = await getAssociatedTokenAddress(
+      SYMLOG_TOKEN_MINT,
+      from
+    )
+    
+    const toTokenAccount = await getAssociatedTokenAddress(
+      SYMLOG_TOKEN_MINT,
+      to
+    )
+    
+    const tx = await this.program.methods
+      .transferTokens(new BN(amount * 1e9)) // Convert to lamports
+      .accounts({
+        from,
+        to,
+        fromTokenAccount,
+        toTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+      })
+      .rpc()
+    
+    return tx
+  }
+  
+  // Fetch user data
+  async getUserData(userPublicKey: PublicKey) {
+    const [userPDA] = await PublicKey.findProgramAddress(
+      [Buffer.from('user'), userPublicKey.toBuffer()],
+      this.program.programId
+    )
+    
+    try {
+      const userData = await this.program.account.user.fetch(userPDA)
+      return {
+        balance: userData.balance.toNumber() / 1e9,
+        reputation: userData.reputation,
+        contentCount: userData.contentCount,
+        joinedAt: new Date(userData.timestamp.toNumber() * 1000),
+      }
+    } catch (error) {
+      // User account doesn't exist
+      return null
+    }
+  }
+}
+```
+
+### 3. Token Operations
+```typescript
+// lib/solana/token.ts
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from '@solana/spl-token'
+import { PublicKey, Transaction } from '@solana/web3.js'
+
+export const SYMLOG_TOKEN_MINT = new PublicKey(
+  process.env.NEXT_PUBLIC_TOKEN_MINT!
+)
+
+export class TokenOperations {
+  // Create token account if needed
+  static async getOrCreateTokenAccount(
+    connection: Connection,
+    payer: PublicKey,
+    owner: PublicKey,
+    mint: PublicKey = SYMLOG_TOKEN_MINT
+  ) {
+    const associatedToken = await getAssociatedTokenAddress(
+      mint,
+      owner,
+      false,
+      TOKEN_PROGRAM_ID,
+      ASSOCIATED_TOKEN_PROGRAM_ID
+    )
+    
+    const account = await connection.getAccountInfo(associatedToken)
+    
+    if (!account) {
+      // Create account
+      const transaction = new Transaction().add(
+        createAssociatedTokenAccountInstruction(
+          payer,
+          associatedToken,
+          owner,
+          mint,
+          TOKEN_PROGRAM_ID,
+          ASSOCIATED_TOKEN_PROGRAM_ID
+        )
+      )
+      
+      return { transaction, address: associatedToken, exists: false }
+    }
+    
+    return { transaction: null, address: associatedToken, exists: true }
+  }
+  
+  // Get token balance
+  static async getTokenBalance(
+    connection: Connection,
+    owner: PublicKey,
+    mint: PublicKey = SYMLOG_TOKEN_MINT
+  ) {
+    try {
+      const tokenAccount = await getAssociatedTokenAddress(mint, owner)
+      const balance = await connection.getTokenAccountBalance(tokenAccount)
+      return parseFloat(balance.value.amount) / Math.pow(10, balance.value.decimals)
+    } catch (error) {
+      return 0
+    }
+  }
+  
+  // Create transfer instruction
+  static createTransferInstruction(
+    from: PublicKey,
+    to: PublicKey,
+    owner: PublicKey,
+    amount: number,
+    decimals: number = 9
+  ) {
+    const amountInLamports = amount * Math.pow(10, decimals)
+    
+    return createTransferInstruction(
+      from,
+      to,
+      owner,
+      amountInLamports,
+      [],
+      TOKEN_PROGRAM_ID
+    )
+  }
+}
+```
+
+### 4. NFT Metadata
+```typescript
+// lib/solana/metadata.ts
+import { Metaplex } from '@metaplex-foundation/js'
+import { Connection, PublicKey } from '@solana/web3.js'
+
+export class NFTMetadata {
+  private metaplex: Metaplex
+  
+  constructor(connection: Connection) {
+    this.metaplex = new Metaplex(connection)
+  }
+  
+  // Upload metadata to Arweave
+  async uploadMetadata(
+    imageFile: File,
+    metadata: {
+      name: string
+      description: string
+      attributes: Array<{
+        trait_type: string
+        value: string | number
+      }>
+    }
+  ) {
+    // Upload image
+    const imageUri = await this.metaplex.storage().upload(imageFile)
+    
+    // Create metadata JSON
+    const metadataJson = {
+      name: metadata.name,
+      description: metadata.description,
+      image: imageUri,
+      attributes: metadata.attributes,
+      properties: {
+        files: [
+          {
+            uri: imageUri,
+            type: imageFile.type,
+          },
+        ],
+        category: 'image',
+      },
+    }
+    
+    // Upload metadata
+    const metadataUri = await this.metaplex.storage().uploadJson(metadataJson)
+    
+    return { imageUri, metadataUri }
+  }
+  
+  // Create NFT
+  async createNFT(
+    wallet: any,
+    metadata: {
+      name: string
+      uri: string
+      sellerFeeBasisPoints: number
+    }
+  ) {
+    const { nft } = await this.metaplex.nfts().create({
+      uri: metadata.uri,
+      name: metadata.name,
+      sellerFeeBasisPoints: metadata.sellerFeeBasisPoints,
+      useNewMint: web3.Keypair.generate(),
+    })
+    
+    return nft
+  }
+  
+  // Fetch NFT metadata
+  async fetchNFT(mintAddress: PublicKey) {
+    const nft = await this.metaplex.nfts().findByMint({
+      mintAddress,
+    })
+    
+    return nft
+  }
+}
+```
+
+### 5. Transaction Management
+```typescript
+// lib/solana/transactions.ts
+import {
+  Connection,
+  Transaction,
+  TransactionSignature,
+  SimulatedTransactionResponse,
+  Commitment,
+} from '@solana/web3.js'
+
+export class TransactionManager {
+  constructor(private connection: Connection) {}
+  
+  // Simulate transaction
+  async simulate(transaction: Transaction): Promise<SimulatedTransactionResponse> {
+    const simulation = await this.connection.simulateTransaction(transaction)
+    
+    if (simulation.value.err) {
+      throw new Error(`Transaction simulation failed: ${JSON.stringify(simulation.value.err)}`)
+    }
+    
+    return simulation.value
+  }
+  
+  // Send and confirm transaction
+  async sendAndConfirm(
+    transaction: Transaction,
+    commitment: Commitment = 'confirmed'
+  ): Promise<TransactionSignature> {
+    try {
+      // Send transaction
+      const signature = await this.connection.sendRawTransaction(
+        transaction.serialize(),
+        {
+          skipPreflight: false,
+          preflightCommitment: commitment,
+        }
+      )
+      
+      // Wait for confirmation
+      const confirmation = await this.connection.confirmTransaction(
+        signature,
+        commitment
+      )
+      
+      if (confirmation.value.err) {
+        throw new Error(`Transaction failed: ${confirmation.value.err}`)
+      }
+      
+      return signature
+    } catch (error) {
+      console.error('Transaction error:', error)
+      throw error
+    }
+  }
+  
+  // Get transaction details
+  async getTransaction(signature: string) {
+    const transaction = await this.connection.getParsedTransaction(
+      signature,
+      'confirmed'
+    )
+    
+    return transaction
+  }
+  
+  // Retry transaction with exponential backoff
+  async retryTransaction(
+    transaction: Transaction,
+    maxRetries: number = 3
+  ): Promise<TransactionSignature> {
+    let lastError: any
+    
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const signature = await this.sendAndConfirm(transaction)
+        return signature
+      } catch (error) {
+        lastError = error
+        
+        // Exponential backoff
+        const delay = Math.pow(2, i) * 1000
+        await new Promise(resolve => setTimeout(resolve, delay))
+        
+        // Refresh blockhash
+        const { blockhash } = await this.connection.getLatestBlockhash()
+        transaction.recentBlockhash = blockhash
+      }
+    }
+    
+    throw lastError
+  }
+}
+```
+
+### 6. Anchor IDL Types
+```typescript
+// lib/solana/idl.ts
+export type SymlogProgram = {
+  version: '0.1.0'
+  name: 'symlog'
+  instructions: [
+    {
+      name: 'initializeUser'
+      accounts: [
+        {
+          name: 'user'
+          isMut: true
+          isSigner: true
+        },
+        {
+          name: 'userAccount'
+          isMut: true
+          isSigner: false
+        },
+        {
+          name: 'systemProgram'
+          isMut: false
+          isSigner: false
+        }
+      ]
+      args: []
+    },
+    {
+      name: 'createContent'
+      accounts: [
+        {
+          name: 'creator'
+          isMut: true
+          isSigner: true
+        },
+        {
+          name: 'mint'
+          isMut: true
+          isSigner: true
+        },
+        {
+          name: 'contentAccount'
+          isMut: true
+          isSigner: false
+        },
+        {
+          name: 'systemProgram'
+          isMut: false
+          isSigner: false
+        },
+        {
+          name: 'tokenProgram'
+          isMut: false
+          isSigner: false
+        },
+        {
+          name: 'rent'
+          isMut: false
+          isSigner: false
+        }
+      ]
+      args: [
+        {
+          name: 'title'
+          type: 'string'
+        },
+        {
+          name: 'description'
+          type: 'string'
+        },
+        {
+          name: 'uri'
+          type: 'string'
+        }
+      ]
+    }
+  ]
+  accounts: [
+    {
+      name: 'user'
+      type: {
+        kind: 'struct'
+        fields: [
+          {
+            name: 'owner'
+            type: 'publicKey'
+          },
+          {
+            name: 'balance'
+            type: 'u64'
+          },
+          {
+            name: 'reputation'
+            type: 'u32'
+          },
+          {
+            name: 'contentCount'
+            type: 'u32'
+          },
+          {
+            name: 'timestamp'
+            type: 'i64'
+          }
+        ]
+      }
+    },
+    {
+      name: 'content'
+      type: {
+        kind: 'struct'
+        fields: [
+          {
+            name: 'creator'
+            type: 'publicKey'
+          },
+          {
+            name: 'mint'
+            type: 'publicKey'
+          },
+          {
+            name: 'title'
+            type: 'string'
+          },
+          {
+            name: 'description'
+            type: 'string'
+          },
+          {
+            name: 'uri'
+            type: 'string'
+          },
+          {
+            name: 'likes'
+            type: 'u64'
+          },
+          {
+            name: 'timestamp'
+            type: 'i64'
+          }
+        ]
+      }
+    }
+  ]
+}
+
+export const IDL: SymlogProgram = {
+  version: '0.1.0',
+  name: 'symlog',
+  instructions: [...],
+  accounts: [...],
+}
+```
+
+### 7. React Hooks
+```typescript
+// hooks/useSolana.ts
+import { useEffect, useState } from 'react'
+import { useWallet, useConnection } from '@solana/wallet-adapter-react'
+import { SolanaProgram } from '@/lib/solana/program'
+import { TokenOperations } from '@/lib/solana/token'
+import { TransactionManager } from '@/lib/solana/transactions'
+
+export function useSolanaProgram() {
+  const { connection } = useConnection()
+  const wallet = useWallet()
+  const [program, setProgram] = useState<SolanaProgram | null>(null)
+  
+  useEffect(() => {
+    if (wallet.publicKey && connection) {
+      const program = new SolanaProgram(connection, wallet)
+      setProgram(program)
+    }
+  }, [connection, wallet.publicKey])
+  
+  return program
+}
+
+export function useTokenBalance(mint?: PublicKey) {
+  const { connection } = useConnection()
+  const { publicKey } = useWallet()
+  const [balance, setBalance] = useState(0)
+  const [loading, setLoading] = useState(true)
+  
+  useEffect(() => {
+    if (!publicKey || !connection) return
+    
+    const fetchBalance = async () => {
+      setLoading(true)
+      try {
+        const balance = await TokenOperations.getTokenBalance(
+          connection,
+          publicKey,
+          mint
+        )
+        setBalance(balance)
+      } catch (error) {
+        console.error('Error fetching balance:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchBalance()
+    
+    // Subscribe to balance changes
+    const id = connection.onAccountChange(
+      publicKey,
+      () => fetchBalance(),
+      'confirmed'
+    )
+    
+    return () => {
+      connection.removeAccountChangeListener(id)
+    }
+  }, [connection, publicKey, mint])
+  
+  return { balance, loading }
+}
+
+export function useTransaction() {
+  const { connection } = useConnection()
+  const [manager] = useState(() => new TransactionManager(connection))
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  const sendTransaction = async (transaction: Transaction) => {
+    setSending(true)
+    setError(null)
+    
+    try {
+      const signature = await manager.sendAndConfirm(transaction)
+      return signature
+    } catch (error) {
+      setError(error.message)
+      throw error
+    } finally {
+      setSending(false)
+    }
+  }
+  
+  return {
+    sendTransaction,
+    sending,
+    error,
+    simulate: manager.simulate.bind(manager),
+  }
+}
+```
+
+### 8. Error Handling
+```typescript
+// lib/solana/errors.ts
+export enum SolanaErrorCode {
+  WALLET_NOT_CONNECTED = 'WALLET_NOT_CONNECTED',
+  INSUFFICIENT_BALANCE = 'INSUFFICIENT_BALANCE',
+  TRANSACTION_FAILED = 'TRANSACTION_FAILED',
+  ACCOUNT_NOT_FOUND = 'ACCOUNT_NOT_FOUND',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+}
+
+export class SolanaError extends Error {
+  constructor(
+    public code: SolanaErrorCode,
+    message: string,
+    public details?: any
+  ) {
+    super(message)
+    this.name = 'SolanaError'
+  }
+}
+
+export function handleSolanaError(error: any): SolanaError {
+  // Wallet errors
+  if (error.message?.includes('not connected')) {
+    return new SolanaError(
+      SolanaErrorCode.WALLET_NOT_CONNECTED,
+      'Please connect your wallet'
+    )
+  }
+  
+  // Insufficient balance
+  if (error.message?.includes('insufficient')) {
+    return new SolanaError(
+      SolanaErrorCode.INSUFFICIENT_BALANCE,
+      'Insufficient balance for transaction'
+    )
+  }
+  
+  // Account not found
+  if (error.message?.includes('Account does not exist')) {
+    return new SolanaError(
+      SolanaErrorCode.ACCOUNT_NOT_FOUND,
+      'Account not found on chain'
+    )
+  }
+  
+  // Network errors
+  if (error.message?.includes('fetch')) {
+    return new SolanaError(
+      SolanaErrorCode.NETWORK_ERROR,
+      'Network connection failed'
+    )
+  }
+  
+  // Generic transaction error
+  return new SolanaError(
+    SolanaErrorCode.TRANSACTION_FAILED,
+    error.message || 'Transaction failed',
+    error
+  )
+}
+```
+
+### 9. Testing
+```typescript
+// __tests__/solana/program.test.ts
+import { Connection, Keypair, LAMPORTS_PER_SOL } from '@solana/web3.js'
+import { SolanaProgram } from '@/lib/solana/program'
+
+describe('SolanaProgram', () => {
+  let connection: Connection
+  let program: SolanaProgram
+  let payer: Keypair
+  
+  beforeAll(async () => {
+    // Use devnet for testing
+    connection = new Connection('https://api.devnet.solana.com', 'confirmed')
+    payer = Keypair.generate()
+    
+    // Airdrop SOL for testing
+    const airdropSignature = await connection.requestAirdrop(
+      payer.publicKey,
+      2 * LAMPORTS_PER_SOL
+    )
+    await connection.confirmTransaction(airdropSignature)
+    
+    // Initialize program
+    program = new SolanaProgram(connection, {
+      publicKey: payer.publicKey,
+      signTransaction: async (tx) => {
+        tx.partialSign(payer)
+        return tx
+      },
+    })
+  })
+  
+  test('initialize user account', async () => {
+    const { tx, userPDA } = await program.initializeUser(payer.publicKey)
+    expect(tx).toBeDefined()
+    expect(userPDA).toBeDefined()
+    
+    // Verify account was created
+    const userData = await program.getUserData(payer.publicKey)
+    expect(userData).toBeDefined()
+    expect(userData?.balance).toBe(0)
+  })
+  
+  test('create content NFT', async () => {
+    const metadata = {
+      title: 'Test Content',
+      description: 'Test Description',
+      uri: 'https://example.com/metadata.json',
+    }
+    
+    const { tx, mint, contentPDA } = await program.createContent(
+      payer.publicKey,
+      metadata
+    )
+    
+    expect(tx).toBeDefined()
+    expect(mint).toBeDefined()
+    expect(contentPDA).toBeDefined()
+  })
+})
+```
+
+### 10. Environment Configuration
+```typescript
+// .env.local
+NEXT_PUBLIC_SOLANA_RPC_HOST=https://api.mainnet-beta.solana.com
+NEXT_PUBLIC_PROGRAM_ID=YOUR_PROGRAM_ID
+NEXT_PUBLIC_TOKEN_MINT=YOUR_TOKEN_MINT
+NEXT_PUBLIC_NETWORK=mainnet-beta
+
+// Development
+NEXT_PUBLIC_SOLANA_RPC_HOST=https://api.devnet.solana.com
+NEXT_PUBLIC_NETWORK=devnet
+```
+
+Remember: Always validate transactions, handle errors gracefully, and ensure wallet security. Never expose private keys.

@@ -1,0 +1,1129 @@
+---
+description: "Deployment Strategies and Infrastructure"
+globs: 
+  - "**/deploy/**/*"
+  - "**/k8s/**/*.{yaml,yml}"
+  - "**/terraform/**/*.tf"
+  - "docker-compose*.yml"
+  - "Dockerfile*"
+alwaysApply: true
+---
+
+# Deployment Rules
+
+## Deployment Philosophy
+
+### 1. Docker Configuration
+
+```dockerfile
+# apps/web/Dockerfile
+# Multi-stage build for Next.js application
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable
+RUN corepack prepare pnpm@8.6.0 --activate
+
+# Copy dependency files
+COPY package.json pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY apps/web/package.json ./apps/web/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/utils/package.json ./packages/utils/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/packages/ui/node_modules ./packages/ui/node_modules
+COPY --from=deps /app/packages/utils/node_modules ./packages/utils/node_modules
+
+# Copy source code
+COPY . .
+
+# Build arguments
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_WS_URL
+
+# Build application
+ENV NEXT_TELEMETRY_DISABLED 1
+RUN pnpm --filter @symlog/web build
+
+# Production image, copy all the files and run next
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+ENV NEXT_TELEMETRY_DISABLED 1
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+# Copy built application
+COPY --from=builder /app/apps/web/public ./apps/web/public
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+USER nextjs
+
+EXPOSE 3000
+
+ENV PORT 3000
+ENV HOSTNAME "0.0.0.0"
+
+CMD ["node", "apps/web/server.js"]
+
+# API Dockerfile
+# apps/api/Dockerfile
+FROM node:18-alpine AS base
+
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+RUN corepack enable
+RUN corepack prepare pnpm@8.6.0 --activate
+
+COPY package.json pnpm-lock.yaml ./
+COPY pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/
+
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
+
+COPY . .
+
+# Generate Prisma client
+RUN pnpm --filter @symlog/api prisma generate
+
+# Build
+RUN pnpm --filter @symlog/api build
+
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+# Copy built application
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/apps/api/prisma ./prisma
+
+USER nodejs
+
+EXPOSE 4000
+
+# Run migrations on startup
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]
+```
+
+### 2. Kubernetes Deployment
+
+```yaml
+# k8s/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: symlog
+  labels:
+    app: symlog
+    environment: production
+
+---
+# k8s/web-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: symlog
+  labels:
+    app: web
+    tier: frontend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+        tier: frontend
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - web
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: web
+        image: symlog/web:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_PUBLIC_API_URL
+          valueFrom:
+            configMapKeyRef:
+              name: web-config
+              key: api_url
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# k8s/api-deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: symlog
+  labels:
+    app: api
+    tier: backend
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+        tier: backend
+    spec:
+      initContainers:
+      - name: db-migration
+        image: symlog/api:latest
+        command: ["npx", "prisma", "migrate", "deploy"]
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: database_url
+      containers:
+      - name: api
+        image: symlog/api:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 4000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: database_url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: redis_url
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: api-secrets
+              key: jwt_secret
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 4000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 4000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+# k8s/services.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: symlog
+spec:
+  selector:
+    app: web
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: symlog
+spec:
+  selector:
+    app: api
+  ports:
+  - port: 80
+    targetPort: 4000
+  type: ClusterIP
+
+---
+# k8s/ingress.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: symlog-ingress
+  namespace: symlog
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - symlog.com
+    - api.symlog.com
+    secretName: symlog-tls
+  rules:
+  - host: symlog.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: web
+            port:
+              number: 80
+  - host: api.symlog.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api
+            port:
+              number: 80
+
+---
+# k8s/hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: web-hpa
+  namespace: symlog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: web
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-hpa
+  namespace: symlog
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+```
+
+### 3. Terraform Infrastructure
+
+```hcl
+# terraform/main.tf
+terraform {
+  required_version = ">= 1.0"
+  
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.23"
+    }
+  }
+  
+  backend "s3" {
+    bucket = "symlog-terraform-state"
+    key    = "production/terraform.tfstate"
+    region = "us-east-1"
+    dynamodb_table = "terraform-state-lock"
+    encrypt = true
+  }
+}
+
+# terraform/vpc.tf
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+  version = "5.1.0"
+  
+  name = "symlog-vpc"
+  cidr = "10.0.0.0/16"
+  
+  azs             = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+  
+  enable_nat_gateway = true
+  enable_vpn_gateway = true
+  
+  enable_dns_hostnames = true
+  enable_dns_support   = true
+  
+  tags = {
+    Environment = var.environment
+    Project     = "symlog"
+  }
+}
+
+# terraform/eks.tf
+module "eks" {
+  source = "terraform-aws-modules/eks/aws"
+  version = "19.16.0"
+  
+  cluster_name    = "symlog-${var.environment}"
+  cluster_version = "1.28"
+  
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+  
+  eks_managed_node_groups = {
+    main = {
+      desired_size = 3
+      min_size     = 3
+      max_size     = 10
+      
+      instance_types = ["t3.medium"]
+      
+      k8s_labels = {
+        Environment = var.environment
+        Application = "symlog"
+      }
+    }
+  }
+  
+  # Enable IRSA
+  enable_irsa = true
+  
+  # Add-ons
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+    aws-ebs-csi-driver = {
+      most_recent = true
+    }
+  }
+}
+
+# terraform/rds.tf
+module "rds" {
+  source = "terraform-aws-modules/rds/aws"
+  version = "6.1.1"
+  
+  identifier = "symlog-${var.environment}"
+  
+  engine               = "postgres"
+  engine_version       = "15.4"
+  family               = "postgres15"
+  major_engine_version = "15"
+  instance_class       = "db.t3.medium"
+  
+  allocated_storage     = 100
+  max_allocated_storage = 1000
+  storage_encrypted     = true
+  
+  db_name  = "symlog"
+  username = "symlog"
+  port     = 5432
+  
+  multi_az               = true
+  vpc_security_group_ids = [aws_security_group.rds.id]
+  
+  maintenance_window = "Mon:00:00-Mon:03:00"
+  backup_window      = "03:00-06:00"
+  
+  backup_retention_period = 30
+  
+  enabled_cloudwatch_logs_exports = ["postgresql"]
+  
+  create_cloudwatch_log_group = true
+  
+  deletion_protection = true
+  
+  performance_insights_enabled = true
+  performance_insights_retention_period = 7
+  
+  create_monitoring_role = true
+  monitoring_interval    = 60
+  
+  tags = {
+    Environment = var.environment
+    Project     = "symlog"
+  }
+}
+
+# terraform/elasticache.tf
+resource "aws_elasticache_replication_group" "redis" {
+  replication_group_id       = "symlog-${var.environment}"
+  replication_group_description = "Redis cluster for SYMLog"
+  
+  engine               = "redis"
+  engine_version       = "7.0"
+  node_type            = "cache.t3.medium"
+  number_cache_clusters = 3
+  
+  parameter_group_name = aws_elasticache_parameter_group.redis.name
+  subnet_group_name    = aws_elasticache_subnet_group.redis.name
+  security_group_ids   = [aws_security_group.redis.id]
+  
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+  
+  automatic_failover_enabled = true
+  multi_az_enabled          = true
+  
+  maintenance_window = "sun:05:00-sun:06:00"
+  snapshot_window    = "03:00-04:00"
+  snapshot_retention_limit = 7
+  
+  notification_topic_arn = aws_sns_topic.alerts.arn
+  
+  tags = {
+    Environment = var.environment
+    Project     = "symlog"
+  }
+}
+```
+
+### 4. AWS ECS Deployment
+
+```typescript
+// infrastructure/ecs/task-definition.json
+{
+  "family": "symlog-api",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "2048",
+  "executionRoleArn": "arn:aws:iam::123456789:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::123456789:role/symlogApiTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "${ECR_REGISTRY}/symlog-api:${VERSION}",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 4000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "PORT",
+          "value": "4000"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789:secret:symlog/production/database-url"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456789:secret:symlog/production/redis-url"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/symlog-api",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "api"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:4000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 60
+      }
+    }
+  ]
+}
+
+// infrastructure/ecs/service.yaml
+apiVersion: ecs/v1
+kind: Service
+metadata:
+  name: symlog-api
+spec:
+  cluster: symlog-production
+  taskDefinition: symlog-api:latest
+  desiredCount: 3
+  launchType: FARGATE
+  platformVersion: LATEST
+  
+  networkConfiguration:
+    awsvpcConfiguration:
+      subnets:
+        - subnet-12345
+        - subnet-67890
+      securityGroups:
+        - sg-api
+      assignPublicIp: DISABLED
+  
+  loadBalancers:
+    - targetGroupArn: arn:aws:elasticloadbalancing:us-east-1:123456789:targetgroup/symlog-api/abc123
+      containerName: api
+      containerPort: 4000
+  
+  deploymentConfiguration:
+    maximumPercent: 200
+    minimumHealthyPercent: 100
+    deploymentCircuitBreaker:
+      enable: true
+      rollback: true
+  
+  enableECSManagedTags: true
+  propagateTags: SERVICE
+```
+
+### 5. Deployment Scripts
+
+```bash
+#!/bin/bash
+# scripts/deploy.sh
+
+set -euo pipefail
+
+# Configuration
+ENVIRONMENT=${1:-staging}
+VERSION=${2:-latest}
+REGION=${AWS_REGION:-us-east-1}
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Functions
+log() {
+  echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')]${NC} $1"
+}
+
+error() {
+  echo -e "${RED}[ERROR]${NC} $1" >&2
+  exit 1
+}
+
+warning() {
+  echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+# Pre-deployment checks
+pre_deploy_checks() {
+  log "Running pre-deployment checks..."
+  
+  # Check AWS credentials
+  if ! aws sts get-caller-identity &>/dev/null; then
+    error "AWS credentials not configured"
+  fi
+  
+  # Check required tools
+  for tool in docker kubectl helm terraform; do
+    if ! command -v $tool &>/dev/null; then
+      error "$tool is required but not installed"
+    fi
+  done
+  
+  # Verify environment
+  if [[ ! "$ENVIRONMENT" =~ ^(staging|production)$ ]]; then
+    error "Invalid environment: $ENVIRONMENT"
+  fi
+  
+  # Production safeguards
+  if [[ "$ENVIRONMENT" == "production" ]]; then
+    warning "Deploying to PRODUCTION!"
+    read -p "Are you sure? (type 'yes' to continue): " confirm
+    if [[ "$confirm" != "yes" ]]; then
+      error "Deployment cancelled"
+    fi
+  fi
+}
+
+# Build and push Docker images
+build_and_push() {
+  log "Building Docker images..."
+  
+  # Build images
+  docker build -t symlog-web:$VERSION -f apps/web/Dockerfile .
+  docker build -t symlog-api:$VERSION -f apps/api/Dockerfile .
+  
+  # Tag for ECR
+  ECR_REGISTRY="123456789.dkr.ecr.$REGION.amazonaws.com"
+  docker tag symlog-web:$VERSION $ECR_REGISTRY/symlog-web:$VERSION
+  docker tag symlog-api:$VERSION $ECR_REGISTRY/symlog-api:$VERSION
+  
+  # Push to ECR
+  log "Pushing to ECR..."
+  aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ECR_REGISTRY
+  docker push $ECR_REGISTRY/symlog-web:$VERSION
+  docker push $ECR_REGISTRY/symlog-api:$VERSION
+}
+
+# Deploy to Kubernetes
+deploy_k8s() {
+  log "Deploying to Kubernetes..."
+  
+  # Update kubeconfig
+  aws eks update-kubeconfig --name symlog-$ENVIRONMENT --region $REGION
+  
+  # Apply configurations
+  kubectl apply -f k8s/namespace.yaml
+  
+  # Update image versions
+  kubectl set image deployment/web web=$ECR_REGISTRY/symlog-web:$VERSION -n symlog
+  kubectl set image deployment/api api=$ECR_REGISTRY/symlog-api:$VERSION -n symlog
+  
+  # Wait for rollout
+  kubectl rollout status deployment/web -n symlog
+  kubectl rollout status deployment/api -n symlog
+}
+
+# Run database migrations
+run_migrations() {
+  log "Running database migrations..."
+  
+  kubectl run migrations \
+    --image=$ECR_REGISTRY/symlog-api:$VERSION \
+    --rm -it --restart=Never \
+    --env="DATABASE_URL=$DATABASE_URL" \
+    -- npx prisma migrate deploy
+}
+
+# Health checks
+health_checks() {
+  log "Running health checks..."
+  
+  # Get service endpoints
+  WEB_URL=$(kubectl get ingress symlog-ingress -n symlog -o jsonpath='{.spec.rules[0].host}')
+  API_URL=$(kubectl get ingress symlog-ingress -n symlog -o jsonpath='{.spec.rules[1].host}')
+  
+  # Check web health
+  if ! curl -sf https://$WEB_URL/api/health > /dev/null; then
+    error "Web health check failed"
+  fi
+  
+  # Check API health
+  if ! curl -sf https://$API_URL/health > /dev/null; then
+    error "API health check failed"
+  fi
+  
+  log "Health checks passed!"
+}
+
+# Main deployment flow
+main() {
+  log "Starting deployment to $ENVIRONMENT (version: $VERSION)"
+  
+  pre_deploy_checks
+  build_and_push
+  deploy_k8s
+  run_migrations
+  health_checks
+  
+  log "Deployment completed successfully!"
+}
+
+# Run main function
+main
+```
+
+### 6. Blue-Green Deployment
+
+```typescript
+// deployment/blue-green.ts
+import { ECS, ELBv2 } from 'aws-sdk'
+
+interface BlueGreenConfig {
+  cluster: string
+  service: string
+  targetGroup: {
+    blue: string
+    green: string
+  }
+  listener: string
+}
+
+class BlueGreenDeployment {
+  private ecs: ECS
+  private elb: ELBv2
+  
+  constructor() {
+    this.ecs = new ECS({ region: 'us-east-1' })
+    this.elb = new ELBv2({ region: 'us-east-1' })
+  }
+  
+  async deploy(config: BlueGreenConfig, newTaskDefinition: string) {
+    console.log('Starting blue-green deployment...')
+    
+    // 1. Update green environment
+    await this.updateService(config.cluster, `${config.service}-green`, newTaskDefinition)
+    
+    // 2. Wait for green to be healthy
+    await this.waitForHealthy(config.cluster, `${config.service}-green`)
+    
+    // 3. Run smoke tests on green
+    await this.runSmokeTests(config.targetGroup.green)
+    
+    // 4. Switch traffic to green
+    await this.switchTraffic(config.listener, config.targetGroup.green)
+    
+    // 5. Monitor for issues
+    await this.monitorDeployment(config.targetGroup.green, 300) // 5 minutes
+    
+    // 6. Update blue environment
+    await this.updateService(config.cluster, `${config.service}-blue`, newTaskDefinition)
+    
+    console.log('Blue-green deployment completed!')
+  }
+  
+  private async updateService(cluster: string, service: string, taskDef: string) {
+    await this.ecs.updateService({
+      cluster,
+      service,
+      taskDefinition: taskDef,
+      forceNewDeployment: true,
+    }).promise()
+  }
+  
+  private async waitForHealthy(cluster: string, service: string) {
+    // Implementation for waiting until service is healthy
+  }
+  
+  private async runSmokeTests(targetGroup: string) {
+    // Run basic health checks against the target group
+  }
+  
+  private async switchTraffic(listener: string, targetGroup: string) {
+    // Update ALB listener to route traffic to new target group
+  }
+  
+  private async monitorDeployment(targetGroup: string, duration: number) {
+    // Monitor error rates and rollback if needed
+  }
+}
+```
+
+### 7. Rollback Procedures
+
+```bash
+#!/bin/bash
+# scripts/rollback.sh
+
+set -euo pipefail
+
+# Configuration
+ENVIRONMENT=$1
+PREVIOUS_VERSION=$2
+
+# Rollback function
+rollback() {
+  log "Starting rollback to version $PREVIOUS_VERSION..."
+  
+  # 1. Update Kubernetes deployments
+  kubectl set image deployment/web web=$ECR_REGISTRY/symlog-web:$PREVIOUS_VERSION -n symlog
+  kubectl set image deployment/api api=$ECR_REGISTRY/symlog-api:$PREVIOUS_VERSION -n symlog
+  
+  # 2. Wait for rollout
+  kubectl rollout status deployment/web -n symlog
+  kubectl rollout status deployment/api -n symlog
+  
+  # 3. Verify health
+  health_checks
+  
+  # 4. Run rollback migrations if needed
+  if [[ -f "migrations/rollback/$PREVIOUS_VERSION.sql" ]]; then
+    log "Running rollback migrations..."
+    kubectl exec -it deployment/api -n symlog -- psql $DATABASE_URL < migrations/rollback/$PREVIOUS_VERSION.sql
+  fi
+  
+  log "Rollback completed!"
+}
+
+# Execute rollback
+rollback
+```
+
+### 8. Monitoring Deployment
+
+```typescript
+// monitoring/deployment-monitor.ts
+export class DeploymentMonitor {
+  private metrics: MetricsClient
+  private alerts: AlertManager
+  
+  async monitorDeployment(deployment: string) {
+    const checks = [
+      this.checkErrorRate(),
+      this.checkResponseTime(),
+      this.checkPodHealth(),
+      this.checkResourceUsage(),
+    ]
+    
+    const results = await Promise.all(checks)
+    
+    if (results.some(r => !r.healthy)) {
+      await this.alerts.send({
+        severity: 'critical',
+        message: `Deployment ${deployment} showing issues`,
+        details: results,
+      })
+      
+      // Automatic rollback if critical
+      if (results.some(r => r.severity === 'critical')) {
+        await this.triggerRollback(deployment)
+      }
+    }
+  }
+  
+  private async checkErrorRate() {
+    const errorRate = await this.metrics.getErrorRate()
+    return {
+      healthy: errorRate < 0.01, // 1% threshold
+      severity: errorRate > 0.05 ? 'critical' : 'warning',
+      value: errorRate,
+    }
+  }
+  
+  private async checkResponseTime() {
+    const p95 = await this.metrics.getResponseTimeP95()
+    return {
+      healthy: p95 < 500, // 500ms threshold
+      severity: p95 > 1000 ? 'critical' : 'warning',
+      value: p95,
+    }
+  }
+}
+```
+
+### 9. Deployment Configuration
+
+```yaml
+# deployment/config.yaml
+environments:
+  staging:
+    cluster: symlog-staging
+    region: us-east-1
+    min_replicas: 2
+    max_replicas: 5
+    cpu_request: 250m
+    memory_request: 256Mi
+    
+  production:
+    cluster: symlog-production
+    region: us-east-1
+    min_replicas: 3
+    max_replicas: 20
+    cpu_request: 500m
+    memory_request: 512Mi
+    
+deployment_strategy:
+  type: RollingUpdate
+  max_surge: 1
+  max_unavailable: 0
+  
+health_checks:
+  liveness:
+    path: /health
+    initial_delay: 30
+    period: 10
+    timeout: 5
+    
+  readiness:
+    path: /ready
+    initial_delay: 5
+    period: 5
+    timeout: 3
+    
+monitoring:
+  error_threshold: 0.01
+  response_time_threshold: 500
+  cpu_threshold: 80
+  memory_threshold: 90
+```
+
+### 10. Zero-Downtime Deployment
+
+```typescript
+// deployment/zero-downtime.ts
+export class ZeroDowntimeDeployment {
+  async deploy(config: DeploymentConfig) {
+    // 1. Pre-deployment database migrations
+    await this.runMigrationsWithBackwardCompatibility()
+    
+    // 2. Deploy new version alongside old
+    await this.deployCanary(config.version, 10) // 10% traffic
+    
+    // 3. Monitor canary
+    const canaryHealthy = await this.monitorCanary(300) // 5 minutes
+    
+    if (!canaryHealthy) {
+      await this.rollbackCanary()
+      throw new Error('Canary deployment failed')
+    }
+    
+    // 4. Gradual rollout
+    for (const percentage of [25, 50, 75, 100]) {
+      await this.updateTrafficSplit(percentage)
+      await this.monitor(60) // 1 minute between increases
+    }
+    
+    // 5. Cleanup old version
+    await this.cleanupOldVersion()
+  }
+  
+  private async runMigrationsWithBackwardCompatibility() {
+    // Run migrations that are backward compatible
+    // e.g., adding columns with defaults, creating new tables
+  }
+  
+  private async deployCanary(version: string, percentage: number) {
+    // Deploy new version and route small percentage of traffic
+  }
+  
+  private async monitorCanary(duration: number) {
+    // Monitor error rates, response times, and business metrics
+  }
+}
+```
+
+Remember: Deployments should be automated, repeatable, and safe. Always have a rollback plan and monitor deployments closely.

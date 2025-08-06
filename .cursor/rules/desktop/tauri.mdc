@@ -1,0 +1,1122 @@
+---
+description: "Tauri 2 Desktop Application Development"
+globs: 
+  - "**/src-tauri/**/*.{rs,toml}"
+  - "**/tauri.conf.json"
+  - "**/*.tauri.{ts,tsx}"
+alwaysApply: true
+---
+
+# Tauri 2 Development Rules
+
+## Tauri Architecture
+
+### 1. Project Configuration
+```json
+// src-tauri/tauri.conf.json
+{
+  "build": {
+    "beforeBuildCommand": "bun run build",
+    "beforeDevCommand": "bun run dev",
+    "devPath": "http://localhost:3001",
+    "distDir": "../out"
+  },
+  "package": {
+    "productName": "SYMLog",
+    "version": "1.0.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "shell": {
+        "all": false,
+        "open": true
+      },
+      "window": {
+        "all": true
+      },
+      "fs": {
+        "all": false,
+        "readFile": true,
+        "writeFile": true,
+        "readDir": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "exists": true,
+        "scope": ["$APPDATA/*", "$APPCONFIG/*", "$APPLOCALDATA/*"]
+      },
+      "path": {
+        "all": true
+      },
+      "os": {
+        "all": true
+      },
+      "process": {
+        "all": false,
+        "relaunch": true
+      },
+      "protocol": {
+        "all": false,
+        "asset": true
+      },
+      "clipboard": {
+        "all": true
+      },
+      "notification": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
+      },
+      "http": {
+        "all": false,
+        "request": true,
+        "scope": ["https://api.symlog.ai/*", "https://*.convex.cloud/*"]
+      },
+      "globalShortcut": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "category": "Productivity",
+      "copyright": "© 2025 SYMLog",
+      "deb": {
+        "depends": []
+      },
+      "externalBin": [],
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "identifier": "ai.symlog.desktop",
+      "longDescription": "Modern digital platform with desktop integration",
+      "macOS": {
+        "entitlements": null,
+        "exceptionDomain": "",
+        "frameworks": [],
+        "providerShortName": null,
+        "signingIdentity": null
+      },
+      "resources": [],
+      "shortDescription": "SYMLog Desktop",
+      "targets": "all",
+      "windows": {
+        "certificateThumbprint": null,
+        "digestAlgorithm": "sha256",
+        "timestampUrl": ""
+      }
+    },
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.symlog.ai wss://*.convex.cloud https://*.convex.cloud"
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://api.symlog.ai/desktop/update/{{target}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": "YOUR_PUBLIC_KEY_HERE"
+    },
+    "windows": [
+      {
+        "fullscreen": false,
+        "height": 800,
+        "resizable": true,
+        "title": "SYMLog",
+        "width": 1200,
+        "minWidth": 800,
+        "minHeight": 600,
+        "center": true,
+        "decorations": false,
+        "transparent": true,
+        "skipTaskbar": false,
+        "fileDropEnabled": true
+      }
+    ]
+  }
+}
+```
+
+### 2. Rust Backend Structure
+```rust
+// src-tauri/src/main.rs
+#![cfg_attr(
+    all(not(debug_assertions), target_os = "windows"),
+    windows_subsystem = "windows"
+)]
+
+use tauri::{
+    CustomMenuItem, Manager, SystemTray, SystemTrayEvent, 
+    SystemTrayMenu, SystemTrayMenuItem, WindowEvent
+};
+use tauri_plugin_store::StoreBuilder;
+use window_shadows::set_shadow;
+
+mod commands;
+mod db;
+mod menu;
+mod state;
+mod utils;
+
+use commands::*;
+use state::AppState;
+
+fn main() {
+    // Create system tray
+    let quit = CustomMenuItem::new("quit".to_string(), "Quit");
+    let hide = CustomMenuItem::new("hide".to_string(), "Hide");
+    let show = CustomMenuItem::new("show".to_string(), "Show");
+    
+    let tray_menu = SystemTrayMenu::new()
+        .add_item(show)
+        .add_item(hide)
+        .add_native_item(SystemTrayMenuItem::Separator)
+        .add_item(quit);
+    
+    let system_tray = SystemTray::new().with_menu(tray_menu);
+    
+    tauri::Builder::default()
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .system_tray(system_tray)
+        .on_system_tray_event(|app, event| match event {
+            SystemTrayEvent::LeftClick {
+                position: _,
+                size: _,
+                ..
+            } => {
+                let window = app.get_window("main").unwrap();
+                if window.is_visible().unwrap() {
+                    window.hide().unwrap();
+                } else {
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
+                }
+            }
+            SystemTrayEvent::MenuItemClick { id, .. } => match id.as_str() {
+                "quit" => {
+                    std::process::exit(0);
+                }
+                "hide" => {
+                    let window = app.get_window("main").unwrap();
+                    window.hide().unwrap();
+                }
+                "show" => {
+                    let window = app.get_window("main").unwrap();
+                    window.show().unwrap();
+                    window.set_focus().unwrap();
+                }
+                _ => {}
+            },
+            _ => {}
+        })
+        .menu(menu::build_menu())
+        .on_menu_event(|event| menu::handle_menu_event(event))
+        .manage(AppState::new())
+        .invoke_handler(tauri::generate_handler![
+            // Window commands
+            minimize_window,
+            maximize_window,
+            close_window,
+            toggle_fullscreen,
+            
+            // File system commands
+            read_file,
+            write_file,
+            list_directory,
+            create_directory,
+            delete_file,
+            
+            // Database commands
+            get_user_data,
+            save_user_data,
+            
+            // Platform-specific commands
+            get_platform_info,
+            open_external,
+            show_notification,
+            
+            // App-specific commands
+            authenticate_user,
+            sync_data,
+            export_data,
+        ])
+        .setup(|app| {
+            let window = app.get_window("main").unwrap();
+            
+            // Set window shadow
+            #[cfg(any(windows, target_os = "macos"))]
+            set_shadow(&window, true).unwrap();
+            
+            // Window event handlers
+            let window_clone = window.clone();
+            window.on_window_event(move |event| match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    window_clone.hide().unwrap();
+                    api.prevent_close();
+                }
+                _ => {}
+            });
+            
+            // Initialize app state
+            let state = app.state::<AppState>();
+            state.init()?;
+            
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| match event {
+            tauri::RunEvent::ExitRequested { api, .. } => {
+                api.prevent_exit();
+            }
+            _ => {}
+        });
+}
+
+// src-tauri/src/state.rs
+use parking_lot::RwLock;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct User {
+    pub id: String,
+    pub email: String,
+    pub name: String,
+    pub token: Option<String>,
+}
+
+pub struct AppState {
+    pub current_user: Arc<RwLock<Option<User>>>,
+    pub db_path: Arc<RwLock<String>>,
+}
+
+impl AppState {
+    pub fn new() -> Self {
+        Self {
+            current_user: Arc::new(RwLock::new(None)),
+            db_path: Arc::new(RwLock::new(String::new())),
+        }
+    }
+    
+    pub fn init(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Initialize database path
+        let app_dir = tauri::api::path::app_data_dir(&tauri::Config::default())
+            .ok_or("Failed to get app data directory")?;
+        
+        let db_path = app_dir.join("symlog.db");
+        *self.db_path.write() = db_path.to_string_lossy().to_string();
+        
+        // Initialize database
+        db::init_database(&db_path)?;
+        
+        Ok(())
+    }
+    
+    pub fn set_user(&self, user: Option<User>) {
+        *self.current_user.write() = user;
+    }
+    
+    pub fn get_user(&self) -> Option<User> {
+        self.current_user.read().clone()
+    }
+}
+```
+
+### 3. Commands (IPC)
+```rust
+// src-tauri/src/commands.rs
+use tauri::{command, State, Window, Manager};
+use crate::state::AppState;
+use serde_json::Value;
+
+// Window management
+#[command]
+pub async fn minimize_window(window: Window) -> Result<(), String> {
+    window.minimize()
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn maximize_window(window: Window) -> Result<(), String> {
+    if window.is_maximized().unwrap_or(false) {
+        window.unmaximize()
+    } else {
+        window.maximize()
+    }
+    .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn close_window(window: Window) -> Result<(), String> {
+    window.close()
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn toggle_fullscreen(window: Window) -> Result<(), String> {
+    let is_fullscreen = window.is_fullscreen().unwrap_or(false);
+    window.set_fullscreen(!is_fullscreen)
+        .map_err(|e| e.to_string())
+}
+
+// File system operations
+#[command]
+pub async fn read_file(path: String) -> Result<String, String> {
+    tokio::fs::read_to_string(&path)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn write_file(path: String, content: String) -> Result<(), String> {
+    tokio::fs::write(&path, content)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn list_directory(path: String) -> Result<Vec<FileInfo>, String> {
+    let mut entries = Vec::new();
+    let mut dir = tokio::fs::read_dir(&path)
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    while let Some(entry) = dir.next_entry().await.map_err(|e| e.to_string())? {
+        let metadata = entry.metadata().await.map_err(|e| e.to_string())?;
+        let file_type = if metadata.is_dir() { "directory" } else { "file" };
+        
+        entries.push(FileInfo {
+            name: entry.file_name().to_string_lossy().to_string(),
+            path: entry.path().to_string_lossy().to_string(),
+            file_type: file_type.to_string(),
+            size: metadata.len(),
+            modified: metadata.modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs()),
+        });
+    }
+    
+    Ok(entries)
+}
+
+#[derive(Serialize)]
+struct FileInfo {
+    name: String,
+    path: String,
+    file_type: String,
+    size: u64,
+    modified: Option<u64>,
+}
+
+// Database operations
+#[command]
+pub async fn save_user_data(
+    state: State<'_, AppState>,
+    key: String,
+    value: Value,
+) -> Result<(), String> {
+    let db_path = state.db_path.read().clone();
+    db::save_data(&db_path, &key, &value)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn get_user_data(
+    state: State<'_, AppState>,
+    key: String,
+) -> Result<Option<Value>, String> {
+    let db_path = state.db_path.read().clone();
+    db::get_data(&db_path, &key)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+// Platform information
+#[command]
+pub async fn get_platform_info() -> Result<PlatformInfo, String> {
+    Ok(PlatformInfo {
+        os: std::env::consts::OS.to_string(),
+        arch: std::env::consts::ARCH.to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        debug: cfg!(debug_assertions),
+    })
+}
+
+#[derive(Serialize)]
+struct PlatformInfo {
+    os: String,
+    arch: String,
+    version: String,
+    debug: bool,
+}
+
+// External operations
+#[command]
+pub async fn open_external(url: String) -> Result<(), String> {
+    open::that(&url).map_err(|e| e.to_string())
+}
+
+#[command]
+pub async fn show_notification(
+    window: Window,
+    title: String,
+    body: String,
+    icon: Option<String>,
+) -> Result<(), String> {
+    use tauri::api::notification::Notification;
+    
+    let mut notification = Notification::new(&window.app_handle().config().tauri.bundle.identifier)
+        .title(&title)
+        .body(&body);
+    
+    if let Some(icon_path) = icon {
+        notification = notification.icon(&icon_path);
+    }
+    
+    notification.show()
+        .map_err(|e| e.to_string())
+}
+
+// Authentication
+#[command]
+pub async fn authenticate_user(
+    state: State<'_, AppState>,
+    email: String,
+    password: String,
+) -> Result<User, String> {
+    // Call your authentication API
+    let response = reqwest::Client::new()
+        .post("https://api.symlog.ai/auth/login")
+        .json(&serde_json::json!({
+            "email": email,
+            "password": password,
+        }))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    
+    if !response.status().is_success() {
+        return Err("Authentication failed".to_string());
+    }
+    
+    let user: User = response.json().await.map_err(|e| e.to_string())?;
+    state.set_user(Some(user.clone()));
+    
+    Ok(user)
+}
+```
+
+### 4. Frontend Integration
+```typescript
+// lib/tauri.ts
+import { invoke } from '@tauri-apps/api/tauri'
+import { listen, emit } from '@tauri-apps/api/event'
+import { appWindow } from '@tauri-apps/api/window'
+import { open } from '@tauri-apps/api/shell'
+import { 
+  readTextFile, 
+  writeTextFile, 
+  readDir,
+  createDir,
+  removeFile,
+  BaseDirectory
+} from '@tauri-apps/api/fs'
+import { 
+  save as saveDialog,
+  open as openDialog,
+  message,
+  confirm
+} from '@tauri-apps/api/dialog'
+import { 
+  isPermissionGranted,
+  requestPermission,
+  sendNotification
+} from '@tauri-apps/api/notification'
+
+// Window controls
+export const windowControls = {
+  minimize: () => invoke('minimize_window'),
+  maximize: () => invoke('maximize_window'),
+  close: () => invoke('close_window'),
+  toggleFullscreen: () => invoke('toggle_fullscreen'),
+}
+
+// Platform detection
+export async function getPlatform() {
+  return await invoke<{
+    os: string
+    arch: string
+    version: string
+    debug: boolean
+  }>('get_platform_info')
+}
+
+// File operations
+export const fileSystem = {
+  async readFile(path: string): Promise<string> {
+    return await readTextFile(path)
+  },
+  
+  async writeFile(path: string, content: string): Promise<void> {
+    await writeTextFile(path, content)
+  },
+  
+  async listDirectory(path: string) {
+    return await readDir(path)
+  },
+  
+  async createDirectory(path: string) {
+    await createDir(path, { recursive: true })
+  },
+  
+  async deleteFile(path: string) {
+    await removeFile(path)
+  },
+  
+  async saveFileDialog(content: string, defaultName?: string) {
+    const filePath = await saveDialog({
+      defaultPath: defaultName,
+      filters: [{
+        name: 'Text Files',
+        extensions: ['txt', 'md']
+      }]
+    })
+    
+    if (filePath) {
+      await writeTextFile(filePath, content)
+      return filePath
+    }
+    
+    return null
+  },
+  
+  async openFileDialog() {
+    const selected = await openDialog({
+      multiple: false,
+      filters: [{
+        name: 'Text Files',
+        extensions: ['txt', 'md']
+      }]
+    })
+    
+    if (selected && typeof selected === 'string') {
+      const content = await readTextFile(selected)
+      return { path: selected, content }
+    }
+    
+    return null
+  }
+}
+
+// Database operations
+export const database = {
+  async save(key: string, value: any): Promise<void> {
+    await invoke('save_user_data', { key, value })
+  },
+  
+  async get<T>(key: string): Promise<T | null> {
+    return await invoke<T | null>('get_user_data', { key })
+  }
+}
+
+// Notifications
+export async function showNotification(title: string, body: string) {
+  let permissionGranted = await isPermissionGranted()
+  
+  if (!permissionGranted) {
+    const permission = await requestPermission()
+    permissionGranted = permission === 'granted'
+  }
+  
+  if (permissionGranted) {
+    sendNotification({ title, body })
+  }
+}
+
+// Dialog utilities
+export const dialogs = {
+  async message(message: string, title?: string) {
+    await message(message, { title, type: 'info' })
+  },
+  
+  async error(message: string, title = 'Error') {
+    await message(message, { title, type: 'error' })
+  },
+  
+  async confirm(message: string, title = 'Confirm') {
+    return await confirm(message, { title })
+  }
+}
+
+// Event system
+export function onWindowResize(handler: (size: { width: number; height: number }) => void) {
+  return listen('tauri://resize', (event) => {
+    handler(event.payload as { width: number; height: number })
+  })
+}
+
+export function onFileDropped(handler: (paths: string[]) => void) {
+  return listen('tauri://file-drop', (event) => {
+    handler(event.payload as string[])
+  })
+}
+
+// Custom events
+export function emitCustomEvent(event: string, payload?: any) {
+  emit(event, payload)
+}
+
+export function onCustomEvent(event: string, handler: (payload: any) => void) {
+  return listen(event, (event) => {
+    handler(event.payload)
+  })
+}
+```
+
+### 5. Window Management
+```typescript
+// components/TauriWindowControls.tsx
+'use client'
+
+import { windowControls } from '@/lib/tauri'
+import { X, Minus, Square, Maximize2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { appWindow } from '@tauri-apps/api/window'
+
+export function TauriWindowControls() {
+  const [isMaximized, setIsMaximized] = useState(false)
+  
+  useEffect(() => {
+    const checkMaximized = async () => {
+      const maximized = await appWindow.isMaximized()
+      setIsMaximized(maximized)
+    }
+    
+    checkMaximized()
+    
+    const unlisten = appWindow.onResized(() => {
+      checkMaximized()
+    })
+    
+    return () => {
+      unlisten.then(fn => fn())
+    }
+  }, [])
+  
+  return (
+    <div className="flex items-center gap-1" data-tauri-drag-region>
+      <button
+        onClick={() => windowControls.minimize()}
+        className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+      >
+        <Minus className="h-4 w-4" />
+      </button>
+      
+      <button
+        onClick={() => windowControls.maximize()}
+        className="p-2 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+      >
+        {isMaximized ? (
+          <Square className="h-4 w-4" />
+        ) : (
+          <Maximize2 className="h-4 w-4" />
+        )}
+      </button>
+      
+      <button
+        onClick={() => windowControls.close()}
+        className="p-2 hover:bg-red-500 hover:text-white rounded"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+// Custom title bar
+export function TauriTitleBar() {
+  return (
+    <div 
+      className="h-8 bg-gray-100 dark:bg-gray-900 flex items-center justify-between px-2 select-none"
+      data-tauri-drag-region
+    >
+      <div className="flex items-center gap-2" data-tauri-drag-region>
+        <img src="/icon.png" alt="Logo" className="h-5 w-5" />
+        <span className="text-sm font-medium">SYMLog</span>
+      </div>
+      
+      <TauriWindowControls />
+    </div>
+  )
+}
+```
+
+### 6. Menu System
+```rust
+// src-tauri/src/menu.rs
+use tauri::{
+    CustomMenuItem, Menu, MenuEntry, MenuItem, Submenu,
+    WindowMenuEvent, Manager
+};
+
+pub fn build_menu() -> Menu {
+    let mut menu = Menu::new();
+    
+    // File menu
+    let new_file = CustomMenuItem::new("new_file", "New File").accelerator("CmdOrCtrl+N");
+    let open_file = CustomMenuItem::new("open_file", "Open File").accelerator("CmdOrCtrl+O");
+    let save_file = CustomMenuItem::new("save_file", "Save").accelerator("CmdOrCtrl+S");
+    let save_as = CustomMenuItem::new("save_as", "Save As").accelerator("CmdOrCtrl+Shift+S");
+    
+    let file_menu = Submenu::new(
+        "File",
+        Menu::new()
+            .add_item(new_file)
+            .add_item(open_file)
+            .add_native_item(MenuItem::Separator)
+            .add_item(save_file)
+            .add_item(save_as)
+            .add_native_item(MenuItem::Separator)
+            .add_native_item(MenuItem::Quit),
+    );
+    
+    // Edit menu
+    let edit_menu = Submenu::new(
+        "Edit",
+        Menu::new()
+            .add_native_item(MenuItem::Undo)
+            .add_native_item(MenuItem::Redo)
+            .add_native_item(MenuItem::Separator)
+            .add_native_item(MenuItem::Cut)
+            .add_native_item(MenuItem::Copy)
+            .add_native_item(MenuItem::Paste)
+            .add_native_item(MenuItem::SelectAll),
+    );
+    
+    // View menu
+    let toggle_fullscreen = CustomMenuItem::new("toggle_fullscreen", "Toggle Fullscreen")
+        .accelerator("F11");
+    let reload = CustomMenuItem::new("reload", "Reload").accelerator("CmdOrCtrl+R");
+    let dev_tools = CustomMenuItem::new("dev_tools", "Developer Tools")
+        .accelerator("CmdOrCtrl+Shift+I");
+    
+    let view_menu = Submenu::new(
+        "View",
+        Menu::new()
+            .add_item(toggle_fullscreen)
+            .add_item(reload)
+            .add_native_item(MenuItem::Separator)
+            .add_item(dev_tools),
+    );
+    
+    // Window menu
+    let window_menu = Submenu::new(
+        "Window",
+        Menu::new()
+            .add_native_item(MenuItem::Minimize)
+            .add_native_item(MenuItem::Zoom)
+            .add_native_item(MenuItem::CloseWindow),
+    );
+    
+    // Help menu
+    let about = CustomMenuItem::new("about", "About SYMLog");
+    let check_updates = CustomMenuItem::new("check_updates", "Check for Updates");
+    let documentation = CustomMenuItem::new("documentation", "Documentation");
+    
+    let help_menu = Submenu::new(
+        "Help",
+        Menu::new()
+            .add_item(about)
+            .add_item(check_updates)
+            .add_native_item(MenuItem::Separator)
+            .add_item(documentation),
+    );
+    
+    // Build complete menu
+    menu = menu.add_submenu(file_menu);
+    menu = menu.add_submenu(edit_menu);
+    menu = menu.add_submenu(view_menu);
+    menu = menu.add_submenu(window_menu);
+    menu = menu.add_submenu(help_menu);
+    
+    menu
+}
+
+pub fn handle_menu_event(event: WindowMenuEvent) {
+    match event.menu_item_id() {
+        "new_file" => {
+            event.window().emit("menu:new_file", ()).unwrap();
+        }
+        "open_file" => {
+            event.window().emit("menu:open_file", ()).unwrap();
+        }
+        "save_file" => {
+            event.window().emit("menu:save_file", ()).unwrap();
+        }
+        "save_as" => {
+            event.window().emit("menu:save_as", ()).unwrap();
+        }
+        "toggle_fullscreen" => {
+            let window = event.window();
+            let is_fullscreen = window.is_fullscreen().unwrap_or(false);
+            window.set_fullscreen(!is_fullscreen).unwrap();
+        }
+        "reload" => {
+            event.window().emit("menu:reload", ()).unwrap();
+        }
+        "dev_tools" => {
+            #[cfg(debug_assertions)]
+            event.window().open_devtools();
+        }
+        "about" => {
+            event.window().emit("menu:about", ()).unwrap();
+        }
+        "check_updates" => {
+            event.window().emit("menu:check_updates", ()).unwrap();
+        }
+        "documentation" => {
+            open::that("https://docs.symlog.ai").unwrap();
+        }
+        _ => {}
+    }
+}
+```
+
+### 7. Auto Updater
+```rust
+// src-tauri/src/updater.rs
+use tauri::updater::UpdateResponse;
+use tauri::{AppHandle, Manager};
+
+pub async fn check_for_updates(app: &AppHandle) -> Result<Option<UpdateResponse>, String> {
+    let updater = app.updater();
+    
+    match updater.check().await {
+        Ok(update) => {
+            if update.is_update_available() {
+                Ok(Some(update))
+            } else {
+                Ok(None)
+            }
+        }
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+pub async fn download_and_install(update: UpdateResponse) -> Result<(), String> {
+    update.download_and_install().await.map_err(|e| e.to_string())
+}
+
+// Frontend integration
+#[command]
+pub async fn check_update(app: AppHandle) -> Result<UpdateInfo, String> {
+    match check_for_updates(&app).await? {
+        Some(update) => Ok(UpdateInfo {
+            available: true,
+            version: update.latest_version().to_string(),
+            notes: update.body().map(|s| s.to_string()),
+            pub_date: update.date().map(|d| d.to_string()),
+        }),
+        None => Ok(UpdateInfo {
+            available: false,
+            version: String::new(),
+            notes: None,
+            pub_date: None,
+        }),
+    }
+}
+
+#[derive(Serialize)]
+struct UpdateInfo {
+    available: bool,
+    version: String,
+    notes: Option<String>,
+    pub_date: Option<String>,
+}
+
+#[command]
+pub async fn install_update(app: AppHandle) -> Result<(), String> {
+    if let Some(update) = check_for_updates(&app).await? {
+        download_and_install(update).await?;
+        app.restart();
+    }
+    Ok(())
+}
+```
+
+### 8. Global Shortcuts
+```typescript
+// hooks/useTauriShortcuts.ts
+import { register, unregister } from '@tauri-apps/api/globalShortcut'
+import { useEffect } from 'react'
+
+export function useTauriShortcuts() {
+  useEffect(() => {
+    const registerShortcuts = async () => {
+      // Quick search
+      await register('CmdOrCtrl+K', () => {
+        window.dispatchEvent(new CustomEvent('open-search'))
+      })
+      
+      // New chat
+      await register('CmdOrCtrl+N', () => {
+        window.dispatchEvent(new CustomEvent('new-chat'))
+      })
+      
+      // Toggle sidebar
+      await register('CmdOrCtrl+B', () => {
+        window.dispatchEvent(new CustomEvent('toggle-sidebar'))
+      })
+      
+      // Quick note
+      await register('CmdOrCtrl+Shift+N', () => {
+        window.dispatchEvent(new CustomEvent('quick-note'))
+      })
+    }
+    
+    registerShortcuts()
+    
+    return () => {
+      // Cleanup shortcuts
+      unregister('CmdOrCtrl+K')
+      unregister('CmdOrCtrl+N')
+      unregister('CmdOrCtrl+B')
+      unregister('CmdOrCtrl+Shift+N')
+    }
+  }, [])
+}
+
+// Component usage
+export function SearchModal() {
+  const [isOpen, setIsOpen] = useState(false)
+  
+  useEffect(() => {
+    const handleOpenSearch = () => setIsOpen(true)
+    window.addEventListener('open-search', handleOpenSearch)
+    return () => window.removeEventListener('open-search', handleOpenSearch)
+  }, [])
+  
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      {/* Search UI */}
+    </Dialog>
+  )
+}
+```
+
+### 9. Local Storage
+```rust
+// src-tauri/src/db.rs
+use rusqlite::{Connection, Result};
+use serde_json::Value;
+
+pub fn init_database(path: &std::path::Path) -> Result<()> {
+    let conn = Connection::open(path)?;
+    
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS user_data (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at INTEGER NOT NULL
+        )",
+        [],
+    )?;
+    
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS chat_history (
+            id TEXT PRIMARY KEY,
+            messages TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            updated_at INTEGER NOT NULL
+        )",
+        [],
+    )?;
+    
+    Ok(())
+}
+
+pub async fn save_data(
+    db_path: &str,
+    key: &str,
+    value: &Value,
+) -> Result<()> {
+    let conn = Connection::open(db_path)?;
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    
+    conn.execute(
+        "INSERT OR REPLACE INTO user_data (key, value, updated_at) VALUES (?1, ?2, ?3)",
+        [key, &value.to_string(), &timestamp.to_string()],
+    )?;
+    
+    Ok(())
+}
+
+pub async fn get_data(
+    db_path: &str,
+    key: &str,
+) -> Result<Option<Value>> {
+    let conn = Connection::open(db_path)?;
+    
+    let mut stmt = conn.prepare("SELECT value FROM user_data WHERE key = ?1")?;
+    let value: Option<String> = stmt
+        .query_row([key], |row| row.get(0))
+        .optional()?;
+    
+    Ok(value.and_then(|v| serde_json::from_str(&v).ok()))
+}
+```
+
+### 10. Platform-Specific Code
+```rust
+// Platform-specific window decorations
+#[cfg(target_os = "windows")]
+fn setup_windows_specific(window: &Window) {
+    use window_vibrancy::{apply_blur, apply_acrylic};
+    
+    // Apply acrylic effect on Windows 10/11
+    apply_acrylic(&window, Some((18, 18, 18, 125)))
+        .unwrap_or_else(|_| {
+            apply_blur(&window, Some((18, 18, 18, 125)))
+                .expect("Failed to apply blur");
+        });
+}
+
+#[cfg(target_os = "macos")]
+fn setup_macos_specific(window: &Window) {
+    use cocoa::appkit::{NSWindow, NSWindowStyleMask};
+    use cocoa::base::id;
+    
+    unsafe {
+        let ns_window = window.ns_window().unwrap() as id;
+        ns_window.setStyleMask_(
+            NSWindowStyleMask::NSTitledWindowMask
+                | NSWindowStyleMask::NSClosableWindowMask
+                | NSWindowStyleMask::NSMiniaturizableWindowMask
+                | NSWindowStyleMask::NSResizableWindowMask
+                | NSWindowStyleMask::NSFullSizeContentViewWindowMask,
+        );
+        ns_window.setTitlebarAppearsTransparent_(true);
+        ns_window.setTitleVisibility_(NSWindowTitleVisibility::NSWindowTitleHidden);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn setup_linux_specific(window: &Window) {
+    // Linux-specific setup
+    // GTK theming, window hints, etc.
+}
+```
+
+Remember: Tauri provides secure, performant native functionality. Always validate inputs and handle platform differences gracefully.
