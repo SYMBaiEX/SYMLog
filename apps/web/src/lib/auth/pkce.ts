@@ -36,7 +36,8 @@ function base64URLEncode(buffer: ArrayBuffer): string {
 async function sha256(plain: string): Promise<ArrayBuffer> {
   const encoder = new TextEncoder()
   const data = encoder.encode(plain)
-  return await crypto.subtle.digest('SHA-256', data)
+  // Use type assertion to work around Node.js/browser type compatibility issue
+  return await crypto.subtle.digest('SHA-256', data as BufferSource)
 }
 
 /**
@@ -85,6 +86,13 @@ export function storePKCEVerifier(verifier: string): void {
 }
 
 /**
+ * Get PKCE verifier without clearing it
+ */
+export function getPKCEVerifier(): string | null {
+  return sessionStorage.getItem('pkce_verifier')
+}
+
+/**
  * Retrieve and clear PKCE verifier
  */
 export function retrievePKCEVerifier(): string | null {
@@ -120,4 +128,12 @@ export function verifyOAuthState(state: string): boolean {
     return storedState === state
   }
   return false
+}
+
+/**
+ * Clear PKCE verifier from storage
+ * Use when you need to explicitly clear without retrieving
+ */
+export function clearPKCEVerifier(): void {
+  sessionStorage.removeItem('pkce_verifier')
 }

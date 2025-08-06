@@ -120,7 +120,7 @@ export function BranchRenameDialog({
             Rename Branch
           </DialogTitle>
           <DialogDescription>
-            Change the name of "{branch.name}" to better describe this conversation path.
+            Change the name of &quot;{branch.name}&quot; to better describe this conversation path.
           </DialogDescription>
         </DialogHeader>
 

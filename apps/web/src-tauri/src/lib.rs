@@ -1,6 +1,12 @@
 use std::env;
 use tauri::{Manager, Emitter, Listener};
 
+mod auth;
+mod deep_link;
+
+use auth::{AuthManager, generate_auth_session, handle_auth_callback, clear_auth_session, clear_all_auth_sessions, get_auth_session};
+use deep_link::{setup_deep_linking, open_auth_url, register_auth_protocol, get_current_deep_link};
+
 #[cfg(target_os = "linux")]
 use std::process::Command;
 
@@ -45,7 +51,32 @@ pub fn run() {
   }
 
   tauri::Builder::default()
+    .plugin(tauri_plugin_deep_link::init())
+    .plugin(tauri_plugin_store::Builder::default().build())
+    .plugin(tauri_plugin_opener::init())
+    .invoke_handler(tauri::generate_handler![
+      generate_auth_session,
+      handle_auth_callback,
+      clear_auth_session,
+      clear_all_auth_sessions,
+      get_auth_session,
+      open_auth_url,
+      register_auth_protocol,
+      get_current_deep_link
+    ])
     .setup(|app| {
+      // Initialize auth manager
+      let auth_manager = AuthManager::new(app.handle()).expect("Failed to initialize auth manager");
+      app.manage(auth_manager);
+      
+      // Setup deep linking
+      let app_handle = app.handle().clone();
+      tauri::async_runtime::spawn(async move {
+        if let Err(e) = setup_deep_linking(&app_handle).await {
+          log::error!("Failed to setup deep linking: {}", e);
+        }
+      });
+      
       // Create and set menu on the main window
       let main_window = app.get_webview_window("main").unwrap();
       

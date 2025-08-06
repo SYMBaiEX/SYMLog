@@ -1,6 +1,6 @@
 import { v } from "convex/values"
 import { mutation, query, internalMutation } from "./_generated/server"
-import { createHash } from "crypto"
+import { Id } from "./_generated/dataModel"
 
 /**
  * Helper function to base64 URL encode
@@ -38,12 +38,61 @@ export const createAuthSession = mutation({
     userAgent: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Rate limiting check
-    if (args.ipAddress) {
-      const { checkRateLimit } = await import("./rateLimiting")
-      await checkRateLimit(ctx, {
-        key: args.ipAddress,
-        action: "auth_code",
+    // Rate limiting check (inline implementation)
+    const now = Date.now()
+    const rateLimitKey = args.ipAddress || "unknown"
+    const rateLimitAction = "auth_code"
+    
+    // Check rate limit
+    const rateLimit = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_key_action", q => 
+        q.eq("key", rateLimitKey).eq("action", rateLimitAction)
+      )
+      .first()
+    
+    const RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 } // 10 attempts per minute
+    
+    // Check if blocked
+    if (rateLimit?.blockedUntil && rateLimit.blockedUntil > now) {
+      const remainingTime = Math.ceil((rateLimit.blockedUntil - now) / 1000)
+      throw new Error(`Rate limit exceeded. Try again in ${remainingTime} seconds.`)
+    }
+    
+    // Check rate limit window
+    if (!rateLimit || rateLimit.windowStart < now - RATE_LIMIT.windowMs) {
+      // Create or reset rate limit window
+      if (rateLimit) {
+        await ctx.db.patch(rateLimit._id, {
+          attempts: 1,
+          windowStart: now,
+          blockedUntil: undefined,
+        })
+      } else {
+        await ctx.db.insert("rateLimits", {
+          key: rateLimitKey,
+          action: rateLimitAction,
+          attempts: 1,
+          windowStart: now,
+        })
+      }
+    } else if (rateLimit.attempts >= RATE_LIMIT.limit) {
+      // Block for exponential backoff
+      const blockDuration = Math.min(
+        RATE_LIMIT.windowMs * Math.pow(2, Math.floor(rateLimit.attempts / RATE_LIMIT.limit)),
+        60 * 60 * 1000 // Max 1 hour
+      )
+      
+      await ctx.db.patch(rateLimit._id, {
+        attempts: rateLimit.attempts + 1,
+        blockedUntil: now + blockDuration,
+      })
+      
+      throw new Error(`Rate limit exceeded. Too many authentication attempts.`)
+    } else {
+      // Increment attempts
+      await ctx.db.patch(rateLimit._id, {
+        attempts: rateLimit.attempts + 1,
       })
     }
     
@@ -57,13 +106,40 @@ export const createAuthSession = mutation({
       throw new Error("Auth code already exists")
     }
 
-    // Create or get user
-    const { createOrUpdateUser } = await import("./users")
-    const userId = await createOrUpdateUser(ctx, {
-      crossmintId: args.crossmintId,
-      email: args.userEmail,
-      walletAddress: args.walletAddress,
-    })
+    // Create or get user - inline implementation to avoid circular dependencies
+    let userId: Id<"users">
+    const existingUser = await ctx.db
+      .query("users")
+      .withIndex("by_crossmint_id", q => q.eq("crossmintId", args.crossmintId))
+      .first()
+    
+    if (existingUser) {
+      await ctx.db.patch(existingUser._id, {
+        lastLoginAt: now,
+        loginCount: existingUser.loginCount + 1,
+        updatedAt: now,
+        walletAddress: args.walletAddress || existingUser.walletAddress,
+      })
+      userId = existingUser._id
+    } else {
+      userId = await ctx.db.insert("users", {
+        crossmintId: args.crossmintId,
+        email: args.userEmail,
+        walletAddress: args.walletAddress,
+        emailVerified: false,
+        twoFactorEnabled: false,
+        passkeysEnabled: false,
+        createdAt: now,
+        updatedAt: now,
+        lastLoginAt: now,
+        loginCount: 1,
+        preferences: {
+          theme: "dark",
+          notifications: true,
+          language: "en",
+        },
+      })
+    }
 
     // Create new auth session with PKCE
     const sessionId = await ctx.db.insert("authSessions", {
@@ -77,8 +153,8 @@ export const createAuthSession = mutation({
       deviceFingerprint: args.deviceFingerprint,
       ipAddress: args.ipAddress,
       userAgent: args.userAgent,
-      createdAt: Date.now(),
-      expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
+      createdAt: now,
+      expiresAt: now + (10 * 60 * 1000), // 10 minutes
     })
 
     return sessionId
@@ -144,12 +220,73 @@ export const validateAuthCode = mutation({
     ipAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    // Rate limiting check
-    if (args.ipAddress) {
-      const { checkRateLimit } = await import("./rateLimiting")
-      await checkRateLimit(ctx, {
-        key: args.ipAddress,
-        action: "login",
+    // Rate limiting check (inline implementation)
+    const now = Date.now()
+    const rateLimitKey = args.ipAddress || "unknown"
+    const rateLimitAction = "auth_code_validation"
+    
+    // Check rate limit
+    const rateLimit = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_key_action", q => 
+        q.eq("key", rateLimitKey).eq("action", rateLimitAction)
+      )
+      .first()
+    
+    const RATE_LIMIT = { limit: 10, windowMs: 60 * 1000 } // 10 attempts per minute
+    
+    // Check if blocked
+    if (rateLimit?.blockedUntil && rateLimit.blockedUntil > now) {
+      const remainingTime = Math.ceil((rateLimit.blockedUntil - now) / 1000)
+      throw new Error(`Rate limit exceeded. Try again in ${remainingTime} seconds.`)
+    }
+    
+    // Check rate limit window
+    if (!rateLimit || rateLimit.windowStart < now - RATE_LIMIT.windowMs) {
+      // Create or reset rate limit window
+      if (rateLimit) {
+        await ctx.db.patch(rateLimit._id, {
+          attempts: 1,
+          windowStart: now,
+          blockedUntil: undefined,
+        })
+      } else {
+        await ctx.db.insert("rateLimits", {
+          key: rateLimitKey,
+          action: rateLimitAction,
+          attempts: 1,
+          windowStart: now,
+        })
+      }
+    } else if (rateLimit.attempts >= RATE_LIMIT.limit) {
+      // Block for exponential backoff
+      const blockDuration = Math.min(
+        RATE_LIMIT.windowMs * Math.pow(2, Math.floor(rateLimit.attempts / RATE_LIMIT.limit)),
+        60 * 60 * 1000 // Max 1 hour
+      )
+      
+      await ctx.db.patch(rateLimit._id, {
+        attempts: rateLimit.attempts + 1,
+        blockedUntil: now + blockDuration,
+      })
+      
+      // Log rate limit violation
+      await ctx.db.insert("auditLogs", {
+        action: "rate_limit_exceeded",
+        ipAddress: rateLimitKey,
+        timestamp: now,
+        success: false,
+        metadata: {
+          action: rateLimitAction,
+          attempts: rateLimit.attempts + 1,
+        },
+      })
+      
+      throw new Error(`Rate limit exceeded. Too many validation attempts.`)
+    } else {
+      // Increment attempts
+      await ctx.db.patch(rateLimit._id, {
+        attempts: rateLimit.attempts + 1,
       })
     }
 
@@ -164,7 +301,7 @@ export const validateAuthCode = mutation({
         action: "auth_code_invalid",
         ipAddress: args.ipAddress || "unknown",
         userAgent: args.userAgent,
-        timestamp: Date.now(),
+        timestamp: now,
         success: false,
         errorMessage: "Invalid authentication code",
       })
@@ -180,7 +317,7 @@ export const validateAuthCode = mutation({
         action: "pkce_verification_failed",
         ipAddress: args.ipAddress || "unknown",
         userAgent: args.userAgent,
-        timestamp: Date.now(),
+        timestamp: now,
         success: false,
         errorMessage: "PKCE verification failed",
       })
@@ -188,14 +325,14 @@ export const validateAuthCode = mutation({
     }
 
     // Check if expired
-    if (session.expiresAt < Date.now()) {
+    if (session.expiresAt < now) {
       await ctx.db.patch(session._id, { status: "expired" as const })
       
       await ctx.db.insert("auditLogs", {
         userId: session.userId,
         action: "auth_code_expired",
         ipAddress: args.ipAddress || "unknown",
-        timestamp: Date.now(),
+        timestamp: now,
         success: false,
         errorMessage: "Authentication code expired",
       })
@@ -209,7 +346,7 @@ export const validateAuthCode = mutation({
         userId: session.userId,
         action: "auth_code_reuse",
         ipAddress: args.ipAddress || "unknown",
-        timestamp: Date.now(),
+        timestamp: now,
         success: false,
         errorMessage: "Authentication code already used",
       })
@@ -217,17 +354,67 @@ export const validateAuthCode = mutation({
       throw new Error("Authentication code has already been used")
     }
 
-    // Create user session with tokens
-    const { createSession } = await import("./sessions")
-    const userSession = await createSession(ctx, {
+    // Create user session with tokens (inline to avoid calling mutation from mutation)
+    
+    // Generate tokens
+    function generateSecureToken(length: number = 32): string {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      let token = ''
+      for (let i = 0; i < length; i++) {
+        token += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return token
+    }
+    
+    function generateAccessToken(userId: Id<"users">): string {
+      const header = { alg: "HS256", typ: "JWT" }
+      const payload = {
+        sub: userId,
+        iat: Math.floor(now / 1000),
+        exp: Math.floor(now / 1000) + (15 * 60), // 15 minutes
+        type: "access"
+      }
+      
+      const encodedHeader = Buffer.from(JSON.stringify(header)).toString('base64')
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+      const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64')
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+      const signature = generateSecureToken(43)
+      
+      return `${encodedHeader}.${encodedPayload}.${signature}`
+    }
+    
+    const accessToken = generateAccessToken(session.userId!)
+    const refreshToken = generateSecureToken(64)
+    
+    const accessTokenExpiresAt = now + (15 * 60 * 1000) // 15 minutes
+    const refreshTokenExpiresAt = now + (30 * 24 * 60 * 60 * 1000) // 30 days
+    
+    // Create session
+    const sessionId = await ctx.db.insert("sessions", {
       userId: session.userId!,
+      accessToken,
+      refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt,
       deviceId: args.deviceId || "unknown",
       deviceName: args.deviceName,
       deviceType: args.deviceType || "web",
       platform: args.platform || "unknown",
       userAgent: args.userAgent,
       ipAddress: args.ipAddress || session.ipAddress || "unknown",
+      isActive: true,
+      createdAt: now,
+      lastActivityAt: now,
     })
+    
+    const userSession = {
+      sessionId,
+      accessToken,
+      refreshToken,
+      accessTokenExpiresAt,
+      refreshTokenExpiresAt,
+    }
 
     // Mark auth session as completed
     await ctx.db.patch(session._id, {
@@ -246,7 +433,7 @@ export const validateAuthCode = mutation({
       action: "auth_success",
       ipAddress: args.ipAddress || "unknown",
       userAgent: args.userAgent,
-      timestamp: Date.now(),
+      timestamp: now,
       success: true,
       metadata: {
         deviceType: args.deviceType,
@@ -275,7 +462,7 @@ export const cleanupExpiredSessions = mutation({
 
     for (const session of expiredSessions) {
       if (session.status !== "expired") {
-        await ctx.db.patch(session._id, { status: "expired" })
+        await ctx.db.patch(session._id, { status: "expired" as const })
       }
     }
 

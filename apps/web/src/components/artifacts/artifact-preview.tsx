@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import NextImage from "next/image"
 import { GlassCard } from "@/components/ui/glass-card"
 import { GlassButton } from "@/components/ui/glass-button"
 import { Badge } from "@/components/ui/badge"
@@ -39,7 +40,7 @@ export function ArtifactPreview({ artifact, className }: ArtifactPreviewProps) {
       case "spreadsheet":
         return <Table className="h-4 w-4" />
       case "image":
-        return <Image className="h-4 w-4" />
+        return <Image className="h-4 w-4" role="img" aria-label="Image icon" />
       case "chart":
         return <BarChart3 className="h-4 w-4" />
       default:
@@ -81,20 +82,24 @@ export function ArtifactPreview({ artifact, className }: ArtifactPreviewProps) {
         return (
           <div className="relative h-32 bg-black/20 rounded-lg overflow-hidden">
             {artifact.url ? (
-              <img
+              <NextImage
                 src={artifact.url}
                 alt={artifact.title}
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
             ) : artifact.base64 ? (
-              <img
+              <NextImage
                 src={`data:image/${artifact.format};base64,${artifact.base64}`}
                 alt={artifact.title}
-                className="w-full h-full object-contain"
+                fill
+                className="object-contain"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-500">
-                <Image className="h-8 w-8" />
+                <Image className="h-8 w-8" role="img" aria-label="Image placeholder" />
               </div>
             )}
           </div>

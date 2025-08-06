@@ -104,10 +104,7 @@ export async function POST(request: NextRequest) {
 
     const expiresAt = Date.now() + (24 * 60 * 60 * 1000) // 24 hours
 
-    // Log successful verification (development only)
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`Crossmint token verification successful for user: ${crossmintPayload.sub}`)
-    }
+    // Crossmint token verification successful
 
     return NextResponse.json({
       isValid: true,

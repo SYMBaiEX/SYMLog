@@ -32,28 +32,34 @@ export function CrossmintProviderWrapper({ children }: { children: React.ReactNo
     return <>{children}</>
   }
 
-  return (
-    <CrossmintProvider 
-      apiKey={clientApiKey}
-    >
-      <CrossmintAuthProvider
-        loginMethods={[
-          "email",
-          "google", 
-          "twitter"
-        ]}
+  try {
+    return (
+      <CrossmintProvider 
+        apiKey={clientApiKey}
       >
-        <CrossmintWalletProvider
-          createOnLogin={{
-            chain: "solana",
-            signer: {
-              type: "email"
-            }
-          }}
+        <CrossmintAuthProvider
+          loginMethods={[
+            "email",
+            "google", 
+            "twitter"
+          ]}
         >
-          {children}
-        </CrossmintWalletProvider>
-      </CrossmintAuthProvider>
-    </CrossmintProvider>
-  )
+          <CrossmintWalletProvider
+            createOnLogin={{
+              chain: "solana",
+              signer: {
+                type: "email"
+              }
+            }}
+          >
+            {children}
+          </CrossmintWalletProvider>
+        </CrossmintAuthProvider>
+      </CrossmintProvider>
+    )
+  } catch (error) {
+    console.error("Crossmint Provider Error:", error)
+    // Return children without Crossmint if there's an error
+    return <>{children}</>
+  }
 }

@@ -42,5 +42,19 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "deep-link": {
+      "mobile": [
+        { "host": "auth.symlog.com", "pathPrefix": ["/callback"] },
+        { "host": "localhost", "pathPrefix": ["/auth"] }
+      ],
+      "desktop": {
+        "schemes": ["symlog", "symlog-auth"]
+      }
+    },
+    "store": {
+      "default": "auth.json"
+    }
   }
 }

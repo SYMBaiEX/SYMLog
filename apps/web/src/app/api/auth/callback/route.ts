@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
 
   // Handle successful authentication with code
   if (code) {
-    console.log('Received auth code via callback:', code)
+    // Authentication code received successfully
     
     // For web environment, redirect to home with code in hash
     const redirectUrl = new URL('/', request.url)

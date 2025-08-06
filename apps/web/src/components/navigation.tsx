@@ -41,10 +41,10 @@ export function Navigation() {
   const isAuthenticated = clientApiKey && clientApiKey !== 'your_client_api_key_here' && !!auth.jwt && !!auth.user
 
   // Build navigation items including AI Chat for authenticated users
-  const navItems = [
+  const navItems = React.useMemo(() => [
     ...navigation,
     ...(isAuthenticated ? [{ name: "AI Chat", href: "/chat", icon: MessageSquare }] : [])
-  ]
+  ], [isAuthenticated])
 
   // Keyboard navigation
   React.useEffect(() => {
@@ -95,7 +95,7 @@ export function Navigation() {
 
     window.addEventListener("keydown", handleKeyDown)
     return () => window.removeEventListener("keydown", handleKeyDown)
-  }, [focusedIndex, router])
+  }, [focusedIndex, router, navItems])
 
   return (
     <header className="navigation sticky top-0 z-50 w-full glass backdrop-blur-xl border-b border-border">

@@ -34,12 +34,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://staging.crossmint.com https://www.crossmint.com https://*.vercel-scripts.com",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://staging.crossmint.com https://www.crossmint.com https://signers.crossmint.com https://*.vercel-scripts.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com https://fonts.googleapis.com https://*.gstatic.com data: https:",
               "img-src 'self' data: blob: https:",
-              "connect-src 'self' https://staging.crossmint.com https://www.crossmint.com https://*.convex.cloud wss://*.convex.cloud https://dynamic-static-assets.com https://*.dynamic-static-assets.com https://api.dynamic.xyz https://*.walletconnect.com wss://*.walletconnect.com https://*.walletconnect.org wss://*.walletconnect.org",
-              "frame-src 'self' https://staging.crossmint.com https://www.crossmint.com",
+              "connect-src 'self' https://staging.crossmint.com https://www.crossmint.com https://signers.crossmint.com https://*.convex.cloud wss://*.convex.cloud",
+              "frame-src 'self' https://staging.crossmint.com https://www.crossmint.com https://signers.crossmint.com",
               "media-src 'self'",
               "object-src 'none'",
               "base-uri 'self'",
@@ -59,6 +59,10 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'strict-origin-when-cross-origin'
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups'
           }
         ]
       }

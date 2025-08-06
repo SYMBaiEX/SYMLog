@@ -54,7 +54,7 @@ export default function ContactPage() {
     // Simulate API call
     await new Promise(resolve => setTimeout(resolve, 2000))
     
-    console.log(values)
+    // Form submitted successfully
     toast.success("Message sent successfully!", {
       description: "We'll get back to you as soon as possible.",
     })
@@ -70,7 +70,7 @@ export default function ContactPage() {
           Get in Touch
         </h1>
         <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-          Have questions about SYMLog? We're here to help. Reach out to our team for support, 
+          Have questions about SYMLog? We&apos;re here to help. Reach out to our team for support, 
           partnerships, or general inquiries.
         </p>
       </div>
@@ -137,7 +137,7 @@ export default function ContactPage() {
             <CardHeader>
               <CardTitle>Send us a Message</CardTitle>
               <CardDescription>
-                Fill out the form below and we'll get back to you within 24 hours.
+                Fill out the form below and we&apos;ll get back to you within 24 hours.
               </CardDescription>
             </CardHeader>
             <CardContent>

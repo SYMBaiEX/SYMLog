@@ -1,13 +1,13 @@
 import { v } from "convex/values"
-import { mutation, query } from "./_generated/server"
-import { Id } from "./_generated/dataModel"
+import { mutation, query, type MutationCtx } from "./_generated/server"
+import { type Id } from "./_generated/dataModel"
 
 /**
  * Create or update a user account
  * Called during authentication to ensure user record exists
  */
 export const createOrUpdateUser = async (
-  ctx: any,
+  ctx: MutationCtx,
   args: {
     crossmintId: string
     email: string
@@ -26,7 +26,7 @@ export const createOrUpdateUser = async (
       // Update existing user
       await ctx.db.patch(existing._id, {
         lastLoginAt: Date.now(),
-        loginCount: existing.loginCount + 1,
+        loginCount: (existing.loginCount || 0) + 1,
         updatedAt: Date.now(),
         ...(args.walletAddress && { walletAddress: args.walletAddress }),
         ...(args.displayName && { displayName: args.displayName }),
@@ -56,7 +56,7 @@ export const createOrUpdateUser = async (
       twoFactorEnabled: false,
       passkeysEnabled: false,
       mfaEnabled: false,
-      mfaMethod: null,
+      mfaMethod: undefined,
       createdAt: Date.now(),
       updatedAt: Date.now(),
       lastLoginAt: Date.now(),

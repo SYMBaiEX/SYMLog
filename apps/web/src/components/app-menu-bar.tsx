@@ -136,18 +136,18 @@ export function AppMenuBar() {
         switch (e.key.toLowerCase()) {
           case "n":
             e.preventDefault()
-            console.log("New file")
+            // console.log("New file")
             break
           case "o":
             e.preventDefault()
-            console.log("Open file")
+            // console.log("Open file")
             break
           case "s":
             e.preventDefault()
             if (e.shiftKey) {
-              console.log("Save as")
+              // console.log("Save as")
             } else {
-              console.log("Save file")
+              // console.log("Save file")
             }
             break
           case "z":
@@ -176,7 +176,7 @@ export function AppMenuBar() {
             break
           case "f":
             e.preventDefault()
-            console.log("Find")
+            // console.log("Find")
             break
           case "r":
             if (!e.shiftKey) {
@@ -203,7 +203,7 @@ export function AppMenuBar() {
             break
           case "/":
             e.preventDefault()
-            console.log("Show shortcuts")
+            // console.log("Show shortcuts")
             break
         }
       }
@@ -257,27 +257,27 @@ export function AppMenuBar() {
     {
       label: "File",
       items: [
-        { label: "New File", icon: FileText, shortcut: "⌘N", action: () => console.log("New file") },
+        { label: "New File", icon: FileText, shortcut: "⌘N", action: () => {} },
         { label: "New Window", shortcut: "⇧⌘N", action: () => window.open(window.location.href, "_blank") },
         { separator: true },
-        { label: "Open...", icon: FileJson, shortcut: "⌘O", action: () => console.log("Open file") },
+        { label: "Open...", icon: FileJson, shortcut: "⌘O", action: () => {} },
         { label: "Open Recent", icon: Clock, submenu: [
-          { label: "research-notes.md", action: () => console.log("Open recent 1") },
-          { label: "blog-draft.md", action: () => console.log("Open recent 2") },
-          { label: "api-docs.json", action: () => console.log("Open recent 3") },
+          { label: "research-notes.md", action: () => {} },
+          { label: "blog-draft.md", action: () => {} },
+          { label: "api-docs.json", action: () => {} },
           { separator: true },
-          { label: "Clear Recent Files", action: () => console.log("Clear recent") },
+          { label: "Clear Recent Files", action: () => {} },
         ]},
         { separator: true },
-        { label: "Save", icon: Save, shortcut: "⌘S", action: () => console.log("Save") },
-        { label: "Save As...", shortcut: "⇧⌘S", action: () => console.log("Save as") },
+        { label: "Save", icon: Save, shortcut: "⌘S", action: () => {} },
+        { label: "Save As...", shortcut: "⇧⌘S", action: () => {} },
         { label: "Export", icon: Download, submenu: [
-          { label: "Export as PDF", action: () => console.log("Export PDF") },
-          { label: "Export as Markdown", action: () => console.log("Export MD") },
-          { label: "Export as HTML", action: () => console.log("Export HTML") },
+          { label: "Export as PDF", action: () => {} },
+          { label: "Export as Markdown", action: () => {} },
+          { label: "Export as HTML", action: () => {} },
         ]},
         { separator: true },
-        { label: "Import", icon: Upload, action: () => console.log("Import") },
+        { label: "Import", icon: Upload, action: () => {} },
         { label: "Print", icon: Printer, shortcut: "⌘P", action: () => window.print() },
         { separator: true },
         { label: "Settings", icon: Settings, shortcut: "⌘,", action: () => router.push("/settings") },
@@ -294,9 +294,9 @@ export function AppMenuBar() {
         { label: "Paste", icon: Clipboard, shortcut: "⌘V", action: () => document.execCommand("paste") },
         { label: "Select All", shortcut: "⌘A", action: () => document.execCommand("selectAll") },
         { separator: true },
-        { label: "Find", icon: Search, shortcut: "⌘F", action: () => console.log("Find") },
-        { label: "Replace", shortcut: "⌥⌘F", action: () => console.log("Replace") },
-        { label: "Find in Files", shortcut: "⇧⌘F", action: () => console.log("Find in files") },
+        { label: "Find", icon: Search, shortcut: "⌘F", action: () => {} },
+        { label: "Replace", shortcut: "⌥⌘F", action: () => {} },
+        { label: "Find in Files", shortcut: "⇧⌘F", action: () => {} },
         { separator: true },
         { label: "Format", icon: Type, submenu: [
           { label: "Bold", icon: Bold, shortcut: "⌘B", action: () => document.execCommand("bold") },
@@ -308,14 +308,14 @@ export function AppMenuBar() {
           { label: "Align Right", icon: AlignRight, action: () => document.execCommand("justifyRight") },
         ]},
         { label: "Insert", submenu: [
-          { label: "Link", icon: Link2, shortcut: "⌘K", action: () => console.log("Insert link") },
-          { label: "Image", icon: Image, action: () => console.log("Insert image") },
-          { label: "Code Block", icon: Code, action: () => console.log("Insert code") },
-          { label: "Table", icon: Table, action: () => console.log("Insert table") },
+          { label: "Link", icon: Link2, shortcut: "⌘K", action: () => {} },
+          { label: "Image", icon: Image, action: () => {} },
+          { label: "Code Block", icon: Code, action: () => {} },
+          { label: "Table", icon: Table, action: () => {} },
           { separator: true },
-          { label: "Bullet List", icon: List, action: () => console.log("Insert list") },
-          { label: "Numbered List", icon: ListOrdered, action: () => console.log("Insert numbered list") },
-          { label: "Quote", icon: Quote, action: () => console.log("Insert quote") },
+          { label: "Bullet List", icon: List, action: () => {} },
+          { label: "Numbered List", icon: ListOrdered, action: () => {} },
+          { label: "Quote", icon: Quote, action: () => {} },
         ]},
       ]
     },
@@ -350,15 +350,15 @@ export function AppMenuBar() {
           { label: "System", icon: Monitor, action: () => setTheme("system") },
         ]},
         { label: "Layout", icon: LayoutGrid, submenu: [
-          { label: "Grid View", icon: Grid, action: () => console.log("Grid view") },
-          { label: "List View", icon: List, action: () => console.log("List view") },
-          { label: "Columns", icon: Columns, action: () => console.log("Columns view") },
+          { label: "Grid View", icon: Grid, action: () => {} },
+          { label: "List View", icon: List, action: () => {} },
+          { label: "Columns", icon: Columns, action: () => {} },
         ]},
         { separator: true },
         { label: "Device Preview", submenu: [
-          { label: "Desktop", icon: Monitor, action: () => console.log("Desktop preview") },
-          { label: "Tablet", icon: Tablet, action: () => console.log("Tablet preview") },
-          { label: "Mobile", icon: Smartphone, action: () => console.log("Mobile preview") },
+          { label: "Desktop", icon: Monitor, action: () => {} },
+          { label: "Tablet", icon: Tablet, action: () => {} },
+          { label: "Mobile", icon: Smartphone, action: () => {} },
         ]},
         { separator: true },
         { label: "Toggle Fullscreen", shortcut: "⌃⌘F", action: () => {
@@ -373,19 +373,19 @@ export function AppMenuBar() {
     {
       label: "Chat",
       items: [
-        { label: "New Chat", icon: MessageSquare, shortcut: "⌘N", action: () => console.log("New chat") },
-        { label: "Chat History", icon: Clock, shortcut: "⌘H", action: () => console.log("Chat history") },
+        { label: "New Chat", icon: MessageSquare, shortcut: "⌘N", action: () => {} },
+        { label: "Chat History", icon: Clock, shortcut: "⌘H", action: () => {} },
         { separator: true },
-        { label: "Voice Chat", icon: Mic, shortcut: "⌘⇧V", action: () => console.log("Voice chat") },
-        { label: "Video Chat", icon: Video, shortcut: "⌘⇧C", action: () => console.log("Video chat") },
+        { label: "Voice Chat", icon: Mic, shortcut: "⌘⇧V", action: () => {} },
+        { label: "Video Chat", icon: Video, shortcut: "⌘⇧C", action: () => {} },
         { separator: true },
         { label: "AI Assistant", icon: Bot, submenu: [
-          { label: "Ask Question", icon: HelpCircle, action: () => console.log("Ask AI") },
-          { label: "Generate Code", icon: Code, action: () => console.log("Generate code") },
-          { label: "Explain Code", icon: Info, action: () => console.log("Explain code") },
-          { label: "Suggest Improvements", icon: Sparkles, action: () => console.log("Suggest improvements") },
+          { label: "Ask Question", icon: HelpCircle, action: () => {} },
+          { label: "Generate Code", icon: Code, action: () => {} },
+          { label: "Explain Code", icon: Info, action: () => {} },
+          { label: "Suggest Improvements", icon: Sparkles, action: () => {} },
         ]},
-        { label: "Send Message", icon: Send, shortcut: "⌘Enter", action: () => console.log("Send message") },
+        { label: "Send Message", icon: Send, shortcut: "⌘Enter", action: () => {} },
         { separator: true },
         { label: "Chat Settings", icon: Settings, action: () => router.push("/settings/chat") },
       ]
@@ -393,44 +393,44 @@ export function AppMenuBar() {
     {
       label: "Analyze",
       items: [
-        { label: "Code Analysis", icon: Code, shortcut: "⌘⇧A", action: () => console.log("Analyze code") },
-        { label: "Performance", icon: Zap, action: () => console.log("Performance analysis") },
-        { label: "Security Scan", icon: Shield, action: () => console.log("Security scan") },
+        { label: "Code Analysis", icon: Code, shortcut: "⌘⇧A", action: () => {} },
+        { label: "Performance", icon: Zap, action: () => {} },
+        { label: "Security Scan", icon: Shield, action: () => {} },
         { separator: true },
         { label: "Metrics", icon: BarChart, submenu: [
-          { label: "Usage Statistics", icon: Activity, action: () => console.log("Usage stats") },
-          { label: "Performance Metrics", icon: TrendingUp, action: () => console.log("Performance metrics") },
-          { label: "Error Tracking", icon: Bug, action: () => console.log("Error tracking") },
+          { label: "Usage Statistics", icon: Activity, action: () => {} },
+          { label: "Performance Metrics", icon: TrendingUp, action: () => {} },
+          { label: "Error Tracking", icon: Bug, action: () => {} },
         ]},
         { label: "Reports", icon: FileText, submenu: [
-          { label: "Daily Report", action: () => console.log("Daily report") },
-          { label: "Weekly Report", action: () => console.log("Weekly report") },
-          { label: "Monthly Report", action: () => console.log("Monthly report") },
-          { label: "Custom Report", action: () => console.log("Custom report") },
+          { label: "Daily Report", action: () => {} },
+          { label: "Weekly Report", action: () => {} },
+          { label: "Monthly Report", action: () => {} },
+          { label: "Custom Report", action: () => {} },
         ]},
         { separator: true },
-        { label: "Data Visualization", icon: PieChart, action: () => console.log("Data viz") },
-        { label: "Export Analytics", icon: Download, action: () => console.log("Export analytics") },
+        { label: "Data Visualization", icon: PieChart, action: () => {} },
+        { label: "Export Analytics", icon: Download, action: () => {} },
       ]
     },
     {
       label: "Tools",
       items: [
-        { label: "Developer Tools", icon: Terminal, shortcut: "⌥⌘I", action: () => console.log("Dev tools") },
-        { label: "Console", icon: Terminal, shortcut: "⌥⌘C", action: () => console.log("Console") },
+        { label: "Developer Tools", icon: Terminal, shortcut: "⌥⌘I", action: () => {} },
+        { label: "Console", icon: Terminal, shortcut: "⌥⌘C", action: () => {} },
         { separator: true },
-        { label: "Database Manager", icon: Database, action: () => console.log("Database") },
-        { label: "API Explorer", icon: Globe, action: () => console.log("API Explorer") },
-        { label: "Network Monitor", icon: Activity, action: () => console.log("Network monitor") },
+        { label: "Database Manager", icon: Database, action: () => {} },
+        { label: "API Explorer", icon: Globe, action: () => {} },
+        { label: "Network Monitor", icon: Activity, action: () => {} },
         { separator: true },
         { label: "Extensions", icon: Sparkles, action: () => router.push("/extensions") },
         { label: "Integrations", icon: Link2, action: () => router.push("/integrations") },
         { separator: true },
         { label: "Import/Export", submenu: [
-          { label: "Import Data", icon: Upload, action: () => console.log("Import data") },
-          { label: "Export Data", icon: Download, action: () => console.log("Export data") },
-          { label: "Backup", icon: Save, action: () => console.log("Backup") },
-          { label: "Restore", icon: RefreshCw, action: () => console.log("Restore") },
+          { label: "Import Data", icon: Upload, action: () => {} },
+          { label: "Export Data", icon: Download, action: () => {} },
+          { label: "Backup", icon: Save, action: () => {} },
+          { label: "Restore", icon: RefreshCw, action: () => {} },
         ]},
       ]
     },
@@ -441,8 +441,8 @@ export function AppMenuBar() {
         { label: "Getting Started", icon: Sparkles, action: () => router.push("/getting-started") },
         { label: "Tutorials", icon: Video, action: () => router.push("/tutorials") },
         { separator: true },
-        { label: "Keyboard Shortcuts", icon: Keyboard, shortcut: "⌘/", action: () => console.log("Show shortcuts") },
-        { label: "Command Palette", icon: Command, shortcut: "⌘K", action: () => console.log("Command palette") },
+        { label: "Keyboard Shortcuts", icon: Keyboard, shortcut: "⌘/", action: () => {} },
+        { label: "Command Palette", icon: Command, shortcut: "⌘K", action: () => {} },
         { separator: true },
         { label: "Report Issue", icon: Bug, action: () => window.open("https://github.com/symlog/issues", "_blank") },
         { label: "Feature Request", icon: CheckSquare, action: () => window.open("https://github.com/symlog/discussions", "_blank") },
@@ -450,7 +450,7 @@ export function AppMenuBar() {
         { label: "Community", icon: Users, action: () => window.open("/community", "_blank") },
         { label: "Support", icon: MessageSquare, action: () => window.open("/support", "_blank") },
         { separator: true },
-        { label: "Check for Updates", icon: RefreshCw, action: () => console.log("Check updates") },
+        { label: "Check for Updates", icon: RefreshCw, action: () => {} },
         { label: "About SYMLog", icon: Info, action: () => router.push("/about") },
       ]
     },

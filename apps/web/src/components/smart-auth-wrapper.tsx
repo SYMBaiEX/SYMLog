@@ -17,7 +17,7 @@ export function SmartAuthWrapper() {
         
         // For Tauri apps, we'll use the fallback by default to avoid URL issues
         if (isTauri) {
-          console.log("Tauri environment detected, using local auth fallback")
+          // console.log("Tauri environment detected, using local auth fallback")
           setUseFallback(true)
           setIsReady(true)
           return

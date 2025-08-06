@@ -82,7 +82,7 @@ export function ArtifactViewer({
       case "spreadsheet":
         return <Table className="h-4 w-4" />
       case "image":
-        return <Image className="h-4 w-4" />
+        return <Image className="h-4 w-4" role="img" aria-label="Image icon" />
       case "chart":
         return <BarChart3 className="h-4 w-4" />
       default:

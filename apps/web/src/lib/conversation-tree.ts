@@ -7,7 +7,8 @@ import type {
   TreeNavigationState,
   MessageEdit,
   BranchingAction,
-  TreeStateChange
+  TreeStateChange,
+  BranchComparison
 } from '@/types/conversation-tree'
 import type { FileAttachment } from '@/types/attachments'
 

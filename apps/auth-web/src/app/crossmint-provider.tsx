@@ -42,7 +42,6 @@ export function CrossmintProviderWrapper({ children }: { children: React.ReactNo
           loginMethods={["email", "google"]}
         >
           <CrossmintWalletProvider
-            showPasskeyHelpers={false}
             createOnLogin={{
               chain: "solana",
               signer: { type: "email" },

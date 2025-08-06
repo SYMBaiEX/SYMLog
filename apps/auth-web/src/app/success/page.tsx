@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ModeToggle } from "@/components/mode-toggle"
+import { generatePKCE } from "@/lib/auth/pkce"
 
 function SuccessPageContent() {
   const router = useRouter()
@@ -73,28 +74,41 @@ function SuccessPageContent() {
       // Generate a unique auth code
       const code = `SYM_${Math.random().toString(36).substring(2, 18).toUpperCase()}`
       
-      // Store auth session in Convex
+      // Generate PKCE challenge and verifier (OAuth 2.1 requirement)
+      const pkce = await generatePKCE()
+      
+      // Store auth session in Convex with PKCE support
       await createAuthSession({
         authCode: code,
-        userId: user.id,
+        codeChallenge: pkce.challenge,
+        crossmintId: user.id || "",
         userEmail: user.email || "",
         walletAddress: wallet.address || "",
-        expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
-        status: "pending"
+        deviceFingerprint: navigator.userAgent,
+        ipAddress: undefined, // Will be set server-side
+        userAgent: navigator.userAgent
       })
+      
+      // Store PKCE verifier locally for later verification
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem(`pkce_verifier_${code}`, pkce.verifier)
+      }
       
       setAuthCode(code)
       setTimeRemaining(600) // Reset timer
       toast.success("Authentication code generated!")
       
-      // Send auth code to parent window if opened as popup
+      // Send auth code and PKCE verifier to parent window if opened as popup
       if (window.opener && window.opener !== window) {
         try {
+          const webAppUrl = process.env.NEXT_PUBLIC_WEB_CALLBACK_URL || process.env.NEXT_PUBLIC_WEB_APP_URL || 'https://symlog-web.vercel.app'
+          const targetOrigin = new URL(webAppUrl).origin
           window.opener.postMessage({
             type: 'SYMLOG_AUTH_CODE',
-            authCode: code
-          }, '*')
-          console.log('Sent auth code to parent window:', code)
+            authCode: code,
+            codeVerifier: pkce.verifier
+          }, targetOrigin)
+          console.log('Sent auth code and PKCE verifier to parent window:', code)
         } catch (error) {
           console.error('Failed to send auth code to parent:', error)
         }
@@ -124,13 +138,23 @@ function SuccessPageContent() {
     if (!authCode) return
     
     try {
-      // Send code to parent window if in popup mode
+      // Get the PKCE verifier from session storage
+      const verifier = sessionStorage.getItem(`pkce_verifier_${authCode}`)
+      if (!verifier) {
+        toast.error("Security verification data not found. Please generate a new code.")
+        return
+      }
+      
+      // Send code and verifier to parent window if in popup mode
       if (window.opener && window.opener !== window) {
         try {
+          const webAppUrl = process.env.NEXT_PUBLIC_WEB_CALLBACK_URL || process.env.NEXT_PUBLIC_WEB_APP_URL || 'https://symlog-web.vercel.app'
+          const targetOrigin = new URL(webAppUrl).origin
           window.opener.postMessage({
             type: 'SYMLOG_AUTH_CODE',
-            authCode: authCode
-          }, '*')
+            authCode: authCode,
+            codeVerifier: verifier
+          }, targetOrigin)
           toast.success("Code sent to main app!")
           // Close popup after sending
           setTimeout(() => window.close(), 1000)
@@ -140,14 +164,14 @@ function SuccessPageContent() {
           // If messaging fails, try web callback redirect
           const webCallbackUrl = process.env.NEXT_PUBLIC_WEB_CALLBACK_URL
           if (webCallbackUrl) {
-            window.location.href = `${webCallbackUrl}?code=${encodeURIComponent(authCode)}`
+            window.location.href = `${webCallbackUrl}?code=${encodeURIComponent(authCode)}&verifier=${encodeURIComponent(verifier)}`
             return
           }
         }
       }
       
-      // Fallback to deep link
-      const deepLinkUrl = `${process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL}?code=${encodeURIComponent(authCode)}`
+      // Fallback to deep link with PKCE verifier
+      const deepLinkUrl = `${process.env.NEXT_PUBLIC_AUTH_REDIRECT_URL}?code=${encodeURIComponent(authCode)}&verifier=${encodeURIComponent(verifier)}`
       window.location.href = deepLinkUrl
       
       // Also show success message

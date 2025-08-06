@@ -101,7 +101,7 @@ export function BranchMergeWizard({
       const result = await onMerge(sourceBranch.id, targetBranch.id, selectedStrategy)
       setMergeResult(result)
       setCurrentStep('complete')
-      toast.success(`Successfully merged "${sourceBranch.name}" into "${targetBranch.name}"`)
+      toast.success(`Successfully merged &quot;${sourceBranch.name}&quot; into &quot;${targetBranch.name}&quot;`)
     } catch (error) {
       console.error('Merge failed:', error)
       toast.error(error instanceof Error ? error.message : 'Failed to merge branches')
@@ -184,7 +184,7 @@ export function BranchMergeWizard({
           {currentStep === 'select-strategy' && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground">
-                Choose how you want to merge "{sourceBranch.name}" into "{targetBranch.name}":
+                Choose how you want to merge &quot;{sourceBranch.name}&quot; into &quot;{targetBranch.name}&quot;:
               </p>
 
               <div className="space-y-3">
@@ -274,17 +274,17 @@ export function BranchMergeWizard({
                 <div className="text-sm text-muted-foreground">
                   {selectedStrategy === 'append' ? (
                     <div>
-                      • {sourceDifferences.length} messages will be added to "{targetBranch.name}"
+                      • {sourceDifferences.length} messages will be added to &quot;{targetBranch.name}&quot;
                       <br />
-                      • All existing messages in "{targetBranch.name}" will be preserved
+                      • All existing messages in &quot;{targetBranch.name}&quot; will be preserved
                       <br />
                       • New messages will appear at the end of the conversation
                     </div>
                   ) : (
                     <div className="text-yellow-300">
-                      • {targetDifferences.length} messages will be removed from "{targetBranch.name}"
+                      • {targetDifferences.length} messages will be removed from &quot;{targetBranch.name}&quot;
                       <br />
-                      • {sourceDifferences.length} messages will be added from "{sourceBranch.name}"
+                      • {sourceDifferences.length} messages will be added from &quot;{sourceBranch.name}&quot;
                       <br />
                       • This operation cannot be undone
                     </div>
@@ -302,7 +302,7 @@ export function BranchMergeWizard({
                   <div>
                     <h3 className="font-medium text-yellow-300 mb-2">Final Confirmation</h3>
                     <p className="text-sm text-muted-foreground">
-                      You are about to merge "{sourceBranch.name}" into "{targetBranch.name}" using the {selectedStrategy} strategy.
+                      You are about to merge &quot;{sourceBranch.name}&quot; into &quot;{targetBranch.name}&quot; using the {selectedStrategy} strategy.
                     </p>
                   </div>
                 </div>
@@ -334,7 +334,7 @@ export function BranchMergeWizard({
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-periwinkle mb-4"></div>
               <h3 className="text-lg font-medium mb-2">Merging Branches...</h3>
               <p className="text-sm text-muted-foreground text-center">
-                Please wait while we merge "{sourceBranch.name}" into "{targetBranch.name}".
+                Please wait while we merge &quot;{sourceBranch.name}&quot; into &quot;{targetBranch.name}&quot;.
                 <br />
                 This may take a few moments.
               </p>
@@ -346,7 +346,7 @@ export function BranchMergeWizard({
               <CheckCircle className="h-12 w-12 text-green-400 mb-4" />
               <h3 className="text-lg font-medium mb-2">Merge Successful!</h3>
               <p className="text-sm text-muted-foreground text-center mb-4">
-                Successfully merged "{sourceBranch.name}" into "{targetBranch.name}".
+                Successfully merged &quot;{sourceBranch.name}&quot; into &quot;{targetBranch.name}&quot;.
                 <br />
                 {sourceDifferences.length} messages were transferred.
               </p>

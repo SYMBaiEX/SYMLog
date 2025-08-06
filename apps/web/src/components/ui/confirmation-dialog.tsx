@@ -66,7 +66,7 @@ export function ConfirmationDialog({
     onClose()
   }
 
-  const isConfirmDisabled = isSubmitting || (requiresTyping && typedText !== requiresTyping)
+  const isConfirmDisabled = isSubmitting || (requiresTyping && typedText !== requiresTyping) || false
 
   const getVariantStyles = () => {
     switch (variant) {

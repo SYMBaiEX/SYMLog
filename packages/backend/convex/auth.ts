@@ -14,13 +14,52 @@ function base64URLEncode(str: string): string {
 }
 
 /**
- * Verify PKCE challenge (server-side)
- * This is a simplified version - in production use crypto library
+ * Verify PKCE challenge (server-side) - Production implementation
  */
 async function verifyPKCEChallenge(verifier: string, challenge: string): Promise<boolean> {
-  // For now, we'll trust the client's PKCE implementation
-  // In production, properly verify SHA-256(verifier) === challenge
-  return true // Simplified for now
+  try {
+    // Verify verifier length (43-128 characters per RFC 7636)
+    if (verifier.length < 43 || verifier.length > 128) {
+      return false
+    }
+    
+    // Verify verifier contains only allowed characters
+    const allowedChars = /^[A-Za-z0-9._~-]+$/
+    if (!allowedChars.test(verifier)) {
+      return false
+    }
+    
+    // Create SHA-256 hash of verifier
+    const encoder = new TextEncoder()
+    const data = encoder.encode(verifier)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    
+    // Convert to base64url (no padding)
+    const hashArray = new Uint8Array(hashBuffer)
+    let binary = ''
+    for (let i = 0; i < hashArray.byteLength; i++) {
+      binary += String.fromCharCode(hashArray[i])
+    }
+    const computedChallenge = btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '')
+    
+    // Constant-time comparison to prevent timing attacks
+    if (computedChallenge.length !== challenge.length) {
+      return false
+    }
+    
+    let result = 0
+    for (let i = 0; i < computedChallenge.length; i++) {
+      result |= computedChallenge.charCodeAt(i) ^ challenge.charCodeAt(i)
+    }
+    
+    return result === 0
+  } catch (error) {
+    console.error('PKCE verification error:', error)
+    return false
+  }
 }
 
 /**
@@ -233,7 +272,7 @@ export const validateAuthCode = mutation({
     await ctx.db.patch(session._id, {
       status: "completed" as const,
       usedAt: Date.now(),
-      sessionId: userSession.sessionId,
+      userSessionId: userSession.sessionId,
     })
 
     // Get user data

@@ -74,7 +74,7 @@ export function TauriWindowControls() {
 
   // Debug logging
   React.useEffect(() => {
-    console.log("TauriWindowControls render - isTauri:", isTauri, "window.__TAURI__:", typeof window !== "undefined" && !!window.__TAURI__)
+    // console.log("TauriWindowControls render - isTauri:", isTauri, "window.__TAURI__:", typeof window !== "undefined" && !!window.__TAURI__)
   })
 
   // Only show in Tauri environment

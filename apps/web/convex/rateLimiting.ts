@@ -1,5 +1,5 @@
 import { v } from "convex/values"
-import { mutation, query } from "./_generated/server"
+import { mutation, query, type MutationCtx } from "./_generated/server"
 
 /**
  * Rate limiting configuration
@@ -16,7 +16,7 @@ const RATE_LIMITS = {
  * Check rate limit for an action (internal function)
  */
 export const checkRateLimit = async (
-  ctx: any,
+  ctx: MutationCtx,
   args: {
     key: string // IP address or userId
     action: string // Action being rate limited
@@ -28,7 +28,7 @@ export const checkRateLimit = async (
     // Find existing rate limit record
     const record = await ctx.db
       .query("rateLimits")
-      .withIndex("by_key_action", q => 
+      .withIndex("by_key_action", (q) => 
         q.eq("key", args.key).eq("action", args.action)
       )
       .first()

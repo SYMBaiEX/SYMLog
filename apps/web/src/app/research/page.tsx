@@ -78,7 +78,7 @@ export default function ResearchPage() {
         </h1>
         <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
           Advancing the frontier of AI and Web3 technology through cutting-edge research 
-          and innovation. Our team is dedicated to pushing the boundaries of what's possible 
+          and innovation. Our team is dedicated to pushing the boundaries of what&apos;s possible 
           in decentralized AI systems.
         </p>
       </div>
@@ -252,7 +252,7 @@ export default function ResearchPage() {
           <CardHeader>
             <CardTitle className="text-2xl">Collaborate With Us</CardTitle>
             <CardDescription className="text-base">
-              We're always looking for talented researchers and industry partners 
+              We&apos;re always looking for talented researchers and industry partners 
               to push the boundaries of AI and Web3 technology.
             </CardDescription>
           </CardHeader>

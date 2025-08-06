@@ -26,14 +26,8 @@ import {
 export default function Home() {
   const [mounted, setMounted] = useState(false)
   
-  // Use optional chaining and error handling for Convex query
-  let healthCheck
-  try {
-    healthCheck = useQuery(api.healthCheck.get)
-  } catch (error) {
-    console.warn("Convex health check not available:", error)
-    healthCheck = null
-  }
+  // Use Convex query without try-catch to follow React rules of hooks
+  const healthCheck = useQuery(api.healthCheck.get)
 
   useEffect(() => {
     setMounted(true)
@@ -45,7 +39,7 @@ export default function Home() {
       const authCode = params.get('auth-code')
       
       if (authCode) {
-        console.log('Found auth code in URL hash:', authCode)
+        // Found auth code in URL hash
         // Dispatch custom event to notify auth components
         window.dispatchEvent(new CustomEvent('symlog-auth-code', { 
           detail: { authCode } 

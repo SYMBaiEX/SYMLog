@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useMutation } from "convex/react"
 import { api } from "../../convex/_generated/api"
 import { GlassButton } from "@/components/ui/glass-button"
@@ -31,6 +31,7 @@ import {
   Key,
   Monitor
 } from "lucide-react"
+import { getPKCEVerifier, clearPKCEVerifier } from "@/lib/auth/pkce"
 
 
 
@@ -53,6 +54,62 @@ export function WebAuthFlow() {
 
   // Convex mutations
   const validateAuthCode = useMutation(api.auth.validateAuthCode)
+
+  // Define handleAuthCode before using it in effects
+  const handleAuthCode = useCallback(async (code: string) => {
+    if (!code || code.trim() === "") {
+      toast.error("Please enter a valid authentication code")
+      return
+    }
+
+    // Get PKCE verifier from session storage
+    const codeVerifier = sessionStorage.getItem(`pkce_verifier_${code.trim()}`)
+    if (!codeVerifier) {
+      toast.error("Security verification data not found. Please try signing in again.")
+      return
+    }
+
+    setIsValidatingCode(true)
+    try {
+      const result = await validateAuthCode({ 
+        authCode: code.trim()
+      })
+      
+      const newUser: AuthUser = {
+        id: result.userId,
+        email: result.userEmail,
+        walletAddress: result.walletAddress,
+      }
+      
+      localStorage.setItem('symlog_auth_user', JSON.stringify(newUser))
+      setUser(newUser)
+      setShowAuthDialog(false)
+      setAuthCode("")
+      
+      // Clear PKCE verifier from session storage
+      clearPKCEVerifier()
+      sessionStorage.removeItem(`pkce_verifier_${code.trim()}`)
+      
+      toast.success("Authentication successful!", {
+        description: `Welcome back, ${newUser.email}`
+      })
+    } catch (error: any) {
+      // Auth code validation failed
+      
+      // Handle Convex connection errors gracefully
+      if (error?.message?.includes('ConvexError') || error?.message?.includes('Connection failed')) {
+        toast.error("Connection Error", {
+          description: "Unable to validate code. Please check your connection and try again."
+        })
+      } else {
+        toast.error("Authentication failed", {
+          description: error?.message || "Invalid or expired code"
+        })
+      }
+    } finally {
+      setIsValidatingCode(false)
+    }
+  }, [validateAuthCode, setUser, setShowAuthDialog])
 
   // Check for existing session on mount
   useEffect(() => {
@@ -77,9 +134,16 @@ export function WebAuthFlow() {
         if (typeof window !== 'undefined' && window.__TAURI__) {
           const { listen } = await import('@tauri-apps/api/event')
           
-          unlisten = await listen<string>('auth-code-received', (event) => {
-            console.log('Received auth code from deep link:', event.payload)
-            handleAuthCode(event.payload)
+          unlisten = await listen<{ authCode: string; codeVerifier?: string }>('auth-code-received', (event) => {
+            // Auth code received from deep link
+            const { authCode, codeVerifier } = event.payload
+            
+            // Store PKCE verifier if provided
+            if (codeVerifier) {
+              sessionStorage.setItem(`pkce_verifier_${authCode}`, codeVerifier)
+            }
+            
+            handleAuthCode(authCode)
           })
         }
       } catch (error) {
@@ -94,7 +158,7 @@ export function WebAuthFlow() {
         unlisten()
       }
     }
-  }, [])
+  }, [handleAuthCode])
 
   // Listen for auth codes from popup window
   useEffect(() => {
@@ -104,6 +168,8 @@ export function WebAuthFlow() {
       const allowedOrigins = [
         'http://localhost:3003', // Development fallback
         'https://auth-web-two.vercel.app', // Production auth web
+        'https://symlog-api.vercel.app', // Alternative deployment URL
+        'https://symlog-web.vercel.app', // Expected deployment URL
         authWebUrl // Environment configured URL
       ].filter((url, index, arr) => arr.indexOf(url) === index) // Remove duplicates
       
@@ -112,12 +178,17 @@ export function WebAuthFlow() {
       }
 
       if (event.data.type === 'SYMLOG_AUTH_CODE') {
-        const { authCode: receivedCode } = event.data
+        const { authCode: receivedCode, codeVerifier } = event.data
         if (receivedCode && receivedCode.startsWith('SYM_')) {
-          console.log('Received auth code from popup:', receivedCode)
+          // Auth code and PKCE verifier received from popup
           setAuthCode(receivedCode)
           
-          // Auto-validate the code
+          // Store PKCE verifier in session storage
+          if (codeVerifier) {
+            sessionStorage.setItem(`pkce_verifier_${receivedCode}`, codeVerifier)
+          }
+          
+          // Auto-validate the code with PKCE
           handleAuthCode(receivedCode)
           
           // Close the popup if it's still open
@@ -135,18 +206,24 @@ export function WebAuthFlow() {
     return () => {
       window.removeEventListener('message', handleMessage)
     }
-  }, [authPopupWindow])
+  }, [authPopupWindow, handleAuthCode])
 
   // Listen for auth codes from URL hash (callback redirects)
   useEffect(() => {
     const handleCustomEvent = (event: CustomEvent) => {
-      const { authCode: receivedCode } = event.detail
+      const { authCode: receivedCode, codeVerifier } = event.detail
       if (receivedCode && receivedCode.startsWith('SYM_')) {
-        console.log('Received auth code from URL callback:', receivedCode)
+        // Auth code received from URL callback
         setAuthCode(receivedCode)
+        
+        // Store PKCE verifier if provided
+        if (codeVerifier) {
+          sessionStorage.setItem(`pkce_verifier_${receivedCode}`, codeVerifier)
+        }
+        
         setShowAuthDialog(true)
         
-        // Auto-validate the code
+        // Auto-validate the code with PKCE
         handleAuthCode(receivedCode)
       }
     }
@@ -157,49 +234,7 @@ export function WebAuthFlow() {
     return () => {
       window.removeEventListener('symlog-auth-code', handleCustomEvent as EventListener)
     }
-  }, [])
-
-  const handleAuthCode = async (code: string) => {
-    if (!code || code.trim() === "") {
-      toast.error("Please enter a valid authentication code")
-      return
-    }
-
-    setIsValidatingCode(true)
-    try {
-      const result = await validateAuthCode({ authCode: code.trim() })
-      
-      const newUser: AuthUser = {
-        id: result.userId,
-        email: result.userEmail,
-        walletAddress: result.walletAddress,
-      }
-      
-      localStorage.setItem('symlog_auth_user', JSON.stringify(newUser))
-      setUser(newUser)
-      setShowAuthDialog(false)
-      setAuthCode("")
-      
-      toast.success("Authentication successful!", {
-        description: `Welcome back, ${newUser.email}`
-      })
-    } catch (error: any) {
-      console.error("Auth code validation failed:", error)
-      
-      // Handle Convex connection errors gracefully
-      if (error?.message?.includes('ConvexError') || error?.message?.includes('Connection failed')) {
-        toast.error("Connection Error", {
-          description: "Unable to validate code. Please check your connection and try again."
-        })
-      } else {
-        toast.error("Authentication failed", {
-          description: error?.message || "Invalid or expired code"
-        })
-      }
-    } finally {
-      setIsValidatingCode(false)
-    }
-  }
+  }, [handleAuthCode])
 
   const handleManualCodeSubmit = () => {
     handleAuthCode(authCode)

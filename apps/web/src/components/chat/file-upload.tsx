@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
+import NextImage from "next/image"
 import type { FileAttachment } from "@/types/attachments"
 import { MAX_FILE_SIZE, MAX_FILES_PER_MESSAGE, isFileTypeSupported, getAttachmentType } from "@/types/attachments"
 import { GlassButton } from "@/components/ui/glass-button"
@@ -225,11 +226,15 @@ export function FileUpload({ attachments, onAttachmentsChange, disabled }: FileU
                   {/* File Preview/Icon */}
                   <div className="flex-shrink-0">
                     {isImage && attachment.preview ? (
-                      <img
-                        src={attachment.preview}
-                        alt={attachment.name}
-                        className="w-10 h-10 object-cover rounded"
-                      />
+                      <div className="relative w-10 h-10 rounded overflow-hidden">
+                        <NextImage
+                          src={attachment.preview}
+                          alt={attachment.name}
+                          fill
+                          className="object-cover"
+                          sizes="40px"
+                        />
+                      </div>
                     ) : (
                       <div className="w-10 h-10 glass rounded flex items-center justify-center">
                         <Icon className="h-5 w-5 text-periwinkle" />

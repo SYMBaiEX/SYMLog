@@ -1,31 +1,62 @@
 import { v } from "convex/values"
 import { mutation, query } from "./_generated/server"
 
-// Authentication session schema
+/**
+ * Create an auth session with PKCE support (OAuth 2.1 compliant)
+ */
 export const createAuthSession = mutation({
   args: {
     authCode: v.string(),
-    userId: v.string(),
+    codeChallenge: v.string(), // PKCE challenge
+    crossmintId: v.string(),
     userEmail: v.string(),
     walletAddress: v.string(),
-    expiresAt: v.number(),
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("expired"))
+    deviceFingerprint: v.optional(v.string()),
+    ipAddress: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
+    // Rate limiting check
+    if (args.ipAddress) {
+      const { checkRateLimit } = await import("./rateLimiting")
+      await checkRateLimit(ctx, {
+        key: args.ipAddress,
+        action: "auth_code",
+      })
+    }
+    
     // Check if code already exists
     const existing = await ctx.db
       .query("authSessions")
-      .filter((q) => q.eq(q.field("authCode"), args.authCode))
+      .withIndex("by_auth_code", q => q.eq("authCode", args.authCode))
       .first()
     
     if (existing) {
       throw new Error("Auth code already exists")
     }
 
-    // Create new auth session
+    // Create or get user
+    const { createOrUpdateUser } = await import("./users")
+    const userId = await createOrUpdateUser(ctx, {
+      crossmintId: args.crossmintId,
+      email: args.userEmail,
+      walletAddress: args.walletAddress,
+    })
+
+    // Create new auth session with PKCE
     const sessionId = await ctx.db.insert("authSessions", {
-      ...args,
+      authCode: args.authCode,
+      codeChallenge: args.codeChallenge,
+      codeChallengeMethod: "S256" as const,
+      userId,
+      userEmail: args.userEmail,
+      walletAddress: args.walletAddress,
+      status: "pending" as const,
+      deviceFingerprint: args.deviceFingerprint,
+      ipAddress: args.ipAddress,
+      userAgent: args.userAgent,
       createdAt: Date.now(),
+      expiresAt: Date.now() + (10 * 60 * 1000), // 10 minutes
     })
 
     return sessionId

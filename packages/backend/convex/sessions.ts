@@ -17,7 +17,7 @@ function generateSecureToken(length: number = 32): string {
 /**
  * Generate JWT access token (simplified - in production use proper JWT library)
  */
-function generateAccessToken(userId: Id<"users">): string {
+function generateAccessToken(userId: string): string {
   // In production, use a proper JWT library with RS256 signing
   const header = { alg: "HS256", typ: "JWT" }
   const payload = {
@@ -36,19 +36,20 @@ function generateAccessToken(userId: Id<"users">): string {
 }
 
 /**
- * Create a new session
+ * Create a new session (internal function)
  */
-export const createSession = mutation({
+export const createSession = async (
+  ctx: any,
   args: {
-    userId: v.id("users"),
-    deviceId: v.string(),
-    deviceName: v.optional(v.string()),
-    deviceType: v.string(),
-    platform: v.string(),
-    userAgent: v.optional(v.string()),
-    ipAddress: v.string(),
-  },
-  handler: async (ctx, args) => {
+    userId: string
+    deviceId: string
+    deviceName?: string
+    deviceType: string
+    platform: string
+    userAgent?: string
+    ipAddress: string
+  }
+) => {
     // Generate tokens
     const accessToken = generateAccessToken(args.userId)
     const refreshToken = generateSecureToken(64)
@@ -98,8 +99,7 @@ export const createSession = mutation({
       accessTokenExpiresAt,
       refreshTokenExpiresAt,
     }
-  },
-})
+}
 
 /**
  * Refresh access token using refresh token

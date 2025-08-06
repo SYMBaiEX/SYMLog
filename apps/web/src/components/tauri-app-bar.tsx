@@ -90,15 +90,15 @@ export function TauriAppBar() {
         switch (e.key.toLowerCase()) {
           case "n":
             e.preventDefault()
-            console.log("New file")
+            // console.log("New file")
             break
           case "o":
             e.preventDefault()
-            console.log("Open file")
+            // console.log("Open file")
             break
           case "s":
             e.preventDefault()
-            console.log("Save file")
+            // console.log("Save file")
             break
           case "q":
             e.preventDefault()
@@ -170,10 +170,10 @@ export function TauriAppBar() {
     {
       label: "File",
       items: [
-        { label: "New File", icon: FileText, shortcut: "⌘N", action: () => console.log("New file") },
-        { label: "Open...", icon: FileJson, shortcut: "⌘O", action: () => console.log("Open file") },
-        { label: "Save", shortcut: "⌘S", action: () => console.log("Save") },
-        { label: "Save As...", shortcut: "⇧⌘S", action: () => console.log("Save as") },
+        { label: "New File", icon: FileText, shortcut: "⌘N", action: () => {} },
+        { label: "Open...", icon: FileJson, shortcut: "⌘O", action: () => {} },
+        { label: "Save", shortcut: "⌘S", action: () => {} },
+        { label: "Save As...", shortcut: "⇧⌘S", action: () => {} },
         { separator: true },
         { label: "Settings", icon: Settings, shortcut: "⌘,", action: () => router.push("/settings") },
         { separator: true },
@@ -195,8 +195,8 @@ export function TauriAppBar() {
         { label: "Copy", icon: Copy, shortcut: "⌘C", action: () => document.execCommand("copy") },
         { label: "Paste", icon: Clipboard, shortcut: "⌘V", action: () => document.execCommand("paste") },
         { separator: true },
-        { label: "Find", icon: Search, shortcut: "⌘F", action: () => console.log("Find") },
-        { label: "Replace", shortcut: "⌥⌘F", action: () => console.log("Replace") },
+        { label: "Find", icon: Search, shortcut: "⌘F", action: () => {} },
+        { label: "Replace", shortcut: "⌥⌘F", action: () => {} },
       ]
     },
     {
@@ -261,8 +261,8 @@ export function TauriAppBar() {
             tauriWindow.emit("toggle-devtools")
           }
         }},
-        { label: "Database Manager", icon: Database, action: () => console.log("Database") },
-        { label: "API Explorer", icon: Globe, action: () => console.log("API Explorer") },
+        { label: "Database Manager", icon: Database, action: () => {} },
+        { label: "API Explorer", icon: Globe, action: () => {} },
         { separator: true },
         { label: "Security Settings", icon: Shield, action: () => router.push("/settings/security") },
       ]
@@ -283,14 +283,14 @@ export function TauriAppBar() {
           }
         }},
         { separator: true },
-        { label: "Bring All to Front", action: () => console.log("Bring all to front") },
+        { label: "Bring All to Front", action: () => {} },
       ]
     },
     {
       label: "Help",
       items: [
         { label: "Documentation", icon: BookOpen, action: () => window.open("/docs", "_blank") },
-        { label: "Keyboard Shortcuts", icon: Keyboard, shortcut: "⌘?", action: () => console.log("Show shortcuts") },
+        { label: "Keyboard Shortcuts", icon: Keyboard, shortcut: "⌘?", action: () => {} },
         { separator: true },
         { label: "Report Issue", icon: Bug, action: () => window.open("https://github.com/symlog/issues", "_blank") },
         { label: "Feature Request", icon: CheckSquare, action: () => window.open("https://github.com/symlog/discussions", "_blank") },

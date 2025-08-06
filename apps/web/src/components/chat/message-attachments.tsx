@@ -1,5 +1,6 @@
 "use client"
 
+import NextImage from "next/image"
 import type { FileAttachment } from "@/types/attachments"
 import { getAttachmentType } from "@/types/attachments"
 import { Badge } from "@/components/ui/badge"
@@ -59,27 +60,31 @@ export function MessageAttachments({ attachments, className }: MessageAttachment
               {/* File Preview/Icon */}
               <div className="flex-shrink-0">
                 {isImage && attachment.preview ? (
-                  <div className="relative">
-                    <img
+                  <div 
+                    className="relative w-12 h-12 rounded overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => {
+                      // Open image in new tab
+                      if (attachment.base64) {
+                        const win = window.open()
+                        if (win) {
+                          win.document.write(`
+                            <html>
+                              <head><title>${attachment.name}</title></head>
+                              <body style="margin:0;padding:20px;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh;">
+                                <img src="${attachment.base64}" alt="${attachment.name}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+                              </body>
+                            </html>
+                          `)
+                        }
+                      }
+                    }}
+                  >
+                    <NextImage
                       src={attachment.preview}
                       alt={attachment.name}
-                      className="w-12 h-12 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
-                      onClick={() => {
-                        // Open image in new tab
-                        if (attachment.base64) {
-                          const win = window.open()
-                          if (win) {
-                            win.document.write(`
-                              <html>
-                                <head><title>${attachment.name}</title></head>
-                                <body style="margin:0;padding:20px;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh;">
-                                  <img src="${attachment.base64}" alt="${attachment.name}" style="max-width:100%;max-height:100%;object-fit:contain;" />
-                                </body>
-                              </html>
-                            `)
-                          }
-                        }
-                      }}
+                      fill
+                      className="object-cover"
+                      sizes="48px"
                     />
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/50 rounded">
                       <ExternalLink className="h-4 w-4 text-white" />
@@ -127,27 +132,31 @@ export function MessageAttachments({ attachments, className }: MessageAttachment
 
             {/* Image Gallery Preview */}
             {isImage && attachment.preview && (
-              <div className="mt-3">
-                <img
+              <div 
+                className="mt-3 relative w-full max-w-xs h-48 rounded border border-white/10 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
+                onClick={() => {
+                  // Open image in new tab
+                  if (attachment.base64) {
+                    const win = window.open()
+                    if (win) {
+                      win.document.write(`
+                        <html>
+                          <head><title>${attachment.name}</title></head>
+                          <body style="margin:0;padding:20px;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh;">
+                            <img src="${attachment.base64}" alt="${attachment.name}" style="max-width:100%;max-height:100%;object-fit:contain;" />
+                          </body>
+                        </html>
+                      `)
+                    }
+                  }
+                }}
+              >
+                <NextImage
                   src={attachment.preview}
                   alt={attachment.name}
-                  className="w-full max-w-xs rounded border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
-                  onClick={() => {
-                    // Open image in new tab
-                    if (attachment.base64) {
-                      const win = window.open()
-                      if (win) {
-                        win.document.write(`
-                          <html>
-                            <head><title>${attachment.name}</title></head>
-                            <body style="margin:0;padding:20px;background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh;">
-                              <img src="${attachment.base64}" alt="${attachment.name}" style="max-width:100%;max-height:100%;object-fit:contain;" />
-                            </body>
-                          </html>
-                        `)
-                      }
-                    }
-                  }}
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, 320px"
                 />
               </div>
             )}
