@@ -1,6 +1,6 @@
 "use client"
 
-import { memo } from 'react'
+import { memo, useEffect, useState } from 'react'
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -10,7 +10,6 @@ import rehypeHighlight from 'rehype-highlight'
 import { cn } from '@/lib/utils'
 import { GlassButton } from './glass-button'
 import { Copy, Check } from 'lucide-react'
-import { useState } from 'react'
 import { toast } from 'sonner'
 
 // Import Prism CSS for syntax highlighting
